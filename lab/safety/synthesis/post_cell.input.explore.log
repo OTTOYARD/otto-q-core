@@ -1,0 +1,26 @@
+WARNING: The CIF specification has features that may cause an unexpected resulting state space:
+WARNING:
+WARNING:   ------------------------------------------------------------------
+WARNING:   (1/1) Invariant is a requirement, but will be explored as a plant.
+WARNING:   ------------------------------------------------------------------
+WARNING:    * In the top-level scope of the specification:
+WARNING:      - requirement invariant R2_no_hold_for_clean_on_out_of_service: c_hold needs not OutOfService or CleanArm.Returning;
+WARNING:                              ^
+WARNING:      - requirement invariant R1_no_mate_on_out_of_service: c_mate_start needs not OutOfService;
+WARNING:                              ^
+WARNING:      - requirement invariant R3a_no_mate_while_clean_arm_out: c_mate_start needs CleanArm.Home or CleanArm.DoorsOpen;
+WARNING:                              ^
+WARNING:      - requirement invariant R3b_no_unlatch_while_cleaning: c_unlatch needs CleanArm.Home or OutOfService;
+WARNING:                              ^
+WARNING:      - requirement invariant R3c_no_clean_entry_while_charge_arm_moves: c_clean_enter needs ChargeArm.Stowed or ChargeArm.Latched;
+WARNING:                              ^
+WARNING:      - requirement invariant R3d_release_needs_arms_home: c_release needs ChargeArm.Stowed and CleanArm.Home;
+WARNING:                              ^
+WARNING:      - requirement invariant R3d_emergency_release_needs_arms_home: c_emergency_release needs ChargeArm.Stowed and CleanArm.Home;
+WARNING:                              ^
+WARNING:      - requirement invariant R4_ready_only_when_served: c_depart_ready needs Battery.Full and Cabin.Clean;
+WARNING:                              ^
+WARNING:      - requirement invariant R5_no_charge_stopped_short: c_stop_charge needs Battery.Full;
+WARNING:                              ^
+Number of states in state space: 302.
+Number of transitions in state space: 831.

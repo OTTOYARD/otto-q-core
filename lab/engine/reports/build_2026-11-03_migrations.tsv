@@ -1,0 +1,732 @@
+seq	file	version	status	seconds	sqlstate	first_error
+1	0002_approval_gate_decider.sql	20260804140958	ok	0.03		
+2	0003_bay_work_recovery.sql	20260804183836	ok	0.05		
+3	0004_close_ledger_loop.sql	20260804232058	ok	0.02		
+4	0005_inspection_and_condition_resets.sql	20260805020029	ok	0.02		
+5	0007_add_site_energy_snapshots_created_at_idx.sql	20260805032907	ok	0.01		
+6	0006_slim_writes_and_arm_retention.sql	20260805142711	ok	0.03		
+7	0008_soil_gate_and_retention_walk.sql	20260805230731	ok	0.03		
+8	0009_honest_completion_and_eta.sql	20260806030248	ok	0.04		
+9	0010_unify_depot_layout.sql	20260806223619	failed	0.01	P0001	0010 ABORT: no depot has any stalls. Nothing to unify.
+10	0011_forward_bay_reservation_at_return_signal.sql	20260806231121	ok	0.03		
+11	0012_tick_cost_and_metronome_ceiling.sql	20260807001645	ok	0.01		
+12	0013_metronome_guard_reads_the_real_timeout.sql	20260807002716	failed	0.01	P0001	ottoq_demo_metronome is not the 0012 body 0013 was written against (md5 1ccbeefd5db61fb184a75c5a6f72fe72). Rolling back rather than overwriting.
+13	0014_bay_binding_witness.sql	20260807005437	ok	0.01		
+14	0015_early_activation_and_untagged_event_flood.sql	20260807013120	ok	0.02		
+15	0016_bay_seat_writes_the_twin_service_timer.sql	20260807015854	ok	0.01		
+16	0017_stop_is_two_phase_so_a_run_can_always_be_stopped.sql	APPLIED-NO-LEDGER-ROW	ok	0.01		
+17	0018_rider_flagged_cleaning_recall.sql	20260808041455	failed	0.02	P0001	A0 FAILED: no Nashville depot to assert against
+18	0019_rider_flag_holds_the_vehicle.sql	20260808153457	failed	0.01	P0001	GUARD FAILED: 1 of 4 pre-images do not match what 0019 was written against.
+19	0020_rider_flag_consume_and_place_is_atomic.sql	20260808165323	failed	0.01	P0001	0020 ABORT: twin.ottoq_sim_generate_service_manifest pre-image is d800e5fb0992cbee209e124cc6f4720c, expected dd6ac3a84afd12aa94cf8d09e74ffeda
+20	0021_one_vehicle_one_stall.sql	20260808170813	ok	0.01		
+21	0022_a_run_owns_its_rows.sql	20260808182226	failed	0.06	42P01	relation "public.ottoq_rider_cleaning_flags" does not exist
+22	0023_a_finished_run_is_read_only.sql	20260808193142	failed	0.01	P0001	0023 refused: ottoq_build_decision_frame(uuid) is not the audited 0022 post-image (md5 d5afd7dab51cc807f3a393947faf490e)
+23	0025_run_governor_auto_stop.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+24	0026_fix_staging_sort.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+25	0027_shift_east_column.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+26	0028_wash_monte_carlo.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+27	0029_reassignment_guard.sql	UNVERIFIED-NO-LEDGER-ROW	failed	0.01	42601	syntax error at end of input
+28	0030_geometry_guard_db.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+29	0031_geometry_guard_minimal.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+30	0032_cuopt_batch_enactment.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+31	0033_reservation_gc.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+32	0034_revert_0005_condition_resets_part2.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	P0001	GUARD: public.ottoq_wear_mark_serviced live md5 6698cea9109e2b45d39ccf2f7c093136 does not match expected a44cdd6c31df748b63986881a9f697a2. Aborting.
+33	0035_drop_decorative_column.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+34	0036_refusal_path.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+35	0037_purge_orphans.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+36	0038_drop_ottoq_recommendations.sql	UNVERIFIED-NO-LEDGER-ROW	failed	0.01	2BP01	cannot drop table ottoq_recommendations because other objects depend on it
+37	0039_ottoq_boundary.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+38	0040_restore_tick_pipeline.sql	UNVERIFIED-NO-LEDGER-ROW	failed	0.01	42601	syntax error at or near "CREATE"
+39	0041_fix_metronome_ceiling.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+40	0042_cleanup_orphan_data.sql	UNVERIFIED-NO-LEDGER-ROW	failed	0.02	42703	column e.sim_run_id does not exist
+41	0043_schema_v2_service_objects.sql	20260819161838	failed	0.07	42P01	relation "public.ottoq_run_scope_registry" does not exist
+42	0044_canonical_kpis.sql	20260819161926	ok	0.02		
+43	0045_twin_determinism_and_playback.sql	APPLIED-NO-LEDGER-ROW	failed	0.04	42P01	relation "public.ottoq_operation_catalog" does not exist
+44	0046_site_alpha_pack_classes.sql	20260819190226	failed	0.02	42703	column "pack_id" of relation "ottoq_vehicle_classes" does not exist
+45	0047_twin_determinism_charge_session_salts.sql	20260819192606	ok	0.01		
+46	0048_twin_service_flow_admit_order_and_deal_salts.sql	20260819210107	ok	0.01		
+47	0049_twin_arm_refuse_move_clock_domain.sql	20260819211753	ok	0.01		
+48	0050_twin_deterministic_cursor_order.sql	APPLIED-NO-LEDGER-ROW	ok	0.02		
+49	0051_twin_assigner_salt_and_tiebreak.sql	APPLIED-NO-LEDGER-ROW	ok	0.01		
+50	0052_twin_holdout_and_comms_run_relative_salts.sql	APPLIED-NO-LEDGER-ROW	ok	0.01		
+51	0053_benchmark_reset_config_residue.sql	20260820014345	ok	0.01		
+52	0054_run_stable_cursor_order_full_sweep.sql	20260820031245	failed	0.01	P0001	0054: twin.ottoq_sim_reconcile_charge_sessions pre-image md5 bf82015a117dccd63e9e15884a73aab3 != pinned 828051a73ef0e13fcc2097cc26225a09
+53	0055_manifest_run_relative_draw_salt.sql	20260820040308	failed	0.01	P0001	0055: twin.ottoq_sim_generate_service_manifest pre-image md5 d800e5fb0992cbee209e124cc6f4720c != pinned 17f845f5c31c6aab0dcf484df5ff4541
+54	0056_cuopt_propose_enabled_cert_quiesce.sql	20260820042552	ok	0.01		
+55	0057_vehicle_state_trigger_preserve_caller_clock.sql	20260820121029	ok	0.01		
+56	0058_variability_card_run_stable_draw_scope.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	P0001	0058: public.ottoq_twin_deal_fault_card pre-image md5 eb34f8aab515462ada5b675f63d1687a != pinned 1e6c83c946adeb5f15dffe3160209063
+57	0059_refusal_reactor_run_stable_order.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+58	0060_confirm_and_selection_run_stable_order.sql	UNVERIFIED-NO-LEDGER-ROW	failed	0.01	P0001	0060: twin.ottoq_sim_confirm_commands pre-image md5 3e1f029202daeb010ee28fea185f532f != pinned 89c6f1fc756a6995a88e12720d4c3886
+59	0061_state_stamp_default_is_sim_domain.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+60	0062_confirm_supersede_total_order.sql	UNVERIFIED-NO-LEDGER-ROW	failed	0.01	P0001	0062: pre-image md5 3e1f029202daeb010ee28fea185f532f != pinned d1297df4dfd78792c2f3d182e9ec6cb6
+61	0063_booking_pick_total_order.sql	APPLIED-NO-LEDGER-ROW	ok	0.01		
+62	0064_hold_outlives_its_command.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+63	0065_cert_arm_pinned_sim_start.sql	20260822004802	ok	0.01		
+64	0066_one_begin_charge_per_enactment.sql	UNVERIFIED-NO-LEDGER-ROW	failed	0.01	P0001	0066: pre-image md5 c21fd498a1bbf5ea106b20ee1a989339 != pinned 94d435ce3391e473e5cd453f7b77a831
+65	0067_greedy_stall_pick_total_order_and_sim_domain.sql	UNVERIFIED-NO-LEDGER-ROW	failed	0.01	P0001	0067: pre-image md5 4d553317b068ffc8da784822a32d4461 != pinned c99394c4cbd7436574e7a17b02dbc348
+66	0068_proposer_never_reuses_another_vehicles_hold.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	P0001	0068: pre-image md5 4d553317b068ffc8da784822a32d4461 != pinned 3d7fa12fec5fe860854d8416dd8e4840
+67	0069_cert_arm_finish_releases_tethers.sql	20260822200504	ok	0.01		
+68	0070_cert_arm_start_pins_the_world.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+69	0071_cert_arm_step_raises_on_short_advance.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+70	0072_cert_arm_step_null_safe_run_guard.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+71	0073_provenance_says_what_it_is.sql	20260829160154	failed	0.01	P0002	query returned no rows
+72	0074_the_archive_carries_its_key.sql	20260829160215	ok	0.01		
+73	0075_deploy_decision_idempotency.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+74	0076_command_reason_codes.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+75	0078_revert_reason_code_on_commands.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+76	0079_activity_feed.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+77	0080_charge_first_mutual_exclusion.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+78	0081_bay_routing_seats_the_vehicle.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+79	0082_wash_hours_clock_backstop.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+80	0083_deep_clean_cabin_condition.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+81	0084_deep_clean_flag_ordering.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+82	0085_wash_must_do_flag_reconciliation.sql	UNVERIFIED-NO-LEDGER-ROW	ok	0.01		
+83	0086_refusals_carry_their_reason.sql	20260829162450	failed	0.01	P0001	0086 abort: confirm_commands drifted from the pinned pre-image (md5 3e1f029202daeb010ee28fea185f532f)
+84	0087_no_command_left_dangling.sql	20260829162640	failed	0.01	P0001	0087 abort: release_depot drifted from the pinned pre-image (md5 61f89d0f529cf7021818417d4bcdc418)
+85	0088_occupied_refusals_reach_the_conflict_ledger.sql	20260829162810	ok	0.01		
+86	0089_a_leg_closes_with_its_work.sql	20260829164021	failed	0.01	P0001	0089 abort: sim_release_depot drifted from the pinned pre-image (md5 61f89d0f529cf7021818417d4bcdc418)
+87	0090_cuopt_enactments_carry_their_verb.sql	20260829164858	failed	0.01	P0001	0090 abort: enact_cuopt_batch drifted from the pinned pre-image (md5 6ba1ebbd8d6ee6c981c375eb01c51d10)
+88	0091_the_kernel_defends_the_verb.sql	20260829165759	ok	0.01		
+89	0092_events_carry_their_run.sql	20260829171141	failed	0.01	P0001	0092 abort: sim_start_run drifted (md5 bed87c1a291cf90bab19dce5afbda4d7)
+90	0093_a_run_leaves_no_plan_residue.sql	20260829171749	failed	0.01	P0001	0093 abort: release_depot drifted (md5 61f89d0f529cf7021818417d4bcdc418)
+91	0094_canonical_means_constant_not_null.sql	20260829171855	failed	0.01	P0001	0094 abort: reset_fleet drifted (md5 ae67c98bb00b994173d75af020d2dffd)
+92	0095_the_reset_keeps_a_whitelist_not_a_blacklist.sql	20260829172404	failed	0.01	P0001	0095 abort: reset_fleet drifted (md5 ae67c98bb00b994173d75af020d2dffd)
+93	0096_target_soc_pins_to_the_seeded_constant.sql	20260829172453	failed	0.01	P0001	0096 abort: reset_fleet drifted (md5 ae67c98bb00b994173d75af020d2dffd)
+94	0097_no_approval_outlives_its_run.sql	20260829173602	failed	0.01	P0001	0097 abort: release_depot drifted (md5 61f89d0f529cf7021818417d4bcdc418)
+95	0098_the_drain_admission_is_not_a_coin_flip.sql	20260829214014	ok	0.01		
+96	0099_the_latest_need_is_not_a_heap_order.sql	20260829214918	failed	0.01	P0001	0099 abort: ottoq.ottoq_plan_opportunistic_charges drifted from pinned pre-image (md5 d11dc0388591485737f54a8323e79550)
+97	0100_service_flow_admissions_close_their_order.sql	20260829215922	ok	0.01		
+98	0101_natural_completion_finalizes.sql	20260829222635	ok	0.01		
+99	0102_finalize_at_the_driver_not_mid_world.sql	20260829222909	ok	0.01		
+100	0103_the_live_completion_seam.sql	20260829223107	ok	0.01		
+101	0104_the_tech_verdict_is_not_a_coin_from_another_run.sql	20260829230116	failed	0.01	P0001	0104 abort: opportunistic_scan drifted (md5 e022176ff59f78c07398e42ed46132e8)
+102	0105_the_cert_run_quiesces_the_llm_proposer.sql	20260829230554	failed	0.01	P0001	0105 abort: decide_and_dispatch drifted (md5 224743d04bf16bc83c7b4b94933501be)
+103	0106_the_production_brain_stands_off_a_cert_run.sql	20260829231202	ok	0.01		
+104	0107_the_run_draws_its_own_world.sql	20260830034718	failed	0.01	P0001	0107 abort: start_run drifted (md5 bed87c1a291cf90bab19dce5afbda4d7)
+105	0108_the_atom_admission_closes_its_order.sql	20260830035542	failed	0.01	P0001	0108 abort: advance_visit_atoms drifted (md5 a4510f8211d68f2428f1a3aa7c224b11)
+106	0109_the_watermark_does_not_outlive_its_run.sql	20260830040601	failed	0.01	P0001	0109 abort: run_boot_draw drifted (md5 79952ed3adfdb788625dd5f273a01004)
+107	0110_the_one_command_determinism_check.sql	20260830042119	ok	0.01		
+108	0110b_pair_verdict_within_status_vocabulary.sql	20260830042328	ok	0.01		
+109	0111_the_production_session_lifecycle.sql	20260830043106	ok	0.01		
+110	0112_the_agent_gate_is_a_policy.sql	20260830043153	failed	0.01	P0001	0112 abort: decide_and_dispatch drifted (md5 224743d04bf16bc83c7b4b94933501be)
+111	0113_the_switch_must_exist_before_it_can_be_off.sql	20260830044116	failed	0.01	P0001	0113 abort: cron_tick drifted (md5 bc17cc978b61b221ed7ab17412612949)
+112	0114_the_release_takes_its_shape_from_the_feed.sql	20260830050414	failed	0.01	P0001	0114 abort: ottoq_sim_release_depot drifted (md5 61f89d0f529cf7021818417d4bcdc418)
+113	0115_the_soc_state_belongs_to_the_run.sql	20260830052403	failed	0.01	P0001	0115 abort: run_boot_draw drifted (md5 79952ed3adfdb788625dd5f273a01004)
+114	0116_the_reservations_timestamp_dies_with_it.sql	20260830053720	failed	0.01	P0001	0116 abort: release_depot drifted (md5 61f89d0f529cf7021818417d4bcdc418)
+115	0117_the_runs_claims_die_with_it.sql	20260830055459	failed	0.01	P0001	0117 abort: release_depot drifted (md5 61f89d0f529cf7021818417d4bcdc418)
+116	0118_the_clock_of_record_is_the_runs.sql	20260830131520	failed	0.01	P0001	0118 abort: run_boot_draw drifted (md5 79952ed3adfdb788625dd5f273a01004)
+117	0119_the_coin_had_two_holds.sql	20260830134026	ok	0.01		
+118	0120_the_whitelist_kept_a_moving_part.sql	20260830135956	failed	0.01	P0001	0120 abort: reset_fleet drifted (md5 ae67c98bb00b994173d75af020d2dffd)
+119	0121_the_odometer_is_dealt_not_inherited.sql	20260830141928	failed	0.01	P0001	0121 abort: reset_fleet drifted (md5 ae67c98bb00b994173d75af020d2dffd)
+120	0121b_the_odometer_draw_calls_the_twin.sql	20260830142542	failed	0.01	P0001	0121b abort: anchor found 0 times
+121	0122_the_sweep_reads_the_clock_the_stamp_was_written_in.sql	20260830165520	failed	0.01	P0001	0122 abort: decide_tick drifted (md5 079754ea35eea8bcb9ee050dca8db855)
+122	0123_the_latest_need_belongs_to_the_run.sql	20260830182110	failed	0.01	P0001	0123 abort: public.ottoq_decide_tick drifted (md5 079754ea35eea8bcb9ee050dca8db855)
+123	0124_the_visit_ledger_belongs_to_the_run.sql	20260830185547	failed	0.01	P0001	0124 abort: public.ottoq_decide_tick drifted (md5 079754ea35eea8bcb9ee050dca8db855)
+124	0125_the_pair_reads_its_own_boot_state.sql	20260830213611	ok	0.01		
+125	0126_the_dead_enactor_is_archived.sql	20260830213715	ok	0.03		
+126	0127_the_teardown_retires_the_interrupted.sql	20260830214923	failed	0.01	P0001	0127 abort: release_depot drifted (md5 61f89d0f529cf7021818417d4bcdc418)
+127	0128_the_adoption_pick_gains_its_content_keys.sql	20260830221659	failed	0.01	P0001	0128 abort: record_enacted_booking drifted (md5 30174e9fa152498bbf0f04a60da811be)
+128	0129_every_pick_orders_itself_completely.sql	20260831000801	failed	0.01	P0001	0129 abort: public.ottoq_decide_tick drifted (md5 079754ea35eea8bcb9ee050dca8db855)
+129	0130_the_deferral_queue_orders_itself_completely.sql	20260831012206	failed	0.01	P0001	0130 abort: public.ottoq_plan_overnight_wave drifted (md5 71cc390d778480d9155fc8c4053afc18)
+130	0131_the_matrix_reads_itself_from_the_ledger.sql	20260831020239	ok	0.01		
+131	0132_the_power_cap_is_a_constraint.sql	20260831133729	failed	0.01	P0001	0132 abort: decide_tick drifted (md5 079754ea35eea8bcb9ee050dca8db855)
+132	0133_the_energy_path_joins_the_certification.sql	20260831150515	failed	0.01	P0001	0133 abort: public.ottoq_tick_invariance_reset_fleet drifted (md5 ae67c98bb00b994173d75af020d2dffd)
+133	0134_the_energy_path_reads_only_its_own_run.sql	20260831182816	failed	0.01	P0001	0134 abort: twin.ottoq_sim_advance_grid drifted (md5 617a867d3686400f45b20485fca77445)
+134	0135_the_battery_starts_cold_and_the_fingerprint_sees_it.sql	20260831185034	failed	0.01	P0001	0135 abort: public.ottoq_tick_invariance_reset_fleet drifted (md5 ae67c98bb00b994173d75af020d2dffd)
+135	0136_the_site_limit_is_an_input.sql	20260831202425	failed	0.01	P0001	0136 abort: public.ottoq_l2_propose_bess drifted (md5 d6ed881fc535c970dd9c47cd60d3c62d)
+136	0137_the_fingerprint_stops_hashing_a_write_timestamp.sql	20260831231230	failed	0.01	P0002	query returned no rows
+137	0138_the_demand_we_cause_carries_the_run_id.sql	20260901002249	ok	0.02		
+138	0140_the_matrix_knows_when_it_went_stale.sql	20260901005506	failed	0.01	P0001	0140: ottoq_cert_matrix moved under this migration (pin b3dbfd98a1f325ba992d58911f961464, found e19e2bbd926dfdc0ffca2a5c14e018fe)
+139	0141_the_floor_reads_the_ledger_for_every_caller.sql	20260901010048	failed	0.01	42883	function public.ottoq_cert_recert_floor() does not exist
+140	0142_a_migration_classifies_itself.sql	20260901010305	failed	0.01	42P01	relation "public.ottoq_cert_lineage" does not exist
+141	0139_the_end_state_is_part_of_the_verdict.sql	20260901011004	ok	0.02		
+142	0143_a_short_arm_is_inconclusive_and_a_streak_starts_at_the_floor.sql	20260901011644	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+143	0144_the_reset_stamp_leaves_the_wall_clock.sql	20260901075119	failed	0.01	42P01	relation "public.ottoq_cert_lineage" does not exist
+144	0145_the_preflight_validator_reads_only_its_own_run.sql	20260901135321	failed	0.01	42P01	relation "public.ottoq_cert_lineage" does not exist
+145	0146_the_load_sum_reads_only_its_own_run_and_depot.sql	20260901172745	failed	0.01	P0001	0146 pin mismatch for ottoq_energy_orchestrate: got bd2ab36815e2d211d8b36c4e3b6c884e
+146	0147_the_noise_salt_is_not_a_random_id.sql	20260901182823	failed	0.01	P0001	0147 pin mismatch ottoq_energy_orchestrate: bd2ab36815e2d211d8b36c4e3b6c884e
+147	0148_the_verdict_sorts_by_every_field_it_hashes_and_hears_the_energy_stream.sql	20260901234940	failed	0.01	P0001	0148 pin mismatch ottoq_determinism_pair: ac0d25c2c1e0ce5147474ba02882b8ba
+148	0149_the_matrix_is_keyed_by_depot_and_reads_the_energy_canon.sql	20260901235044	failed	0.01	P0001	0149 pin mismatch ottoq_cert_matrix: e19e2bbd926dfdc0ffca2a5c14e018fe
+149	0150_the_odometer_sums_only_its_own_run.sql	20260902121232	failed	0.01	P0001	0150 proof: no flagship vehicle has completed dispatches across >1 run
+150	0151_the_fleet_api_returns_only_production_commands.sql	20260902121253	failed	0.08	42P01	relation "public.ottoq_cert_lineage" does not exist
+151	0152_the_certification_runs_the_deterministic_core_alone.sql	20260902121334	failed	0.01	P0001	0152 pin mismatch ottoq_determinism_pair: ac0d25c2c1e0ce5147474ba02882b8ba
+152	0153_a_grid_fixture_the_engine_cannot_tell_from_a_depot.sql	20260902124926	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+153	0154_the_assertion_matched_a_key_only_one_verb_carries.sql	20260902125859	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+154	0155_the_site_meter_reports_the_power_that_flowed.sql	20260902190425	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+155	0156_a_point_that_fits_beats_a_point_that_starves.sql	20260902191145	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+156	0157_the_assertions_state_the_rule_the_engine_actually_has.sql	20260902191331	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+157	0158_the_sixth_kpi_did_the_asset_make_its_due_time.sql	20260902194149	failed	0.02	42883	function public.ottoq_default_target_soc() does not exist
+158	0159_wait_or_take_what_fits_is_a_policy_not_a_constant.sql	20260902194751	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+159	0160_the_need_check_learns_about_holds_and_reservations.sql	20260902195045	failed	0.01	22004	query string argument of EXECUTE is null
+160	0160r_repair_the_anchor_must_be_unique_not_merely_present.sql	20260902195148	failed	0.01	22004	query string argument of EXECUTE is null
+161	0161_the_grid_can_be_broken_on_purpose_and_must_prove_it.sql	20260902195819	failed	0.01	22004	query string argument of EXECUTE is null
+162	0162_a_declared_fault_is_part_of_the_seeded_world.sql	20260902200201	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+163	0163_a_fault_needs_a_clock_and_a_repair_time.sql	20260902200406	failed	0.01	P0001	0163: 0162 charger-fault anchor must occur exactly once, found 0
+164	0164_drop_the_two_arg_grid_fault_overload.sql	20260902200433	failed	0.01	42P01	relation "public.ottoq_cert_lineage" does not exist
+165	0165_the_fault_assertion_learns_that_faults_end.sql	20260902200851	failed	0.01	22004	query string argument of EXECUTE is null
+166	0166_starved_means_below_its_own_target_not_below_ninety.sql	20260902201059	failed	0.01	22004	query string argument of EXECUTE is null
+167	0167_the_run_key_hashed_the_outcome_and_the_wait_was_always_zero.sql	20260902205647	failed	0.03	42P01	relation "public.ottoq_cert_lineage" does not exist
+168	0168_the_kpi_view_recomputed_every_run_to_answer_about_one.sql	20260902234153	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+169	0170_unserved_counted_the_horizon_not_the_engine.sql	20260902235023	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+170	0171_the_plan_lookup_reached_back_past_its_own_return.sql	20260902235218	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+171	0172_a_return_stamped_after_the_run_ended_never_happened.sql	20260903003438	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+172	0173_the_overnight_planner_had_nashville_baked_in.sql	20260903023713	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+173	0174_a_rule_that_cannot_fire_should_not_look_like_one_that_enforces.sql	20260903024009	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+174	0169_the_engine_can_say_it_found_nothing_but_not_that_it_never_looked.sql	20260903025526	failed	0.03	42P01	relation "public.ottoq_cert_lineage" does not exist
+175	0175_the_pair_and_the_scenario_must_name_the_same_world.sql	20260903031500	failed	0.01	P0001	0175: declare anchor occurs 0 times, expected 1
+176	0176_a_deadline_past_the_end_of_the_run_was_never_missed.sql	20260903034836	failed	0.02	42883	function public.ottoq_default_target_soc() does not exist
+177	0178_an_asset_that_arrived_on_the_last_tick_never_had_a_turn.sql	20260903035049	failed	0.01	P0001	0178: twin.ottoq_grid_assert not found
+178	0179_the_recorder_wrote_a_status_the_table_refused.sql	20260903075250	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+179	0177_the_cold_start_guard_looked_at_every_depot.sql	20260903113902	failed	0.01	P0001	0177: cold-start anchor occurs 0 times, expected 1
+180	0180_the_watermark_sweep_cleared_every_depot.sql	20260903171637	failed	0.01	P0001	0180: watermark-sweep anchor occurs 0 times, expected 1
+181	0181_the_teardown_recorded_a_return_that_never_happened.sql	20260903225200	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+182	0182_kpi_one_reported_more_hours_than_the_window_could_hold.sql	20260903225512	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+183	0183_kpi_two_counted_a_booking_nobody_kept_as_a_turn.sql	20260903230222	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+184	0184_kpi_four_divided_by_the_same_bad_denominator.sql	20260903230800	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+185	0185_the_correction_nobody_could_see_from_the_one_command.sql	20260904013402	failed	0.02	42703	column a.engine_hash does not exist
+186	0186_the_hours_were_filed_under_a_day_they_did_not_happen_on.sql	20260904013840	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+187	0187_the_kpi_that_scanned_two_and_a_half_million_rows_per_call.sql	20260904014708	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+188	0188_the_percentile_that_dropped_its_worst_cases.sql	20260904015708	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+189	0189_the_population_reaches_the_command_that_ships_the_number.sql	20260904015843	failed	0.01	P0001	0189: audit-block anchor occurs 0 times, expected 1
+190	0190_the_index_that_closed_the_unattributed_five_seconds.sql	20260904020600	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+191	0191_a_baseline_to_measure_ourselves_against.sql	20260904140914	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+192	0192_an_atom_that_can_be_required_must_be_retirable.sql	APPLIED-NO-LEDGER-ROW	failed	0.03	42P01	relation "public.ottoq_cert_lineage" does not exist
+193	0193_the_eta_was_read_from_every_run_that_ever_dispatched_the_car.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	P0001	0193: manifest generator has lost its 0192 guard - refusing to edit a body that is not the one certified
+194	0194_three_wall_clocks_in_the_world_the_fingerprint_hashes.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	P0001	0194: reset_fleet is missing its 0133/0094 blocks - refusing to edit a body that is not the one certified
+195	0195_the_bay_queue_was_ordered_by_a_number_drawn_fresh_each_run.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	P0001	0195 A2 FAILED: the round-14 pair-2 rows are not there to test against
+196	0196_two_flags_that_die_with_the_transaction_and_the_pair_is_one_transaction.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	P0001	0196: reset_fleet 0194 predicate anchor occurs 0 times, expected 1
+197	0197_an_assignment_the_calendar_refused_is_not_an_assignment.sql	APPLIED-NO-LEDGER-ROW	failed	0.07	P0001	0197 A3 FAILED: probe depot aacd0bb0-2d02-d101-72cc-33f70e950bc8 has no vehicle
+198	0198_nobody_anonymous_changes_the_world_and_identity_is_the_servers_to_assign.sql	APPLIED-NO-LEDGER-ROW	failed	0.1	P0001	0198 A5 FAILED: fixture missing (rule <NULL>, manager <NULL>, supervisor <NULL>)
+199	0199_the_verdict_hears_the_proposers_and_the_floor_hears_every_recert.sql	APPLIED-NO-LEDGER-ROW	failed	0.06	42883	function public.ottoq_cert_recert_floor() does not exist
+200	0200_the_twin_observes_the_kernel_derives_and_a_real_vehicle_stops_rolling_dice.sql	APPLIED-NO-LEDGER-ROW	failed	0.03	P0001	0200: the live generator body (md5 e04d35b48822a2fe7492e9d83da3de63) is not the one this migration was written against (0cd6b895...)
+201	0201_the_priors_are_part_of_the_world_and_the_verdict_now_names_them.sql	APPLIED-NO-LEDGER-ROW	failed	0.08	42883	function public.ottoq_cert_recert_floor() does not exist
+202	0202_every_evaluation_names_its_run_and_a_pair_stops_sharing_one_clock.sql	APPLIED-NO-LEDGER-ROW	failed	0.03	P0001	0202 refused: ottoq_evaluate_rule_core is not the body this file was written against (md5 4e9b890d4f5045372272f6ecc8f39dc3)
+203	0203_the_verdict_hears_the_shield_measured_before_it_may_fail_a_pair.sql	APPLIED-NO-LEDGER-ROW	failed	0.06	42P01	relation "public.ottoq_cert_lineage" does not exist
+204	0204_the_run_has_one_clock_and_the_shield_and_the_events_read_it.sql	APPLIED-NO-LEDGER-ROW	failed	0.06	42P01	relation "public.ottoq_cert_lineage" does not exist
+205	0205_h_rule_may_now_fail_a_pair.sql	APPLIED-NO-LEDGER-ROW	failed	0.06	42P01	relation "public.ottoq_cert_lineage" does not exist
+206	0206_every_recall_decision_is_a_ledger_row_and_the_implementation_is_a_name.sql	APPLIED-NO-LEDGER-ROW	failed	0.06	42P01	relation "public.ottoq_cert_lineage" does not exist
+207	0207_a_tie_in_the_command_walk_is_settled_by_the_issuance_sequence_not_the_heap.sql	APPLIED-NO-LEDGER-ROW	failed	0.03	P0001	0207 refused: ottoq_sim_confirm_commands is not the body this file was written against (md5 3e1f029202daeb010ee28fea185f532f)
+208	0208_the_verdict_sees_what_the_shield_read.sql	20260907213653	failed	0.01	P0208	PRECONDITION: public.ottoq_hash_rule_evaluations does not exist
+209	0209_the_frame_carries_the_join_key_and_the_plug.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	P0209	PRECONDITION: public.ottoq_build_decision_frame(uuid,uuid) does not exist
+210	0210_a_production_run_does_not_recall_on_a_parked_implementation.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	P0001	0210: ottoq_evaluate_return_need is not at the pinned 53018872 (found edf36ea9a281e1690b56541269e7726a). Something changed it since 0206; re-read before rewriting.
+211	0211_the_work_side_can_refuse_a_recall_and_the_refusal_is_a_ledger_row.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	P0001	0211: ottoq_recall_decisions is missing; 0206 must land first
+212	0212_the_tick_asks_the_work_side_before_it_books_the_stall.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	P0001	0212: 0211 must land first
+213	0216_the_settlement_record_binds_to_whichever_booking_the_heap_returned_first.sql	20260908081848	failed	0.01	P0001	0216 P0: ottoq_trg_leg_done_sdr is <NULL> , pinned 54226dc2 — the body moved under me
+214	0217_the_verdict_sees_the_settlement_record_and_h_rcl_may_now_fail_a_pair.sql	20260908082227	failed	0.01	P0001	0217 P0: ottoq_determinism_pair is ac0d25c2, pinned 788ed4b7
+215	0218_h_sdr_hashed_a_signature_computed_over_a_run_scoped_id.sql	20260908084304	failed	0.01	P0001	0218 P0: ottoq_hash_sdrs is <NULL>, pinned 820f3491
+216	0219_h_sdr_may_now_fail_a_pair.sql	20260908111547	failed	0.01	P0001	0219 P1: only 0 flagship column(s) have a post-0218 pair; all six must, or the gate is being met by absence rather than by evidence
+217	0213_kpi_four_counted_seven_actor_types_that_cannot_exist.sql	20260908111702	failed	0.04	42P01	relation "public.ottoq_cert_lineage" does not exist
+218	0214_the_cheap_answer_costs_eight_queries_because_i_asked_last.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	P0001	0214: ottoq_work_side_accepts does not exist; 0211 must land first
+219	0215_a_standing_refusal_stands_whatever_the_rate_is_now.sql	APPLIED-NO-LEDGER-ROW	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+220	0220_the_schedule_task_emitter_asks_the_stall_what_kind_of_charge_it_was.sql	20260908111846	failed	0.01	P0001	0220 P0: ottoq_trg_task_completed_sdr is <NULL>, pinned 39ad8e0a
+221	0221_the_run_scope_predicate_no_index_can_read.sql	20260908111950	failed	0.01	P0001	0221 P0: ottoq.ottoq_validate_assignment is 2592d5f1, pinned 6515128e
+222	0222_the_fingerprint_hashed_a_million_rows_to_report_thirteen.sql	20260908112038	failed	0.01	P0001	0222 P0: ottoq_boot_state_fingerprint is 0312472d, pinned 4a6d2809
+223	0223_the_load_meter_asks_which_run_is_running_once_per_row.sql	20260908133954	failed	0.01	P0001	0223 P0: twin.ottoq_sim_compute_charger_load_kw is 33839cfb, pinned 1386d615
+224	0224_the_refusal_reactor_says_production_and_hands_you_a_sim_run_id.sql	20260908134109	failed	0.01	P0001	0224 P0: ottoq.ottoq_react_to_refusals is ea24d2ab, pinned 4d46d5e5
+225	0226_the_recert_floor_reads_a_name_the_ledger_never_writes.sql	20260908161239	failed	0.01	P0001	0226 P0: public.ottoq_cert_recert_floor does not exist
+226	0225_the_canon_comparison_sees_every_atom_the_pair_enforces.sql	20260908161615	failed	0.01	42703	column "depot" does not exist
+227	0227_the_load_meter_scans_forty_five_thousand_rows_to_sum_three_hundred.sql	20260908161809	failed	0.01	P0001	0227 P0: expected exactly one post-0223 load meter with the COALESCE run scope, found 0. Re-derive before applying.
+228	0228_provenance_asks_the_depot_not_the_run_id.sql	20260908162004	failed	0.01	P0001	0228 P1: the isolated fragment does not look like h_evt (no event_type / sim_clock_at / ottoq_events). The two checks above would have passed on nothing.
+229	0229_the_approach_band_scans_every_run_to_answer_about_one.sql	20260908204137	failed	0.04	42P01	relation "public.ottoq_cert_lineage" does not exist
+230	0230_a_score_that_cannot_be_gamed_by_not_checking.sql	20260908220518	failed	0.02	42703	column e.sim_run_id does not exist
+231	0231_a_comparative_score_may_read_only_what_every_arm_writes.sql	20260908222953	failed	0.02	42883	function "public.ottoq_ab_score_run(uuid)" does not exist
+232	0232_a_vehicle_the_arm_is_holding_is_not_a_candidate.sql	20260908224618	failed	0.01	P0001	A2 FAILED: ottoq_decide_tick md5 is 079754ea35eea8bcb9ee050dca8db855, expected ae98f71b879a0a11bdf366d21ff5b4eb -- the certified path moved
+233	0233_a_session_may_only_be_closed_on_its_own_timeline.sql	20260909003956	failed	0.05	42P01	relation "public.ottoq_cert_lineage" does not exist
+234	0234_the_tether_is_run_written_residue_too.sql	20260909004734	failed	0.01	P0001	P1 REFUSED: benchmark_reset md5 is f2014058b6e1c07530a7db0203efbfc1, pinned ae412097c7b1b7cca8d110b9b91733a8 (0233 output)
+235	0235_the_ab_rig_takes_a_clock_anchor_and_ignores_it.sql	20260909015606	failed	0.01	P0001	A2 FAILED: ottoq_decide_tick md5 moved: 079754ea35eea8bcb9ee050dca8db855
+236	0236_a_proposal_must_know_which_tick_it_was_made_in.sql	20260909021833	failed	0.02	42P01	relation "public.ottoq_run_scope_registry" does not exist
+237	0237_record_and_replay_an_agent_proposal_stream.sql	20260909022308	failed	0.01	P0001	P1 REFUSED: 0236 (tick_seq) must be applied first -- a replay without a tick is not a replay
+238	0238_the_proposal_selector_orders_by_a_clock_that_does_not_tick.sql	20260909031507	failed	0.01	P0001	P1 REFUSED: ottoq_reoptimize_reservation_book md5 is 2f4be5960e01934fbee23ca048efbc83, pinned db254f6974f17e8db0cda918cf83497a
+239	0239_a_certification_that_replays_a_recorded_agent_stream.sql	20260909032347	failed	0.01	P0001	P1 REFUSED: ottoq_determinism_pair md5 is ac0d25c2c1e0ce5147474ba02882b8ba, pinned e323bf87d0fbd9d3778bbda7c8f94ba7
+240	0240_the_gate_that_opens_the_nvidia_door_leaves_a_ledger_row.sql	20260909051802	failed	0.01	P0001	P1 REFUSED: ottoq_cron_tick md5 is bc17cc978b61b221ed7ab17412612949, pinned 0562fbd6579524bf71f6c733b9295268
+241	0241_a_certification_hears_only_the_proposers_it_certified.sql	20260909051917	failed	0.01	P0001	P1 REFUSED: ottoq_submit_external_proposal md5 is ffb9f0cdfa524dbaeba7b8ef00529a23, pinned 036f5128c357477fa9f329edd79cf2f6
+242	0242_a_capture_records_only_what_the_run_cannot_regenerate.sql	20260909052026	failed	0.02	42883	function "public.ottoq_proposal_replay_capture(uuid,uuid,text[])" does not exist
+243	0243_the_start_of_run_world_hash_cannot_see_a_vehicle_mid_tether.sql	20260909060909	failed	0.02	42883	function "public.ottoq_tick_invariance_reset_fleet(uuid,bigint,timestamptz)" does not exist
+244	0244_the_end_state_fingerprint_cannot_see_the_assets_either.sql	20260909075534	failed	0.01	P0001	0244 PRECONDITION: boot_state_fingerprint md5 is 0312472d8af0b1fa04c34e42e2f0f6bc, expected 5b52e61a5ae9717f5b6791eb50415f99
+245	0245_current_depot_id_is_written_in_the_tick_and_cleared_by_nothing.sql	20260909075605	failed	0.02	42883	function "public.ottoq_tick_invariance_reset_fleet(uuid,bigint,timestamptz)" does not exist
+246	0246_the_world_hash_is_id_blind_everywhere_except_inside_config.sql	20260909094627	failed	0.01	42883	function "ottoq.ottoq_world_fingerprint(uuid)" does not exist
+247	0247_a_dead_runs_working_rows_outlive_it_because_nothing_deletes_them.sql	20260909133254	failed	0.02	42P01	relation "public.ottoq_run_scope_registry" does not exist
+248	0248_the_refusal_ledger_was_registered_engine_without_the_key_that_makes_it_true.sql	20260909133442	failed	0.01	42P01	relation "public.ottoq_recall_refusals" does not exist
+249	0249_the_purge_loop_variable_shadowed_the_table_it_was_selecting_from.sql	20260909133615	ok	0.01		
+250	0250_the_engine_class_is_not_a_delete_list_and_it_holds_the_moat.sql	20260909134546	failed	0.03	42P01	relation "public.ottoq_run_scope_registry" does not exist
+251	0252_a_certification_column_nobody_schedules_is_invisible.sql	20260912033615	failed	0.02	P0001	A2 FAILED: 9 registered column(s) have never been paired
+252	0253_sm006_points_at_a_five_argument_evaluator_and_the_dispatcher_passes_four.sql	20260912033843	failed	0.01	P0001	A3 FAILED: an invalid bess transition was allowed
+253	0251_a_purged_run_must_say_gone_not_zero.sql	20260912034252	failed	0.02	P0001	A4 FAILED: no purged run to test against -- the backfill did nothing
+254	0254_the_world_hash_moved_and_could_not_say_where.sql	20260912035032	failed	0.02	42703	column v.robotic_tether_phase does not exist
+255	0255_the_teardown_stamps_the_wall_clock_into_a_hashed_column.sql	20260912130622	failed	0.01	P0001	GUARD FAILED: ottoq_sim_release_depot body is 84702cefd491e0012cd7c4d78e935a1e (3745 chars), expected 46738ed8edc6d3bd8082508c3bf66613 at 12780. Someone changed it since I read it; the anchors below are against the wrong source.
+256	0256_the_trigger_restamps_what_the_teardown_fixed.sql	20260912165023	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+257	0257_the_second_floor_ships_as_a_count_with_its_own_limits_attached.sql	20260912165137	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+258	0258_the_comment_states_the_invariant_and_no_code_holds_it.sql	20260912165243	failed	0.01	P0001	GUARD FAILED: ottoq_sim_advance_tick_world body is fbf71dfa1356345cadd93aab35bef8d3 (8044 chars), expected 62f1f30165d2f4ac61635b38db191824 at 9826. Someone changed it since I read it; the anchor below is against the wrong source.
+259	0259_the_proposer_seat_is_declared_data_not_three_literals.sql	20260912205202	failed	0.01	P0001	GUARD FAILED: ottoq_l2_external_proposal body is bfbaf3febba8bd2293f55352ffec6657 (2249 chars), expected e6b6277394d5d29a76309e8a7b05dfae at 3064
+260	0260_every_proposer_fire_is_a_ledger_row.sql	20260912205301	failed	0.03	42P01	relation "public.ottoq_run_scope_registry" does not exist
+261	0261_the_policy_is_what_proposes_the_kernel_disposes.sql	20260912233647	failed	0.01	P0001	0261 P0: ottoq_sim_decide_and_dispatch body is ba3472f7bec9971a2cad7da511ab32c4 (expected 50b598790334cd6e910ad90faee6da48); it was changed since this file was written -- re-derive the splice markers before applying
+262	0262_the_hold_key_the_setter_refused.sql	20260913011239	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+263	0265_the_frame_carries_what_the_selector_filters_on.sql	20260913122605	failed	0.01	P0001	0265 A0: the (uuid) delegate md5 is d5afd7dab51cc807f3a393947faf490e, expected 810d5e9962f24e39f9a53aa6edf9ae0d
+264	0266_the_canon_stops_being_hostage_to_another_runs_leftovers.sql	20260913135634	failed	0.01	P0001	0266 G: ottoq_cert_matrix prosrc md5 is 3fd27fb09d4a504c616c930b9f163df2, expected f5bb81931feae44871c3ecd86d4f86b4 -- the body moved since this file was written; re-derive the copy before replacing it
+265	0267_the_fire_log_registered_a_stamp_and_never_bound_it_to_a_run.sql	20260913141438	failed	0.01	P0001	0267 G: public.ottoq_proposer_fire_log does not exist
+266	0268_0267_never_classified_itself_and_the_floor_swallowed_every_column.sql	20260913142959	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+267	0269_the_purge_cannot_see_a_scheduled_round_only_a_running_pair.sql	20260913205636	failed	0.02	42883	function public.ottoq_check_run_scope_registry() does not exist
+268	0270_the_only_queue_depth_rule_crashes_on_two_states_that_do_not_exist.sql	20260913225716	failed	0.03	42P01	relation "public.ottoq_cert_lineage" does not exist
+269	0271_the_outbound_command_stream_is_the_only_stream_without_provenance.sql	20260913231758	failed	0.01	P0001	0271 P1: ottoq_fleet_pending_commands is not the body this migration was written against
+270	0272_0271_never_classified_itself_and_the_floor_swallowed_every_column.sql	20260913232252	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+271	0273_the_uplink_is_written_by_the_same_transaction_as_the_downlink.sql	20260913233201	failed	0.01	P0001	0273 P2: ottoq_vehicle_commands.data_source is missing -- apply 0271 first
+272	0274_there_is_no_queue_so_the_asset_cannot_be_told_its_place_in_one.sql	20260913234605	failed	0.01	P0001	0274 P2: the charge cursor's ORDER BY is not the one this mirror was written against (md5 a5ee3e6cf721f889d19139b1e2bde78b) -- re-read the decide path before trusting any position it reports
+273	0275_no_single_place_says_which_intelligence_sources_are_actually_on.sql	20260914001937	failed	0.01	P0001	0275 P2: cuopt_propose_enabled is now (unset) -- expected 0
+274	0276_cpsat_enacted_three_times_and_the_scoreboard_called_it_a_stranger.sql	20260914005147	failed	0.04	P0001	0276 md5 guard: ottoq_intelligence_refresh is (absent) -- expected 0275's body 62a469c10edfc510f869da80f04762b8; someone changed it since this file was written
+275	0277_a_source_that_has_proposed_and_one_that_has_never_existed_read_the_same.sql	20260914012023	failed	0.04	P0001	0277 P1: 0276's l2_engine_labels is missing -- apply 0276 first
+276	0278_arming_the_agentic_layer_is_a_five_key_hand_ritual_and_the_demo_got_four.sql	20260914040338	failed	0.01	P0001	0278 P1: expected all 3 arming keys in ottoq_policy_param_catalog, found 0. ottoq_policy_set silently refuses an uncatalogued key (0262).
+277	0279_the_dial_that_can_kill_a_certification_arm_is_not_in_the_catalog.sql	20260914040837	failed	0.02	P0001	0279 P2: ottoq_l2_propose_stall_seat does not exist
+278	0280_a_tamper_check_that_cannot_tell_tampering_from_a_fresh_uuid.sql	20260914043322	failed	0.01	P0001	0280 P1: ottoq_capture_decision_snapshot is 7b68fcabdc5ab0f481cbb45c16b12abb, pinned c264c404...
+279	0281_the_setter_refuses_ninety_two_of_the_keys_the_engine_reads.sql	20260914054506	failed	0.04	P0001	A1 FAILED: view reports 90 read keys / 4 ok -- the scan looks broken
+280	0282_two_dials_whose_ranges_the_database_already_declares.sql	20260914061049	failed	0.01	P0001	0282 P1: ottoq_recall_naive_threshold_v1 does not exist
+281	0283_five_floors_the_engine_already_writes_down_and_two_ceilings_it_does_not.sql	20260914062112	failed	0.01	P0001	0283 P1: ottoq_is_depot_night does not exist
+282	0284_a_hold_whose_outcome_is_invisible_can_only_be_argued_about.sql	20260914064710	failed	0.01	P0001	0284 P2: defer_hold no longer decides "answered" from ottoq_proposer_precedence.holds_tick; the view would measure something the engine does not do
+283	0285_nine_more_dials_and_two_ceilings_the_rng_declares.sql	20260914065559	failed	0.01	P0001	0285 P2: interior_share is no longer compared against a seeded draw
+284	0286_eleven_dials_and_the_ceiling_a_check_constraint_hands_you.sql	20260914071810	failed	0.01	P0001	0286 P3: allow_concurrent_runs is no longer a < 1 gate
+285	0287_the_two_halves_disagree_about_what_already_placed_means.sql	20260914073900	failed	0.01	P0001	0287 P0: public.ottoq_build_decision_frame(uuid,uuid) does not exist
+286	0288_a_seat_is_only_worth_holding_if_there_is_something_to_offer.sql	PENDING	skipped_pending	0.0		
+287	0289_five_gates_and_the_one_that_tests_a_different_threshold.sql	20260914081939	failed	0.03	42P01	relation "public.ottoq_policy_catalog_gap" does not exist
+288	0290_three_geometry_dials_and_one_the_catalog_cannot_express.sql	20260914083734	failed	0.01	P0001	0290 P1: public.ottoq_site_geometry does not exist
+289	0291_eighteen_dials_whose_consumer_already_wrote_the_range.sql	20260914085632	failed	0.03	P0001	0291 P1: consumer public.ottoq_recall_naive_threshold_v1 does not exist
+290	0292_the_proposer_cannot_see_its_own_pending_plans.sql	20260914090954	failed	0.02	42883	function "public.ottoq_build_decision_frame(uuid,uuid)" does not exist
+291	0293_the_nightly_run_purge_has_never_once_run.sql	20260914093107	failed	0.01	P0001	0293 P0: cron job 625 does not exist
+292	0294_the_purge_commits_inside_a_cursor_loop.sql	20260914094551	failed	0.01	P0001	0294 P0: the procedure is not the definition this file was written against (live md5 b11e18b146d65e42c53dabb93f7f3c20). Re-read it and rebase rather than overwriting someone else's change
+293	0295_a_procedure_with_a_set_clause_cannot_commit.sql	20260914095529	failed	0.01	P0001	0295 P1: a query-driven FOR loop is back (1). 0294 must be in place first; both causes have to be gone together
+294	0296_the_gap_view_cannot_see_five_of_its_own_call_sites.sql	20260914101744	failed	0.02	42P01	relation "public.ottoq_policy_catalog_gap" does not exist
+295	0297_seven_gates_whose_range_is_the_comparison_itself.sql	20260914102812	failed	0.13	P0001	A1 FAILED: catalog holds 14 rows, predicted 133
+296	0298_four_hours_three_probabilities_and_a_dial_that_is_half_wired.sql	20260914103801	failed	0.01	P0001	0298 P0: 0 live rows for these eight, expected exactly 3 (the two night_wave globals and run_start_deployed_fraction). The header reasons about those three by name; a different set means re-reading before cataloguing.
+297	0299_a_dial_that_defaults_for_a_checked_column_inherits_the_check.sql	20260914104618	failed	0.01	P0001	0299 P0: 0 live rows for these four, expected exactly 2 (topoff_threshold_soc and vehicle_target_soc_default). A different set means re-reading before cataloguing.
+298	0300_three_dials_whose_floor_is_on_the_other_side_of_the_assignment.sql	20260914105135	failed	0.05	P0001	A1 FAILED: catalog holds 7 rows, predicted 148
+299	0301_five_files_never_classified_themselves_and_the_floor_swallowed_every_column.sql	20260914105943	failed	0.01	P0001	0301 P0: only 0 of the five are in the migration ledger; this file would classify something that never ran
+300	0302_the_only_agent_that_tunes_dials_is_the_one_that_bypasses_the_catalog.sql	20260914121021	failed	0.02	P0001	0302 P3: only 0 of the two keys the loop writes are catalogued; routing through the setter would make it REFUSE them
+301	0303_a_bound_that_cannot_be_clamped_must_refuse.sql	20260914122818	failed	0.01	P0001	0303 P0: ottoq_policy_set is not the definition this file was written against (live md5 ff58bc23ed0c0e42a3374d7f25e0d839)
+302	0304_five_more_floors_and_six_dials_admitted_without_a_clamp.sql	20260914124522	failed	0.02	42P01	relation "public.ottoq_policy_catalog_gap" does not exist
+303	0305_the_catalog_becomes_the_allow_list_for_every_writer.sql	20260914125444	failed	0.01	P0001	0305 P0: ottoq_policy_params is empty; the FK would validate vacuously and A2 would prove nothing about real data
+304	0306_a_null_dial_value_silently_wrote_the_maximum.sql	20260914131308	failed	0.01	P0001	0306 P0: ottoq_policy_set is not the body this file was written against (live prosrc md5 118b6ac6c750671d493922f99c614f4f). Re-read it before replacing it.
+305	0307_the_dial_audit_reads_functions_and_never_looked_at_a_view.sql	20260914134225	failed	0.02	42P01	relation "public.ottoq_policy_catalog_gap" does not exist
+306	0308_the_loop_may_not_tune_a_depot_the_harness_certifies_on.sql	20260914144046	failed	0.01	P0001	P0 FAILED: ottoq_cil_tick prosrc md5 is 4c8d57c475439fde038dd561a0c54622, expected e5bc51489496730445c898befc1b1790 -- the body changed since it was read; re-read it before replacing it
+307	0309_benchmark_had_everything_except_a_scenario.sql	20260914144547	failed	0.02	42703	column "vehicle_class_code" does not exist
+308	0310_two_migrations_argued_forces_recert_false_and_never_wrote_the_row.sql	20260914150516	failed	0.01	42P01	relation "public.ottoq_cert_lineage" does not exist
+309	0311_a_column_that_looks_like_the_price_and_is_not.sql	20260914153500	failed	0.01	P0001	0311 P1: only 0 rows in site_energy_snapshots; too few to call the column dead
+310	0312_the_forward_curve_reads_the_soc_the_twin_already_tracks.sql	20260914161504	failed	0.01	P0001	0312 P1: ottoq_forecast_net_load prosrc md5 is 7166b6cbb547396ca975707c3b7bcec5, expected eb4da52c6ca633ac4bf0d707756b6f0a; the function changed after this migration was written
+311	0313_the_predictive_recall_rung_takes_eight_values_and_none_of_them_is_the_vehicle.sql	20260914163515	failed	0.01	P0001	0313 P1: ottoq_recall_naive_threshold_v1 prosrc md5 is ABSENT, expected 50b7bf11b14ae952b1f8326f37da58af; the function changed after this migration was written
+312	0314_vehicles_get_a_position_and_the_eta_stops_being_a_constant.sql	20260914164237	failed	0.01	P0001	0314 P2: no depot has origin_lat; every position would be NULL
+313	0315_the_speed_cancelled_out_of_my_own_eta.sql	20260914164649	failed	0.01	P0001	0315 P1: ottoq_trip_geometry is absent; 0314 has not been applied
+314	0316_the_eta_function_starts_answering_its_own_arguments.sql	20260914165752	failed	0.01	P0001	0316 P2: ottoq_computed_eta_minutes is absent; 0314 has not been applied
+315	0317_the_twin_writes_where_each_asset_is_not_only_how_charged.sql	20260914170416	failed	0.06	42P01	relation "public.ottoq_cert_lineage" does not exist
+316	0318_the_engine_stopped_guessing_and_the_label_kept_saying_guess.sql	20260914170807	failed	0.01	P0001	0318 P1: prosrc md5 is 693c8e8b3f83e51525b8d9fde540b27c, not what this migration was written against
+317	0319_i_seeded_a_deterministic_draw_on_a_random_uuid.sql	20260914171845	failed	0.03	42P01	relation "public.ottoq_cert_lineage" does not exist
+318	0320_one_function_writes_the_return_eta_and_writes_its_label_with_it.sql	20260914192115	failed	0.03	P0001	0320 A4: a wall clock appears in the refresh function
+319	0321_each_writer_of_the_eta_states_its_own_provenance_and_active_vehicles_get_a_forecast.sql	20260914192306	failed	0.01	P0001	0321 P6: public.ottoq_refresh_return_eta does not exist; apply 0320 first
+320	0322_the_eta_and_its_provenance_move_together_or_the_write_is_refused.sql	20260914192410	failed	0.02	P0001	0322 P1: twin.ottoq_sim_prime_deployment insert(s) a return_eta_minutes without an eta_refreshed_at; apply 0321 first or this trigger refuses the next run at t=0
+321	0323_nothing_that_starts_a_run_ever_armed_the_agentic_layer.sql	20260914192648	failed	0.02	P0001	0323 P2: public.ottoq_agentic_arm(uuid,text) not found
+322	0324_the_one_world_guard_says_this_depot_and_has_no_depot_predicate.sql	20260914192738	failed	0.01	P0001	0324 P1: the phrase is still moving this depot. does not occur exactly once
+323	0326_the_stamp_must_be_present_and_not_older_not_different.sql	20260914193928	failed	0.01	P0001	0326 P0: ottoq_assert_eta_provenance not found
+324	0325_energy_commands_get_the_dock_that_vehicle_commands_already_have.sql	20260914214010	failed	0.01	P0001	0325 P0: ottoq_determinism_pair no longer mentions h_nrg
+325	0327_the_ledger_comment_claims_a_protection_that_has_never_existed.sql	20260914214102	failed	0.01	P0001	0327 P1: the table carries no comment; the premise has changed
+326	0328_the_conflict_ledger_records_who_was_there_and_not_what_they_were_doing.sql	20260914235653	failed	0.03	42P01	relation "public.ottoq_cert_lineage" does not exist
+327	0329_the_departure_release_covers_five_of_the_flagships_one_hundred_and_fifty_eight_stalls.sql	20260915001355	failed	0.01	P0001	0329 P3: v3 does not cover interrupted; sweep 1 clip assumption is wrong
+328	0331_the_agent_hands_one_solver_request_to_the_kernel.sql	20260916000638	failed	0.01	P0001	0331 P1: one or more required functions are missing
+329	0332_one_agent_claim_per_run_tick.sql	20260916002025	failed	0.01	P0001	0332 P1: 0331 or the decide driver is missing
+330	0333_every_solver_proposal_gets_a_deterministic_disposition.sql	20260916144203	failed	0.01	P0001	0333 P-: ottoq_decide_tick moved from the measured 0327/0332 body
+331	0334_a_newer_solver_packet_explains_what_it_superseded.sql	20260916180920	failed	0.01	P0001	0334 P-: proposal submit door moved (md5 b31af1d4b5c9ec27da53ff57ea8fb0ac)
+332	0335_cp_sat_becomes_the_primary_agent_solver.sql	20260916194021	failed	0.02	42P01	relation "public.ottoq_proposer_precedence" does not exist
+333	0336_the_proposal_finalizer_accepts_the_kernel_tick_type.sql	20260917122803	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+334	0337_the_agent_chain_gets_first_refusal_before_greedy_dispatch.sql	20260917123453	failed	0.01	P0001	0337 P1: delegated run lookup anchor occurs 0 times
+335	0338_one_inflight_agent_gets_a_bounded_solver_window.sql	20260917124150	failed	0.02	42883	function "public.ottoq_agentic_arm(uuid,text)" does not exist
+336	0339_the_charge_stall_was_reserved_before_any_solver_could_see_it.sql	20260919042514	failed	0.01	P0001	0339 P1: a patch target is missing
+337	0340_every_external_model_call_gets_a_ledger_that_outlives_its_run.sql	20260919045051	failed	0.02	42883	function public.ottoq_check_run_scope_registry() does not exist
+338	0341_the_intelligence_view_dropped_two_thirds_of_its_own_rows.sql	20260919045936	failed	0.01	P0001	0341 P1: 0340 has not been applied
+339	0342_the_agent_never_learns_what_the_kernel_did_with_its_objective.sql	20260919052746	failed	0.01	P0001	0342 P1: a patch target is missing
+340	0343_the_review_joined_on_the_tick_and_the_chain_crosses_ticks.sql	20260919053350	failed	0.01	P0001	0343 P1: 0342 has not been applied
+341	0344_the_purge_cannot_complete_and_the_twin_start_door_has_no_handler.sql	20260919154650	failed	0.02	42883	function public.ottoq_check_run_scope_registry() does not exist
+342	0345_the_purge_deletes_engine_tables_alphabetically_not_by_dependency.sql	20260919155936	failed	0.02	42883	function public.ottoq_check_run_scope_registry() does not exist
+343	0330_sweep_two_asks_if_the_vehicle_is_in_the_stall_and_never_if_it_is_coming.sql	20260919161129	failed	0.01	P0001	0330 P1: ottoq.ottoq_release_departed_spaces not found -- 0329 is not applied
+344	0346_the_cockpits_solver_join_has_never_matched_a_row.sql	20260919161259	failed	0.01	P0001	0346 P2: 0340 has not been applied; the solver leg has nothing to read
+345	0347_one_missing_index_made_the_twin_start_door_cost_six_thousand_gigabytes.sql	20260919163943	failed	0.03	42883	function public.ottoq_check_run_scope_registry() does not exist
+346	0348_a_six_row_table_held_the_twin_start_door_shut_because_its_guard_never_learned_the_purge_protocol.sql	20260919170057	failed	0.01	P0001	0348 P1: public.ottoq_recall_refusals is absent; this migration has no subject
+347	0349_a_run_reads_armed_while_its_rank_zero_proposer_is_unreachable.sql	20260919173442	failed	0.02	42P01	relation "public.ottoq_proposer_precedence" does not exist
+348	0350_the_agent_orchestrates_a_depot_from_eleven_hundred_characters_of_counters.sql	20260919191701	failed	0.01	P0001	0350 P2: vehicle_need_profile is empty; this migration would surface zeros and call them health
+349	0351_the_intelligence_layers_are_real_and_nothing_assembles_them_into_a_stack.sql	20260919195941	failed	0.01	P0001	0351 P1: missing instrument(s): ottoq_agentic_arming ottoq_agent_asset_depth ottoq_agent_review  -- 0349/0350/0342 must be applied first
+350	0352_the_agents_dial_limits_live_in_edge_typescript_and_not_in_this_database.sql	20260919205659	failed	0.01	P0001	0352 P2: expected all six agent dials in the catalog, found 0
+351	0353_the_shield_gains_a_fifth_probe_point_and_the_ai_write_path_finally_lands_in_its_ledger.sql	20260919210336	failed	0.01	P0001	0353 P0: ottoq_policy_set body moved. expected md5 3b497067..., got ff58bc23ed0c0e42a3374d7f25e0d839 (len 1491)
+352	0354_the_review_judged_the_whole_run_from_three_chains_and_a_ledger_that_never_held_cuopt.sql	20260919224417	failed	0.01	P0001	0354 P2: expected exactly 1 ottoq_agent_review, found 0
+353	0355_the_energy_shield_declared_five_block_rules_at_the_moment_power_flows_and_none_had_ever_run.sql	20260919235525	failed	0.01	P0001	0355 P6: expected 5 active rules at charge_session_start, found 0 -- re-run the pre-flight before applying
+354	0356_the_shield_finally_sees_the_moment_power_begins.sql	20260919235738	failed	0.01	P0001	0356 P3: 0355 is not applied (EN.001 carries no en001_evaluated label)
+355	0357_the_booking_calendar_keeps_three_timestamps_on_two_clocks_and_says_so_nowhere.sql	20260920004021	failed	0.01	P0001	0357 P5b: expected exactly 3 COALESCE(r.sim_clock_current, now()) occurrences, found 0
+356	0358_a_single_stall_proposal_gives_the_disposer_nothing_to_dispose_over.sql	20260920005644	failed	0.01	P0001	0358 P3a: public.ottoq_dispose_external_proposals not found
+357	0359_a_promoted_candidate_must_carry_its_own_kilowatts_or_the_shield_judges_the_wrong_load.sql	20260920010111	failed	0.01	P0001	0359 P3: 0358 is not applied (the promotion function is absent)
+358	0360_a_stall_reservation_outlives_the_vehicle_that_can_no_longer_use_it.sql	20260920022145	failed	0.01	P0001	0360 P2: ottoq_gc_stale_reservations changed under me (md5 d4d75b185f2b8ad35572fb2c0b50e10e) -- someone edited it since this file was written; re-read it before replacing, or a fix is about to be deleted
+359	0361_a_proposer_that_declines_is_not_a_proposer_that_named_a_bad_stall.sql	20260920023610	failed	0.01	P0001	0361 P2: ottoq_dispose_external_proposals does not exist
+360	0362_a_worse_ranked_proposer_removes_a_better_one_from_the_pool_before_rank_is_read.sql	20260920024530	failed	0.01	P0001	0362 P2: ottoq_submit_external_proposal changed under me (md5 ffb9f0cdfa524dbaeba7b8ef00529a23)
+361	0363_the_gate_0362_installed_could_never_be_opened.sql	20260920025230	failed	0.01	P0001	0363 P2: ottoq_submit_external_proposal references the gate key 0 time(s), expected 1 -- apply 0362 first, or this registers a key nothing reads
+362	0365_the_overstay_has_a_name_and_no_reader_so_give_it_one.sql	20260920033500	failed	0.05	42P01	relation "public.ottoq_cert_lineage" does not exist
+363	0366_the_frame_now_says_which_vehicles_are_overstaying_a_charge_stall.sql	20260920034500	failed	0.01	P0001	0366 P2: the 2-arg ottoq_build_decision_frame does not exist
+364	0364_a_proposers_hit_rate_is_deleted_by_the_next_run_that_starts.sql	20260920035200	failed	0.02	42P01	relation "public.ottoq_run_scope_registry" does not exist
+365	0368_the_reroute_hunted_the_scarcest_stall_type_for_vehicles_that_wanted_the_most_plentiful.sql	20260920041236	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+366	0367_the_reclaimer_0360_installed_has_never_run_on_the_live_metronome_path.sql	20260920041500	failed	0.01	P0001	P1: ottoq_release_unusable_reservations(uuid, timestamptz, uuid) not found as 0360 left it
+367	0369_a_vehicle_parked_in_one_stall_was_still_holding_another.sql	20260920041750	failed	0.01	P0001	P0: reclaimer not found
+368	0370_fifty_nine_calendar_claims_were_already_overruled_and_the_ledger_held_none_of_them.sql	20260920042835	failed	0.03	42P01	relation "public.ottoq_cert_lineage" does not exist
+369	0371_i_put_a_nondeterminism_source_inside_the_tick_path_taking_it_back_out.sql	20260920043723	failed	0.01	P0001	P0: reclaimer not found
+370	0372_the_shared_candidate_source_offered_charge_stalls_whose_charger_was_faulted.sql	20260920045844	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+371	0373_three_comments_that_stop_the_next_person_repeating_tonight.sql	20260920050351	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+372	0374_two_legal_decisions_summed_past_the_service_contract_and_the_meter_that_would_have_seen_it_is_not_read.sql	20260920123000	failed	0.01	P0001	0374 P3: ottoq_effective_charge_cap_kw(uuid,uuid,timestamptz) is missing -- this file reads the site cap from it and must not invent a second definition of the cap
+373	0375_my_own_new_column_says_throttle_the_vehicles_when_the_answer_is_defer_the_battery.sql	20260920124500	failed	0.01	P0001	0375 P1: ottoq_site_power_ledger does not exist -- 0374 must be applied before this correction to it
+374	0376_i_built_a_detector_whose_silence_cannot_be_told_from_absence_which_is_the_defect_i_spent_tonight_fixing.sql	20260920131500	failed	0.01	P0001	0376 P1: 0374 must be applied first
+375	0379_the_engine_exceeding_its_own_published_budget_is_only_observable_at_tick_time.sql	20260920132449	failed	0.01	P0001	0379 P1: 0374/0376's detector is missing
+376	0377_removing_the_one_row_my_own_path_test_left_in_an_evidence_table.sql	20260920132500	failed	0.01	42P01	relation "public.ottoq_site_power_excursion_ledger" does not exist
+377	0378_the_entire_causal_record_of_the_excursion_is_class_engine_and_dies_with_the_next_demo_run.sql	20260920134500	failed	0.03	42P01	relation "public.ottoq_run_scope_registry" does not exist
+378	0380_joining_an_evidence_table_to_sim_runs_silently_undoes_the_reason_it_is_evidence.sql	20260920135731	failed	0.01	42P01	relation "public.ottoq_run_scope_registry" does not exist
+379	0381_the_published_reliability_field_names_an_action_that_never_happened_and_undercounts_the_one_that_did.sql	20260920141533	failed	0.03	42P01	relation "public.ottoq_cert_lineage" does not exist
+380	0382_a_column_named_for_a_fifteen_minute_quantity_that_is_a_running_peak_in_sim_and_not_even_that_in_production.sql	20260920155947	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+381	0383_the_whole_of_g86_is_one_concurrency_class_that_no_executor_admits_and_the_walkaround_is_its_only_member.sql	20260920161631	failed	0.01	P0001	0383 P0: expected exactly 1 derive function carrying 'concurrency','hold', found 0
+382	0384_my_own_new_detector_raises_on_the_malformed_data_it_exists_to_find.sql	20260920162559	failed	0.01	P0001	0384 P0: expected 1 ottoq_atom_class_coverage, found 0 -- 0383 must be applied first
+383	0385_the_catch_up_that_stopped_one_state_short_strands_a_vehicle_for_the_whole_run.sql	20260920172340	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+384	0386_the_fourteen_atom_verdict_is_the_one_thing_the_permanent_run_record_does_not_keep.sql	20260920173700	failed	0.01	P0001	0386 P0: no archived determinism arms -- the premise of this migration is not present
+385	0387_two_critical_state_machine_rules_had_a_caller_shaped_hole_and_the_input_they_need_did_not_exist.sql	20260920185425	failed	0.02	42P01	relation "public.ottoq_kpi_touch_actor_types" does not exist
+386	0388_my_own_new_probe_writes_blocked_into_a_log_where_that_word_means_something_it_did_not_do.sql	20260920185739	failed	0.01	P0001	0388 P0: 0387's probes are not present (found 0 of 2)
+387	0389_cp_sat_was_told_the_site_could_draw_2500_kw_while_the_engine_was_enforcing_795.sql	20260920194102	failed	0.02	22023	0389 P0: the twin depot no longer reads 2500/1800/10.0; P2's no-cap equivalence assertion is stated against those values and must be re-derived before this file is applied
+388	0390_an_abstention_is_not_a_claim_and_two_predicates_counted_it_as_one.sql	20260921000517	failed	0.02	42883	0390 P0: one of the two target functions is absent
+389	0391_kpi_four_stops_counting_the_shields_own_safe_defaults_as_human_labour.sql	20260921001618	failed	0.03	42P01	relation "ottoq_kpi_touch_actor_types" does not exist
+390	0392_the_shields_coverage_was_only_ever_counted_from_the_rules_side_so_two_enacting_branches_were_invisible.sql	20260921002608	failed	0.01	22023	0392 P0: resolved_action_context is not discriminating (0 distinct values); the coverage instrument would report one undifferentiated bucket
+391	0393_the_branch_i_led_0392_with_is_gated_at_a_probe_point_i_did_not_look_for.sql	20260921004457	failed	0.02	42P01	relation "public.ottoq_enactment_branches" does not exist
+392	0394_shield_expected_was_the_wrong_question_an_hour_after_i_shipped_it_ask_which_effects_are_gated_where.sql	20260921005249	failed	0.02	42P01	0394 P0: 0392's declaration table is absent
+393	0395_my_one_shot_cron_guard_read_before_it_wrote_and_started_two_runs_fourteen_seconds_apart.sql	20260921012521	failed	0.03	42P01	relation "public.ottoq_cert_lineage" does not exist
+394	0396_choose_the_clock_before_you_build_the_world_g107.sql	20260921025959	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+395	0397_one_word_for_rest_and_the_dwell_that_lived_in_two_missing_rows_g96.sql	20260921031935	failed	0.03	42P01	relation "public.ottoq_cert_lineage" does not exist
+396	0398_the_address_of_a_service_that_moves_belongs_in_data_g108.sql	20260921073824	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+397	0399_the_bess_state_machine_gets_its_caller_and_the_table_gets_its_first_trigger_g96.sql	20260921122812	failed	0.01	P0001	0399 P(a): probe context 'bess_state_change' does not resolve to SM.006 (got <NULL>)
+398	0402_a_determinism_verdict_can_finally_state_the_clock_it_was_earned_at_g112.sql	20260921165330	failed	0.01	P0001	0402 P1: ottoq_determinism_verdict_ledger is missing one of verdict_id/arm_a_run/arm_b_run/ticks/engine_hash/certified_at (found 0 of 6)
+399	0403_the_dials_outlive_their_run_so_reanalysis_becomes_possible_g116.sql	20260921172038	failed	0.02	42P01	relation "public.ottoq_run_scope_registry" does not exist
+400	0404_the_reward_function_and_dial_promotion_behind_hard_evidence_gates_g116.sql	20260921174317	failed	0.01	P0001	0404 P1: ottoq_run_dial_ledger is absent -- apply 0403 first
+401	0405_the_cockpit_gets_its_reads_back_after_0198_revoked_them_on_a_grep_over_the_wrong_repo.sql	20260921190250	failed	0.01	P0001	0405 P1: expected 10 target functions in public, found 9 -- re-census before granting
+402	0406_thirteen_writers_were_reachable_with_the_browser_key_including_three_i_shipped_this_afternoon.sql	20260921190457	failed	0.01	P0001	0406 P1: ottoq_assert_anon_rpc_surface() is missing -- apply 0405 first
+403	0400_the_fault_reroute_gets_the_gate_it_was_missing_and_hears_its_own_gate_say_no_g114.sql	20260921191243	failed	0.02	P0001	0400 P4: ottoq_stall_bookings_no_overlap_v3 not found
+404	0401_the_deploy_dial_gets_one_value_and_the_pointer_gate_gets_switched_on_g114.sql	20260921192817	failed	0.01	P0001	0401 P3: calendar_occupancy_guard is not in ottoq_policy_param_catalog; ottoq_policy_set would refuse it
+405	0407_a_busy_day_demo_starts_at_a_uniformly_random_hour_so_a_third_of_them_open_in_the_overnight_trough.sql	20260921193848	failed	0.02	42P01	relation "public.ottoq_run_scope_registry" does not exist
+406	0408_the_registry_gate_that_catches_unclassified_run_tables_cannot_see_the_twin_schema_and_one_evidence_check_has_been_dead_since_this_afternoon.sql	20260921203327	failed	0.01	P0001	0408 P1: public.ottoq_check_run_scope_registry() is missing
+407	0409_the_evidence_ledgers_look_98_percent_unattributable_and_95_percent_of_that_is_recoverable_from_the_archive.sql	20260921203917	failed	0.01	P0001	0409 P1: expected exactly 1 ottoq_evidence_join_loss overload, found 0
+408	0410_the_fourth_time_a_header_argued_forces_recert_false_at_length_and_did_not_write_the_row_the_floor_reads.sql	20260921204952	failed	0.01	42P01	relation "public.ottoq_cert_lineage" does not exist
+409	0411_the_purge_hardcodes_public_so_the_two_twin_tables_it_was_meant_to_clear_would_have_shut_the_start_door.sql	20260921210548	failed	0.02	42883	function public.ottoq_check_run_scope_registry() does not exist
+410	0412_the_state_machine_never_learned_that_a_vehicle_can_break_while_parked.sql	20260922042212	failed	0.01	P0001	0412 P1: expected 41 active vehicle transitions, found 0 -- re-derive db/checks/0321 before adding rows
+411	0413_a_fault_hazard_denominated_in_scheduler_ticks_is_not_a_fault_rate.sql	20260922043506	failed	0.02	42703	column "agent_writable" of relation "ottoq_policy_param_catalog" does not exist
+412	0414_the_agent_envelope_was_advertised_and_judged_and_enforced_by_nobody.sql	20260922050100	failed	0.01	P0001	0414 P2: AI.001 enforcement is <NULL>, expected log_only. If it now blocks, re-read ottoq_policy_set's exception-swallow comment before proceeding
+413	0415_the_ledger_called_an_empty_frame_an_abstention_and_a_decision_a_call.sql	20260922053000	failed	0.02	42P01	relation "public.ottoq_model_call_ledger" does not exist
+414	0416_the_drift_cap_was_a_fraction_in_a_percent_column_so_it_froze_the_dial_it_was_meant_to_bound.sql	20260922065233	failed	0.01	42703	column "agent_max_drift_pct" does not exist
+415	0417_the_agents_advice_carries_the_tick_it_was_computed_from_and_the_tick_it_was_applied_at_and_nobody_had_ever_subtracted_them.sql	20260922070445	failed	0.01	42P01	relation "public.ottoq_model_call_ledger" does not exist
+416	0418_the_probe_for_the_one_unprobed_context_the_engine_actually_exercises_built_and_proven_but_not_wired.sql	20260922073820	failed	0.01	P0001	0418 P1: only 0 active codes declare task_completion, expected at least 5 -- re-derive 0326 §6(b) before building its probe
+417	0419_my_own_abstention_counter_counted_two_of_the_four_abstentions_as_real_verdicts.sql	20260922074145	failed	0.01	P0001	0419 P1: 0418's two functions are not both present (found 0) -- apply 0418 first
+418	0420_i_converted_the_hazard_with_the_metronome_cadence_instead_of_the_sim_time_the_tick_actually_advances.sql	20260922080856	failed	0.01	P0001	0420 P1: ottoq_vehicle_fault_per_tick does not exist -- apply 0413 first
+419	0421_a_certified_arms_evidence_is_rewritten_by_the_next_arms_fleet_reset.sql	20260922125637	failed	0.01	P0001	0421 P1: the reset call literal matches 0 times in ottoq_determinism_pair, expected exactly 1 -- read the function before substituting
+420	0422_wiring_the_task_completion_probe_so_the_rule_that_names_g121_can_finally_fire.sql	20260922134041	failed	0.01	P0001	0422 P1: expected 0418's two functions, found 0 -- apply 0418 first
+421	0423_a_vehicle_can_power_down_from_any_state_and_the_catalog_never_knew_it.sql	20260922134203	failed	0.01	P0001	0423 P1: only 0 run-edge SM.001 failures -- re-derive db/checks/0331 before declaring 29 transitions to fix a problem that may no longer exist
+422	0424_a_charger_heartbeat_written_after_the_charge_starts_is_a_liveness_check_that_cannot_pass.sql	20260922150552	failed	0.01	P0001	0424 P1: only 0 HW.002 failures carrying now_ts -- the ledger was purged or the defect changed. Re-derive db/checks/0337 §5 before applying.
+423	0425_the_walkaround_claims_a_service_bay_because_its_leg_type_falls_through_and_the_one_line_fix_would_have_broken_the_planner.sql	20260922155332	failed	0.01	P0001	0425 P1: only 0 walkaround bookings on the twin depot -- the evidence was purged; re-derive db/checks/0338 section 6 before applying.
+424	0426_a_charge_only_rule_fails_every_walkaround_because_my_probe_spells_the_service_key_svc_and_it_reads_service.sql	20260922155423	failed	0.01	P0001	0426 P1: no task_completion HW.003 evaluation carries 'svc' -- the probe context changed or the ledger was purged. Re-derive db/checks/0340 before applying.
+425	0427_the_presence_rule_finally_gets_a_stall_by_probing_where_a_charge_actually_ends.sql	20260922163008	failed	0.01	P0001	0427 P1: no HW.006 evaluations at task_completion since 0426 -- the ledger was purged or the probe is gone. Re-derive db/checks/0343 before applying.
+426	0428_the_first_advisory_checkpoint_becomes_enforcing_and_refusing_by_raise_would_have_erased_its_own_evidence.sql	20260922170157	failed	0.01	P0001	0428 P1: expected exactly 1 discarding PERFORM of the shield probe, found 0 -- somebody changed this checkpoint. STOP and re-read db/checks/0345.
+427	0429_the_depot_is_in_entity_id_and_every_query_written_to_this_repos_own_mandated_predicate_reads_zero.sql	20260922171450	failed	0.01	P0001	0429 P1: no unattributed depot events -- either somebody fixed this or the ledger was purged. Re-derive db/checks/0344 before applying.
+428	0430_the_ledger_says_blocked_and_cannot_say_whether_anything_was_blocked_so_it_learns_to_say_both.sql	20260922172845	failed	0.01	P0001	0430 P1: no blocked rows in the ledger -- re-derive db/checks/0337 and 0345 before building an instrument for a population that does not exist.
+429	0431_a_quarter_of_departures_skipped_the_readiness_check_because_it_runs_before_the_vehicle_is_staged.sql	20260922224038	failed	0.01	P0001	0431 P1: ottoq.ottoq_plan_dispatch_tick prosrc md5 is 65be125ae60ce677a1f0d3283d40ddb5 -- it changed since 0351 read it; re-read before splicing
+430	0432_the_agent_could_rewrite_the_simulated_demand_it_is_measured_against_and_could_not_see_its_own_clamps.sql	20260922231738	failed	0.01	P0001	0432 P1: ottoq_agent_board prosrc md5 is 2302edba83c608bef3cb7bd4cb5354ad -- it changed since 0352 read it
+431	0433_a_demand_response_reduction_was_read_as_the_depots_whole_charging_ceiling_and_the_gate_forgot_the_battery.sql	20260923012038	failed	0.01	P0001	0433 P1: public.ottoq_decide_tick prosrc md5 is 6dc25d1dc45bb5c39ba1d5c9c2145ebf -- it changed since this file read it
+432	0434_three_consumers_of_the_deploy_demand_defaulted_it_three_ways_and_one_saw_double.sql	20260923012128	failed	0.01	P0001	0434 P1: public.ottoq_decide_tick prosrc md5 is 6dc25d1dc45bb5c39ba1d5c9c2145ebf -- apply 0433 first, or it changed since this file read it
+433	0435_the_battery_planned_eight_hours_ahead_on_a_forecast_where_charging_stops_and_was_empty_before_the_expensive_afternoon.sql	20260923012432	failed	0.01	P0001	0435 P1: public.ottoq_energy_orchestrate prosrc md5 is 0a6630ffec8259cd4b1e39ea4701c07d -- it changed since this file read it
+434	0436_the_twins_afternoon_peaked_at_eight_pm_because_a_sine_was_written_where_its_comment_meant_a_cosine.sql	20260923012457	failed	0.01	P0001	0436 P1: twin.ottoq_sim_advance_weather_and_solar md5 is 069d5d3cd59a8ee100644e7fa038edcb -- it changed since this file read it
+435	0437_the_readiness_check_had_a_second_door_out_of_the_depot_and_0431_only_guarded_one.sql	20260923012530	failed	0.01	P0001	0437 P1: ottoq.ottoq_plan_dispatch_tick md5 is 65be125ae60ce677a1f0d3283d40ddb5 -- it changed since this file read it
+436	0438_three_of_the_agents_five_dials_did_nothing_and_its_board_never_said_so.sql	20260923012821	failed	0.07	42703	column "agent_writable" does not exist
+437	0439_the_learning_loop_had_nothing_to_compare_so_it_now_runs_its_own_experiments.sql	20260923020808	failed	0.01	P0001	0439 P1: public.ottoq_bess_day_plan is absent -- apply 0435 first
+438	0440_the_dial_runner_lost_its_lock_to_the_recert_heartbeat_on_every_minute_they_share.sql	20260923021253	failed	0.02	42883	function "public.ottoq_dial_pair(uuid,bigint,integer)" does not exist
+439	0441_the_physical_pointer_defect_is_safety_evidence_and_it_evaporates_on_the_next_demo_run.sql	20260923023300	failed	0.02	42883	function public.ottoq_check_run_scope_registry() does not exist
+440	0442_the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere.sql	20260923042027	failed	0.01	P0001	0442 P1: ottoq_energy_orchestrate md5 is 0a6630ffec8259cd4b1e39ea4701c07d
+441	0443_the_ab_pair_filed_its_second_arms_fleet_reset_as_the_first_arms_evidence.sql	20260923042056	failed	0.02	42883	function "public.ottoq_ab_pair(bigint,integer,text,uuid,timestamp with time zone,integer,text,text)" does not exist
+442	0444_the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak.sql	20260923042223	failed	0.02	42883	function "public.ottoq_bess_day_plan(uuid,uuid,timestamp with time zone,numeric)" does not exist
+443	0445_the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late.sql	20260923042310	failed	0.01	P0001	0445 P1: ottoq_sim_advance_tick_world md5 is fbf71dfa1356345cadd93aab35bef8d3
+444	0446_two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing.sql	20260923042353	failed	0.01	P0001	0446 P1: ottoq_l2_propose_stall_assignment md5 is e58ecc8b8505a11a79917c09b7a4e257
+445	0447_the_readiness_gates_hold_clock_lived_on_the_vehicle_so_an_old_runs_stamp_released_fresh_holds.sql	20260923042423	failed	0.01	P0001	0447 P1: twin.ottoq_sim_advance_service_flow md5 is cb5bae56bc391bc7313cf73014fec21e
+446	0448_the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped.sql	20260923042526	failed	0.02	42883	function "public.ottoq_recall_naive_threshold_v1(uuid,uuid,timestamp with time zone,numeric,numeric)" does not exist
+447	0449_the_twins_september_afternoon_was_hotter_than_nashvilles_record_because_it_widened_around_the_yearly_mean.sql	20260923042610	failed	0.01	P0001	0449 P1: twin.ottoq_sim_advance_weather_and_solar md5 is 069d5d3cd59a8ee100644e7fa038edcb
+448	0450_the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call.sql	20260923042708	failed	0.01	P0001	0450 P1: twin.ottoq_sim_bess_step md5 is c3a6176cb06f43338d3bab3cdc39fe30
+449	0451_the_intelligence_panel_counted_failures_as_refusals_and_showed_every_runs_solver_calls_as_this_ones.sql	20260923053740	failed	0.01	P0001	0451 P2: ottoq_rule_evaluation_effect (0430) is missing
+450	0452_the_decisions_stream_restated_every_waiting_vehicle_every_tick_and_the_ledger_never_saw_a_failed_agent_call.sql	20260923060345	failed	0.01	P0001	0452 P2: ottoq_activity_feed is not the 0451 body this file extends
+451	0453_a_repeat_is_the_next_decide_tick_and_standing_is_per_action.sql	20260923060733	failed	0.02	42883	function "public.ottoq_activity_feed(uuid,integer,uuid,boolean,integer)" does not exist
+452	0454_events_are_their_own_rows_and_a_waiting_vehicle_is_one_row.sql	20260923061135	failed	0.02	42883	function "public.ottoq_activity_feed(uuid,integer,uuid,boolean,integer)" does not exist
+453	0455_every_decision_in_the_stream_says_what_it_decided_and_why.sql	20260923061500	failed	0.02	42883	function "public.ottoq_activity_feed(uuid,integer,uuid,boolean,integer)" does not exist
+454	0456_the_kernel_card_counted_abstentions_as_refused_proposals.sql	20260923062252	failed	0.02	42883	function "public.ottoq_intelligence_stack(uuid,boolean)" does not exist
+455	0457_a_held_deploy_is_a_state_not_an_event.sql	20260923063827	failed	0.02	42883	function "public.ottoq_activity_feed(uuid,integer,uuid,boolean,integer)" does not exist
+456	0460_the_cockpits_could_not_read_the_card_they_were_built_on_and_it_never_said_where_a_vehicle_was_booked.sql	20260925200000	ok	0.01		
+457	0461_the_depot_card_migration_never_classified_itself_so_the_recert_floor_restarted_every_column.sql	20260926032129	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+458	0458_a_bay_door_seated_cars_for_no_time_and_the_bay_could_not_credit_the_need_it_was_seated_for.sql	20260926033237	failed	0.01	P0001	0458 P2: twin.ottoq_sim_confirm_commands is not the body this file patches
+459	0459_stopping_a_run_relabelled_every_interrupted_bay_booking_so_the_interruption_record_vanished.sql	20260926033252	failed	0.01	P0001	0459 P2: public.ottoq_sim_release_depot is not the body this file patches
+460	0462_the_events_feed_printed_real_time_painted_passing_rules_critical_and_restated_every_tick.sql	20260926040843	failed	0.02	42703	column e.sim_clock_at does not exist
+461	0466_the_run_list_counted_no_charge_sessions_for_any_run_and_printed_its_row_cap_as_a_count.sql	20260926045441	failed	0.02	P0001	0466 V3: the grants moved
+462	0463_a_charge_that_completed_below_its_visit_target_stayed_open_and_the_deploy_gate_looped_the_car_through_the_service_bay.sql	20260926045517	failed	0.02	42883	function "ottoq.ottoq_close_satisfied_charge_needs(uuid,timestamp with time zone)" does not exist
+463	0464_the_deploy_gate_sent_every_kind_of_open_work_to_the_service_bay_and_named_the_wrong_work_as_missing.sql	20260926045544	failed	0.01	P0001	0464 P2: twin.ottoq_sim_advance_service_flow is not the body this file patches
+464	0465_the_command_door_dropped_the_step_a_gate_intake_carried_so_the_car_was_never_moved_again.sql	20260926045604	failed	0.01	P0001	0465 P2: twin.ottoq_sim_confirm_commands is not the body this file patches
+465	0467_the_gate_intake_picked_a_stall_its_own_gate_refused_and_each_refusal_left_a_phantom_hold.sql	20260926052522	failed	0.01	P0001	0467 P2: public.ottoq_decide_tick is not the body this file patches
+466	0468_the_service_bay_admitted_cars_on_their_step_alone_and_seated_the_boot_cohort_for_work_that_did_not_exist.sql	20260926055955	failed	0.01	P0001	0468 P2: twin.ottoq_sim_advance_service_flow is not the body this file patches
+467	0469_the_service_sequencer_sent_every_ready_car_a_stage_command_every_tick_that_the_door_executed_as_nothing.sql	20260926060017	failed	0.01	P0001	0469 P2: public.ottoq_decide_tick is not the body this file patches
+468	0470_the_run_list_showed_certification_arms_and_pushed_the_operators_own_runs_off_it.sql	20260926062937	failed	0.01	P0001	0470 P2: public.ottoq_twin_run_list is not the body this file patches
+469	0471_the_staging_hold_booked_stalls_promised_to_another_car_and_left_each_refused_booking_held.sql	20260926063850	failed	0.01	P0001	0471 P2: ottoq.ottoq_place_unplaced_vehicles is not the body this file patches
+470	0472_the_inspection_seam_sent_cars_the_gate_intake_had_already_sent_and_the_door_kept_one_by_stall_id.sql	20260926070905	failed	0.01	P0001	0472 P2: ottoq.ottoq_enact_inspection_seam is not the body this file patches
+471	0473_the_inspection_seam_served_the_readiness_leg_as_a_second_interior_inspection.sql	20260926070924	failed	0.01	P0001	0473 P2: ottoq.ottoq_enact_inspection_seam is not the body this file patches
+472	0474_a_car_moved_off_a_faulted_charger_was_staged_with_no_step_so_no_gate_read_it.sql	20260926112238	failed	0.01	P0001	0474 P2: twin.ottoq_sim_stop_charge_session is not the body this file patches
+473	0475_the_deploy_gates_technician_flag_was_never_cleared_and_took_service_bay_seats_in_later_runs.sql	20260926112312	failed	0.01	P0001	0475 P2: twin.ottoq_sim_advance_service_flow is not the body this file patches
+474	0476_the_gate_intake_booked_over_the_cars_own_hold_and_ran_with_no_booking.sql	20260926112337	failed	0.01	P0001	0476 P2: public.ottoq_decide_tick is not the body this file patches
+475	0477_the_energy_command_hashed_the_day_plans_solve_time_so_a_reserve_shaving_depot_could_not_certify.sql	20260926112403	failed	0.01	P0001	0477 P2: public.ottoq_energy_orchestrate is not the body this file patches
+476	0478_the_dial_setter_kept_a_rows_first_writer_so_a_dial_named_who_created_it_not_who_set_it.sql	20260926115337	failed	0.01	P0001	0478 P2: public.ottoq_policy_set is not the body this file patches
+477	0479_the_solar_canopies_soiling_was_shared_by_every_run_so_an_arm_inherited_the_panels_the_last_run_left.sql	20260926115429	failed	0.01	P0001	0479 P2: twin.ottoq_sim_advance_weather_and_solar is not the body this file patches
+478	0480_the_reserve_shave_promotion_is_measured_again_on_arms_that_start_on_the_same_panels.sql	20260926115449	failed	0.01	42P01	relation "public.ottoq_cert_lineage" does not exist
+479	0481_a_dial_promotion_the_canon_keeps_failing_under_now_rolls_itself_back.sql	20260926122216	failed	0.02	42883	function "public.ottoq_rollback_dial_promotion(bigint)" does not exist
+480	0482_the_dial_runner_opens_and_closes_its_own_overnight_window.sql	20260926122233	failed	0.02	42883	function "public.ottoq_dial_experiment_runner()" does not exist
+481	0483_a_recalled_cars_charge_was_closed_on_the_soc_it_left_with_before_the_arrival_drain.sql	20260926132036	failed	0.01	P0001	0483 P2: twin.ottoq_sim_advance_flow_contract is not the body this file patches
+482	0484_a_finished_charge_kept_its_charger_booked_and_reserved_so_the_car_held_it_from_staging.sql	20260926132059	failed	0.01	P0001	0484 P2: twin.ottoq_sim_stop_charge_session is not the body this file patches
+483	0485_the_dial_window_stays_closed_while_the_build_is_still_moving.sql	20260926143555	failed	0.01	P0001	0485 P2: cron 761 is not 0482's active window opener
+484	0486_the_battery_drains_while_the_car_is_out_and_otto_q_rereads_its_charge_need_every_tick.sql	20260926145308	failed	0.01	P0001	0486 P2: twin.ottoq_sim_advance_deployed_telemetry is not the body this file patches
+485	0487_the_crew_decides_first_and_the_engine_applies_it.sql	20260926152610	failed	0.01	P0001	0487 P2: twin.ottoq_opportunistic_scan is not the body this file patches
+486	0488_the_wave_admission_edge_function_stops_moving_cars_under_the_live_tick.sql	20260926160930	failed	0.01	P0001	0488 P2: public.ottoq_cron_tick is not the body this file patches
+487	0489_the_completion_probe_reads_the_stall_the_work_was_done_in.sql	20260926161825	failed	0.02	42883	function "public.ottoq_probe_task_completion(uuid,uuid,uuid,text,timestamp with time zone,timestamp with time zone)" does not exist
+488	0490_the_refusal_reactor_leaves_a_car_the_decide_path_has_already_replanned.sql	20260926161853	failed	0.01	P0001	0490 P2: ottoq.ottoq_react_to_refusals is not the body this file patches
+489	0491_an_ops_action_outside_the_whitelist_is_refused_and_says_so.sql	20260926170743	failed	0.01	P0001	0491 P2: public.ottoq_apply_ops_action is not the body this file patches
+490	0492_the_orphan_sweep_ends_a_twin_session_on_its_runs_clock.sql	20260926170804	failed	0.01	P0001	0492 P2: public.ottoq_reconcile_charger_states is not the body this file patches
+491	0493_a_refused_charge_books_nothing_and_a_charging_car_holds_no_other_charger.sql	20260926183701	failed	0.01	P0001	0493 P2: public.ottoq_decide_tick is not the body this file patches
+492	0494_the_charge_proposer_offers_only_a_charger_the_gate_accepts.sql	20260926190651	failed	0.01	P0001	0494 P2: public.ottoq_l2_propose_stall_assignment is not the body this file patches
+493	0496_the_intelligence_card_reads_the_playback_speed_the_run_is_paced_by.sql	20260926200223	failed	0.02	42883	function "public.ottoq_intelligence_stack(uuid,boolean)" does not exist
+494	0495_the_greedy_optimizer_offers_only_a_charger_the_gate_accepts.sql	20260926201658	failed	0.01	P0001	0495 P2: public.ottoq_l2_optimize_assignments is not the body this file patches
+495	0497_a_run_seed_goes_to_the_cockpit_as_text.sql	20260926204519	failed	0.01	P0001	0497 P2: one of the four twin read functions is not the body this file patches
+496	0498_the_cp_sat_frame_reads_the_calendar_the_gate_refuses_on.sql	20260926210609	failed	0.02	42883	function "public.ottoq_build_decision_frame(uuid,uuid)" does not exist
+497	0499_the_proposal_selector_asks_the_calendar_the_gate_refuses_on.sql	20260926210943	failed	0.01	P0001	0499 P2: public.ottoq_l2_external_proposal is not the body this file patches
+498	0500_a_parking_hold_lasts_as_long_as_its_car_is_parked.sql	20260926214200	failed	0.01	P0001	0500 P2: ottoq.ottoq_release_expired_bookings is not the body this file patches
+499	0501_the_wait_for_a_charger_is_measured_beside_kpi_5.sql	20260926221345	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+500	0502_the_recall_appointment_picks_a_staging_stall_the_gate_accepts.sql	20260926232454	failed	0.01	P0001	0502 P2: ottoq.ottoq_book_appointment is not the body this file patches
+501	0503_the_refusal_reactor_leaves_a_refused_staging_appointment_to_the_cars_arrival.sql	20260926232527	failed	0.01	P0001	0503 P2: ottoq.ottoq_react_to_refusals is not the body this file patches
+502	0504_an_inspection_closes_its_own_leg_not_the_readiness_check.sql	20260926235621	failed	0.01	P0001	0504 P2: public.ottoq_close_atom_leg is not the body this file patches
+503	0505_a_twin_command_records_when_it_executed.sql	20260927002850	failed	0.01	P0001	0505 P2: twin.ottoq_sim_confirm_commands is not the body this file patches
+504	0506_a_vehicle_card_names_its_steps_and_says_when_one_is_overdue.sql	20260927004648	failed	0.02	P0001	0506 V2: public.ottoq_depot_cards's privileges or settings changed
+505	0507_a_vehicle_card_ends_the_current_step_when_it_will_end.sql	20260927005114	failed	0.01	P0001	0507 P2: public.ottoq_depot_cards is not the body this file patches
+506	0508_a_charge_is_recorded_when_its_session_ends_with_the_energy_it_delivered.sql	20260927012721	failed	0.01	P0001	0508 P2: ottoq.ottoq_release_expired_bookings is not the body this file patches
+507	0509_a_charging_card_ends_when_the_charge_physics_says_it_will.sql	20260927020531	failed	0.01	P0001	0509 P2: public.ottoq_depot_cards is not the body this file patches
+508	0510_one_air_temperature_for_the_whole_depot.sql	20260927030227	failed	0.01	P0001	0510 P2: twin.ottoq_sim_start_charge_session is not the body this file patches
+509	0511_the_interior_inspection_happens_during_the_charge.sql	20260927034307	failed	0.01	P0001	0511 P2: public.ottoq_start_concurrent_atoms is not the body this file patches
+510	0513_the_weekly_refit_could_not_see_the_recert_runner_and_wrote_the_priors_under_a_pair.sql	20260927050506	failed	0.01	P0001	0513 P2: public.ottoq_twin_ingest_refresh is not the body this file patches
+511	0512_the_cards_say_who_did_the_work.sql	20260927050956	failed	0.01	P0001	0512 P2: public.ottoq_twin_snapshot is not the body this file patches
+512	0514_the_charges_that_teach_the_booking_window_are_purged_with_their_run.sql	20260927052757	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+513	0515_the_ledger_records_what_the_charge_was_booked_for_and_aimed_at.sql	20260927060333	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+514	0516_the_booking_window_is_fitted_from_the_charges_with_the_run_s_stop_counted.sql	20260927061451	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+515	0517_a_calibrated_charge_window_behind_a_dial.sql	20260927062217	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+516	0518_one_rule_for_whether_a_car_needs_its_charge.sql	20260927074142	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+517	0519_the_charger_s_sensors_cannot_finish_an_inspection_on_a_car_that_has_left.sql	20260927074236	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+518	0520_a_paired_experiment_can_judge_the_booking_window_at_a_charge_s_own_cadence.sql	20260927081719	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+519	0521_the_charger_s_sensors_see_only_a_car_on_a_charger.sql	20260927085218	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+520	0522_the_dial_window_closes_before_its_last_pair_could_outlast_it.sql	20260927111501	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+521	0523_a_dial_experiment_restarts_only_for_a_change_that_can_move_an_arm.sql	20260927122408	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+522	0524_a_start_stops_the_live_run_and_a_failed_seed_starts_nothing.sql	20260927131711	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+523	0525_the_charge_evidence_records_the_cadence_it_was_observed_at.sql	20260927131932	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+524	0526_a_visit_with_no_charge_does_its_cabin_work_where_the_car_is_parked.sql	20260927140637	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+525	0527_kpi_two_counts_a_turn_when_a_car_leaves_a_service_point.sql	20260927140742	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+526	0528_kpi_four_counts_the_technicians_and_divides_by_the_cars_that_came_in.sql	20260927150822	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+527	0529_a_guardrail_that_moves_off_zero_is_judged_and_the_verdict_names_the_unmeasured.sql	20260927151819	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+528	0530_unmet_demand_is_measured_from_the_cars_actually_out.sql	20260927153902	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+529	0531_the_learners_arms_start_through_the_operators_door.sql	20260927161230	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+530	0532_the_challenger_asks_whether_the_chargers_could_do_more_while_cars_wait.sql	20260927164827	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+531	0533_the_charge_target_an_arm_is_given_is_the_one_it_charges_to.sql	20260927171208	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+532	0534_an_experiment_can_wait_its_turn.sql	20260927173711	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+533	0535_a_top_off_is_offered_to_a_car_still_waiting_for_one.sql	20260927175201	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+534	0536_the_cockpits_see_what_the_brain_questions_and_what_it_learns.sql	20260927180246	failed	0.01	42883	function "public.ottoq_activity_feed(uuid,integer,uuid,boolean,integer)" does not exist
+535	0537_a_question_is_one_the_next_scan_still_sees.sql	20260927194349	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+536	0538_a_challenger_grade_says_what_it_measures_and_what_tests_its_lever.sql	20260927210230	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+537	0539_a_car_charges_to_full_and_nothing_the_depot_decides_lowers_it.sql	20260927223621	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+538	0540_every_result_the_learner_reaches_is_a_recommendation_a_person_ships.sql	20260927230739	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+539	0541_a_car_charging_to_its_target_is_never_a_question.sql	20260927230859	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+540	0542_a_car_that_owes_its_charge_goes_to_the_charger_and_no_gate_sends_a_car_out_unfinished.sql	20260928003702	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+541	0543_no_car_leaves_the_depot_with_a_service_still_needed.sql	20260928013804	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+542	0544_a_car_that_is_not_finished_cannot_be_dispatched.sql	20260928033602	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+543	0545_no_queue_starves_a_car_that_cannot_leave_until_it_is_finished.sql	20260928034458	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+544	0546_a_car_waiting_for_a_charger_keeps_its_place_in_line.sql	20260928053318	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+545	0547_a_charger_its_car_has_left_for_a_bay_is_free.sql	20260928074913	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+546	0548_a_paired_test_can_keep_a_fast_charger_for_a_car_that_wants_one.sql	20260928093601	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+547	0549_a_car_seated_in_a_bay_early_is_served_now.sql	20260928111517	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+548	0550_a_charger_fault_from_the_cockpit_stops_the_charge.sql	20260928163347	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+549	0552_the_fault_door_waits_for_the_tick_instead_of_deadlocking_with_it.sql	20260928170009	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+550	0551_a_car_keeps_its_place_in_the_charge_line_through_a_fault.sql	20260928180804	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+551	0553_a_hold_for_a_car_that_cannot_come_gives_way_to_a_car_waiting_now.sql	20260928184413	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+552	0554_a_car_is_in_a_bay_only_when_it_stands_in_one.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+553	0555_a_faulted_car_is_repaired_before_it_goes_back_to_work.sql	20260928212503	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+554	0556_the_gates_patience_flag_is_a_note_for_a_person_not_service_work.sql	APPLIED-NO-LEDGER-ROW	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+555	0557_a_faulted_car_is_repaired_before_it_charges.sql	20260928220015	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+556	0558_a_faulted_cars_repair_goes_first_in_its_plan.sql	20260928235524	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+557	0561_every_charger_stall_is_angled_and_the_database_says_so.sql	20260929014318	failed	0.01	P0001	0561 P1: the twin depot has 0 charger stalls, not 40 — the layout moved since this file was written
+558	0564_a_manual_start_interrupts_a_running_check.sql	20260929024700	failed	0.01	P0001	0564 P1: ottoq_sim_run_scenario(text, bigint, text, timestamptz) is not the start this wraps
+559	0565_a_scorecard_that_counts_cars_served.sql	20260929183923	failed	0.03	P0001	0565 P1: the scorecard reads columns that do not exist: ottoq_run_archives.engine_hash, ottoq_run_scope_registry.class, ottoq_cert_lineage.forces_recert
+560	0566_the_scorecard_reads_the_step_a_run_actually_took.sql	20260929184316	failed	0.01	P0001	0566 P1: 0565 is not applied
+561	0567_a_charger_build_out_lives_only_inside_a_test_day.sql	20260929191451	failed	0.01	P0001	0567 P1: a conversion reads or writes columns that do not exist: ottoq_service_point_capabilities.stall_id, ottoq_service_point_capabilities.asset_class_code, ottoq_service_point_capabilities.operation_code, ottoq_cert_lineage.forces_dial_restart
+562	0590_each_charger_choice_says_what_it_chose_from.sql	20260929192241	failed	0.01	P0001	0590 P1: ottoq_l2_propose_stall_assignment changed since it was measured; re-measure the rebuild
+563	0568_an_overnight_sweep_scores_one_test_day_at_a_time.sql	20260929193249	failed	0.01	P0001	0568 P1: the arm protocol calls functions that do not exist: public.ottoq_try_world_lock(integer,numeric), public.ottoq_dial_pair_floor(), public.ottoq_engine_hash(), public.ottoq_tick_invariance_reset_fleet(uuid,bigint,timestamptz), public.ottoq_sim_run_scenario(text,bigint,text,timestamptz), ottoq.ottoq_world_fingerprint(uuid), public.ottoq_ab_arm_atoms(uuid,uuid), public.ottoq_dial_arm_metrics(uuid,uuid,numeric), public.ottoq_throughput_score_write(uuid,text), public.ottoq_site_buildout_apply(uuid,text), public.ottoq_site_buildout_restore(uuid)
+564	0569_a_margin_ledger_prices_what_the_twin_measured.sql	20260929200104	failed	0.01	P0001	0569 P1: the ledger reads columns that do not exist: ottoq_throughput_sweep_pairs.sweep_code, ottoq_throughput_sweep_pairs.buildout_code, ottoq_throughput_sweep_pairs.fixed_params, ottoq_throughput_sweep_pairs.seed, ottoq_throughput_sweep_pairs.baseline, ottoq_throughput_sweep_pairs.world_identical, ottoq_throughput_sweep_pairs.deployed_car_hours_delta, ottoq_throughput_sweep_pairs.site_cost_usd_delta, ottoq_throughput_sweep_pairs.served_delta, ottoq_throughput_sweep_pairs.otto_q_run, ottoq_throughput_sweep_pairs.baseline_run, ottoq_throughput_sweep_pairs.on_time_pct_delta, ottoq_throughput_sweep_arms.sim_run_id, ottoq_throughput_sweep_arms.replicate, ottoq_throughput_sweep_arms.scorecard, ottoq_throughput_sweep_arms.arm_metrics
+565	0570_the_batch_optimizer_can_serve_cars_in_the_order_the_cursor_does.sql	20260930113817	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+566	0571_a_sweep_measures_a_dial_against_its_own_control.sql	20260930114255	failed	0.01	P0001	0571 P1: 0568's sweep or 0569's ledger is missing
+567	0572_a_fleet_build_out_borrows_cars_for_one_test_day.sql	20260930114616	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+568	0578_a_replicate_is_judged_on_what_it_did_not_on_its_own_run_id.sql	20260930114742	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+569	0573_every_charge_and_service_takes_the_time_public_data_says.sql	20260930115308	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+570	0574_the_twin_prices_power_at_nashvilles_published_rate.sql	20260930115405	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+571	0575_night_two_measures_what_a_customer_is_paying_for.sql	20260930115452	failed	0.01	P0001	0575 P1: 0571's control cells are missing; apply 0571 first
+572	0576_the_value_tab_reads_what_night_two_measured.sql	20260930115650	failed	0.01	P0001	0576 P1: 0568's sweep or 0569's prices are missing
+573	0577_a_test_days_opening_surge_is_not_the_depots_peak.sql	20260930115753	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+574	0591_the_staging_stall_beside_the_gate_fills_last.sql	20261001232134	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+575	0592_a_vehicle_card_names_each_steps_station_and_the_plan_it_replaced.sql	20261001233144	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+576	0593_the_entrance_sign_stands_outside_the_fence_where_the_twin_draws_it.sql	20261002014128	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+577	0579_the_in_flight_probe_sees_an_overnight_sweep_arm.sql	20261002194411	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+578	0580_the_overnight_sweep_keeps_its_own_window_and_starts_no_arm_it_cannot_finish.sql	20261002194524	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+579	0581_the_value_tab_names_the_test_a_charger_claim_failed.sql	20261002195422	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+580	0582_a_run_that_has_ended_dispatches_no_car.sql	20261002195507	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+581	0600_the_battery_never_charges_itself_into_the_billed_half_hour.sql	20261002195616	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+582	0601_the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts.sql	20261002200039	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+583	0602_the_calendar_keeps_the_exclusion_that_binds_and_sheds_the_one_it_subsumes.sql	PENDING	skipped_pending	0.0		
+584	0603_a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_test_day.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+585	0604_every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them.sql	20261002200316	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+586	0559_an_outside_agent_asks_through_one_door_and_a_person_decides.sql	20261004111417	failed	0.01	P0001	0559 P1: a door this file routes to is missing (recall <NULL>, ops ottoq_apply_ops_action(uuid,uuid,text,jsonb,text))
+587	0560_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql	20261004111501	failed	0.01	P0001	0560 P1: ottoq_agent_requests_for_operator does not exist; apply 0559 first
+588	0605_an_owners_agent_sets_what_its_own_cars_need_and_the_runs_end_puts_it_back.sql	20261004112442	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+589	0606_the_fleet_owner_cockpit_reads_what_its_agent_set.sql	20261004112719	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+590	0607_any_agent_is_welcomed_and_the_demo_passcode_opens_the_fleet_until_the_run_ends.sql	20261004113110	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+591	0608_the_crew_and_the_twin_see_what_every_owners_agent_set_with_its_confirmation_code.sql	20261004113230	failed	0.01	42P01	relation "public.ottoq_cert_lineage" does not exist
+592	0609_the_kpi_tab_reads_uptime_turnaround_service_and_energy.sql	20261007024116	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+593	0610_the_kpi_boards_turnaround_in_one_pass.sql	20261007024824	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+594	0611_the_kpi_board_prices_the_demand_charge.sql	20261007031040	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+595	0612_the_twin_sees_a_faulted_charger_and_when_it_comes_back.sql	20261007131113	failed	0.03	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+596	0613_the_planners_learn_inside_the_run_where_their_offers_went.sql	20261007135127	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+597	0614_the_agent_can_order_the_charge_line_and_the_decide_path_disposes.sql	20261007181946	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+598	0615_an_operators_demo_run_takes_the_agents_charge_order.sql	20261007183516	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+599	0616_the_order_usage_counts_the_orders_that_seated_cars.sql	20261007184459	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+600	0617_a_car_named_for_the_kind_not_free_waits_behind_the_cars_not_named.sql	20261007202316	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+601	0618_the_kernel_checks_the_agents_charge_order_against_its_own_before_taking_it.sql	20261007203510	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+602	0619_the_kernel_learns_how_long_a_charge_takes_and_when_a_car_comes_back.sql	20261008132327	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+603	0620_the_kernel_takes_an_agent_order_only_when_it_wins_most_futures.sql	20261008134303	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+604	0621_the_kernel_grades_its_own_check_in_hindsight.sql	20261008144612	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+605	0622_the_kernel_learns_each_cars_charge_clock_from_its_own_charges.sql	20261008162412	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+606	0623_the_check_sees_cars_leave_and_come_back.sql	20261008191129	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+607	0624_the_check_reads_each_cars_open_work.sql	20261008204412	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+608	0625_a_learned_model_knows_when_its_world_changed.sql	20261008214932	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+609	0626_the_self_review_judges_the_clock_within_runs_and_ranks_what_to_build.sql	20261008225037	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+610	0627_the_futures_call_cars_home_the_way_the_kernel_does.sql	20261009002205	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+611	0628_the_futures_drain_each_car_at_its_own_rate.sql	20261009021006	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+612	0629_a_production_session_is_armed_and_no_agent_write_reaches_it.sql	20261009033733	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+613	0630_the_grader_reads_a_runs_stop_as_the_stop.sql	20261009100905	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+614	0631_a_fault_owns_the_charge_it_cut.sql	20261009101257	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+615	0632_the_charge_clock_reads_the_air.sql	20261009101743	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+616	0633_the_futures_spread_each_arrival_as_the_returns_show.sql	20261009102050	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+617	0634_a_drain_is_timed_only_from_a_dispatch_the_depot_saw_begin.sql	20261009102518	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+618	0635_the_futures_take_chargers_down_as_the_depots_chargers_fail.sql	20261009103141	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+619	0636_the_charge_clocks_spread_is_what_its_charges_show.sql	20261009103417	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+620	0637_the_futures_read_the_latest_return_model_that_was_usable.sql	20261009103821	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+621	0638_the_self_review_remembers_what_it_found.sql	20261009104044	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+622	0639_the_futures_hold_a_charger_for_the_car_the_calendar_names.sql	20261009104324	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+623	0640_the_agent_sees_the_chargers_the_calendar_holds.sql	20261009104502	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+624	0641_the_agent_sees_the_kernels_own_plan.sql	20261009104632	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+625	0642_the_kernel_serves_a_long_wait_first_and_times_its_line_in_minutes.sql	20261009123213	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+626	0643_the_research_wing_tests_0642s_two_keys_in_the_twin.sql	20261009132013	failed	0.01	42P01	relation "public.ottoq_cert_lineage" does not exist
+627	0644_the_research_safety_check_judges_cars_not_served_across_a_look.sql	20261009174701	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+628	0645_the_nightly_run_purge_runs_again_and_never_takes_what_the_learning_reads.sql	PENDING	skipped_pending	0.0		
+629	0646_the_wall_clock_retention_never_takes_a_production_runs_shield_log.sql	PENDING	skipped_pending	0.0		
+630	0647_the_public_key_reads_no_vehicle_and_no_command.sql	20261009232411	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+631	0648_the_command_dock_answers_only_the_platform.sql	20261009232737	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+632	0649_source_keys_are_issued_by_the_platform_and_bind_a_depot_and_a_data_source.sql	20261009233223	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+633	0650_the_v2_door_takes_cloudevents_keeps_their_time_drops_duplicates_and_orders_them.sql	20261010005456	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+634	0651_a_directive_leaves_with_an_id_a_version_an_expiry_and_the_depots_signing_key.sql	20261010005934	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+635	0652_the_twin_applies_the_directives_it_is_handed_and_answers_each_with_an_ack.sql	20261010010118	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+636	0653_the_twin_speaks_to_otto_q_as_two_operators.sql	20261010013631	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+637	0654_the_walk_reports_to_the_twin_and_the_ticks_let_its_operators_answer_first.sql	20261010014628	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+638	0655_the_finalizer_leaves_a_directive_its_operator_answered_as_it_was_answered.sql	20261010031137	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+639	0656_the_research_wing_measures_the_operator_door_in_the_twin.sql	20261010031436	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+640	0658_the_public_key_reads_only_what_a_cockpit_shows.sql	20261010110559	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+641	0699_the_twin_apps_determinism_canon_card_reads_again.sql	20261010110724	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+642	0659_the_twins_chargers_can_be_depot_grade_and_the_research_wing_measures_it.sql	20261010110931	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+643	0690_the_dispatch_ledger_counts_the_miles_the_car_drove.sql	20261010111333	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+644	0700_an_owner_signs_in_and_connects_their_own_agent.sql	20261010111411	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+645	0701_a_signed_in_user_cannot_read_the_signing_key_or_call_the_signers_or_purge.sql	PENDING	skipped_pending	0.0		
+646	0702_the_production_guard_knows_every_agent_by_name.sql	PENDING	skipped_pending	0.0		
+647	0691_a_twin_operators_fault_report_goes_with_its_run.sql	20261010111503	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+648	0692_the_twins_operators_send_telemetry_and_faults_through_the_door.sql	20261010111739	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+649	0693_a_car_leaving_the_depot_is_reported_through_the_door.sql	20261010112022	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+650	0694_the_twins_chargers_speak_ocpp_2_0_1.sql	20261010112739	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+651	0657_the_readiness_check_is_the_last_thing_a_visit_does.sql	20261010112938	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+652	0695_an_autonomous_cars_data_comes_off_while_it_charges.sql	20261010113609	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+653	0696_the_twins_roads_crash_at_the_filed_rate_and_the_cold_is_counted_once.sql	20261010113746	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+654	0697_the_charger_back_end_hears_the_twins_chargers_through_a_relay.sql	PENDING	skipped_pending	0.0		
+655	0698_a_new_visit_carries_the_work_the_visit_it_replaces_still_owes.sql	20261010113923	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+656	0703_every_agent_pass_keeps_what_it_saw_and_what_it_changed.sql	20261013150710	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+657	0704_every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find.sql	20261013151002	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+658	0705_the_agent_is_consulted_when_something_changes_not_on_every_beat.sql	20261013151112	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+659	0709_the_agents_return_wave_counts_this_runs_cars_not_every_run_ever.sql	20261013152102	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+660	0710_the_wake_gate_reads_the_record_the_claim_reads.sql	20261013180020	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+661	0711_the_wake_gate_wakes_on_a_change_that_matters_not_on_every_wobble.sql	20261013180804	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+662	0712_the_checks_futures_are_drawn_from_the_world_not_from_the_runs_minted_id.sql	20261013181932	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+663	0713_one_agent_pass_holds_its_claim_for_as_long_as_a_pass_can_take.sql	20261013182717	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+664	0714_the_lease_catalog_row_says_what_the_claim_does.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	42P01	relation "public.ottoq_cert_lineage" does not exist
+665	0716_the_feed_agents_propose_the_twins_world_and_a_person_promotes_it.sql	20261013184608	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+666	0562_a_charger_is_not_held_for_a_car_still_on_its_way_back.sql	20261013191424	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+667	0707_the_engine_notices_when_a_channel_goes_dark.sql	20261013193522	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+668	0708_the_promotion_gate_can_ask_whether_the_check_tells_a_winning_order_from_a_losing_one.sql	20261013195202	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+669	0717_the_board_calls_eighty_percent_a_priority_band_not_a_floor.sql	20261013201139	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+670	0718_production_runs_the_world_phases_the_twin_certifies.sql	20261013210801	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+671	0706_the_order_built_from_the_newest_board_stands_and_an_outranked_order_never_does.sql	20261013210919	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+672	0719_production_start_takes_the_world_as_the_operator_door_does.sql	20261013211005	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+673	0720_a_signed_in_user_cannot_call_the_black_box_export_functions.sql	PENDING	skipped_pending	0.0		
+674	0721_a_signed_in_owner_changes_production_under_their_own_name.sql	PENDING	skipped_pending	0.0		
+675	0722_the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies.sql	PENDING	skipped_pending	0.0		
+676	0723_a_charges_closing_frames_name_the_charger_that_sent_them.sql	PENDING	skipped_pending	0.0		
+677	0715_a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves.sql	20261014144327	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+678	0724_forty_robotic_fast_chargers_are_a_test_day_before_they_are_the_depot.sql	20261017060928	failed	0.01	P0001	0724 P1: 0567/0568's build-out and sweep machinery is missing
+679	0725_forty_fast_chargers_on_a_normal_day_where_the_service_bays_are_not_the_wall.sql	20261017063328	failed	0.01	42P01	relation "public.ottoq_site_buildouts" does not exist
+680	0726_a_shared_power_cabinet_divides_its_power_and_the_twin_can_model_one.sql	20261017072652	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+681	0727_the_site_power_gate_can_read_the_meter_instead_of_guessing.sql	20261017072928	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+682	0728_forty_robotic_chargers_on_todays_service_through_shared_cabinets.sql	20261017073142	failed	0.02	42P01	relation "public.ottoq_cert_lineage" does not exist
+683	0729_a_site_that_divides_its_power_is_judged_by_the_limit_it_holds.sql	20261017081553	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+684	0730_twenty_fast_chargers_on_the_same_normal_day_to_find_the_knee.sql	20261017082241	failed	0.02	42P01	relation "public.ottoq_site_buildouts" does not exist
+685	0731_the_battery_plans_for_the_bill_the_value_view_reads.sql	20261017083042	failed	0.02	42P01	relation "public.ottoq_site_buildouts" does not exist
+686	0732_two_more_seeds_for_the_four_cells_the_recommendation_rests_on.sql	20261017105250	failed	0.02	42P01	relation "public.ottoq_site_buildouts" does not exist
+687	0733_a_shared_pool_gives_a_new_car_what_it_has_spare.sql	20261017110658	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+688	0734_the_same_morning_at_half_the_tick_to_measure_what_the_tick_costs.sql	20261017111846	failed	0.02	42P01	relation "public.ottoq_site_buildouts" does not exist
+689	0735_a_car_answers_a_command_in_the_tick_it_is_given.sql	20261017161641	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+690	0736_a_realistic_promise_at_arrival_and_its_grade.sql	20261017163802	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+691	0737_a_held_site_powers_the_cars_due_first.sql	20261017164907	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+692	0738_the_nightly_charge_clock_refit_gets_the_time_it_needs.sql	APPLIED-NO-LEDGER-ROW	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+693	0739_a_promise_counts_the_cars_still_waiting.sql	20261017173306	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+694	0740_a_promise_on_the_busy_day.sql	20261017174210	failed	0.01	42P01	relation "public.ottoq_throughput_sweeps" does not exist
+695	0741_the_promise_is_graded_beside_what_the_owner_app_says.sql	20261017182220	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+696	0742_a_promise_stays_honest_while_the_car_waits.sql	20261017185512	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+697	0743_the_bay_calendar_seats_each_car_on_its_own.sql	20261018110944	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+698	0744_a_bay_hold_follows_a_charge_that_runs_past_its_plan.sql	20261018111140	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+699	0745_the_itinerary_plans_each_charge_on_a_charger_the_depot_has.sql	20261018111301	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+700	0746_robotic_wash_lanes_and_bay_work_timed_by_the_work.sql	20261018111429	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+701	0747_the_bay_line_serves_the_car_that_rejoins_service_soonest.sql	20261018111537	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+702	0748_an_evidence_table_refuses_truncate_and_only_a_migration_says_what_is_evidence.sql	20261018111650	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+703	0749_an_evidence_table_is_not_dropped_by_accident.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+704	0750_every_bay_seat_ends_in_its_leg_and_its_service_record.sql	20261018112027	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+705	0751_in_production_only_a_person_answers_a_technician_question.sql	20261018112154	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+706	0752_a_service_reported_done_ends_in_its_leg_and_its_service_record.sql	20261018112438	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+707	0753_a_repair_waits_for_its_green_light_at_every_door.sql	20261018112725	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+708	0754_a_billed_half_hour_holds_thirty_minutes.sql	20261018112908	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+709	0755_a_parked_car_leaves_its_stall_before_the_calendar_seats_it.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+710	0756_a_proposal_ages_on_the_clock_it_was_stamped_in.sql	20261018113339	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+711	0757_a_bay_seat_that_finished_early_is_done.sql	20261018113640	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+712	0758_a_fast_chargers_cleaning_arm_cleans_the_cabin_while_the_car_charges.sql	20261019134637	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+713	0759_canopy_b_is_restriped_for_ten_more_robotic_fast_chargers.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+714	0760_a_car_the_cleaning_arm_is_cleaning_keeps_its_stall_when_the_charge_arm_lets_go.sql	20261020213742	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+715	0761_a_car_held_at_its_charger_is_passed_over_by_the_bay_doors.sql	20261020225005	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+716	0762_the_snapshot_says_when_each_cars_bay_work_started_and_ends.sql	20261021022543	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+717	0763_canopy_c_is_restriped_and_the_twin_depot_has_no_standard_chargers.sql	APPLIED-NO-LEDGER-ROW	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+718	0764_every_car_that_charges_gets_the_overhead_arms_cabin_clean.sql	APPLIED-NO-LEDGER-ROW	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+719	0765_every_charge_is_cleaned_however_short_and_a_topped_off_car_has_its_visit_as_it_plugs_in.sql	APPLIED-NO-LEDGER-ROW	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+720	0766_the_agents_board_reads_the_arrival_forecast_without_writing_it.sql	20261024044503	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+721	0767_a_cabin_clean_a_charger_fault_cut_short_is_done_at_the_cars_next_post.sql	APPLIED-NO-LEDGER-ROW	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+722	0768_the_demo_metronome_ticks_through_the_whole_minute.sql	APPLIED-NO-LEDGER-ROW	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+723	0769_the_agent_wakes_when_a_charger_is_free_or_a_car_in_line_is_due.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+724	0780_a_car_that_owes_no_charge_is_ready_for_its_bay_whatever_its_plan_says.sql	20261024163830	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+725	0781_the_charge_line_serves_first_the_cars_a_charge_sends_home.sql	APPLIED-NO-LEDGER-ROW	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+726	0782_when_every_post_is_taken_a_car_takes_a_free_bay_first.sql	APPLIED-NO-LEDGER-ROW	failed	0.01	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+727	0783_the_agents_board_says_where_the_depots_wall_is.sql	APPLIED-NO-LEDGER-ROW	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+728	0784_the_check_takes_an_agents_order_only_when_no_owner_is_worse_off.sql	APPLIED-NO-LEDGER-ROW	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+729	0785_a_car_on_a_charger_comes_to_its_bay_when_the_charge_it_is_on_ends.sql	20261102140211	failed	0.02	42883	function public.ottoq_certification_in_flight(boolean) does not exist
+730	0790_the_stop_door_takes_the_runs_row_before_the_proposals.sql	PENDING	skipped_pending	0.0		
+731	0791_a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run.sql	PENDING	skipped_pending	0.0		

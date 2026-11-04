@@ -1,0 +1,446 @@
+{
+ "plant": {
+  "states": 507,
+  "transitions": 1632
+ },
+ "r2_difference": {
+  "all_extra_are_g506_holds": true,
+  "g506_witness_path_without_r2": [
+   "c_admit",
+   "c_clean_start",
+   "c_mate_start",
+   "c_mate_abort",
+   "u_fault",
+   "u_cleared",
+   "c_hold"
+  ],
+  "held_on_out_of_service_mid_clean_reachable_with_r2": true,
+  "states_only_with_r2": 0,
+  "states_only_without_r2": 0,
+  "transitions_only_with_r2": 0,
+  "transitions_only_without_r2": [
+   {
+    "event": "c_hold",
+    "from": {
+     "Battery": "Below",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "Faulted",
+     "CleanArm": "DoorsOpen",
+     "Tether": "Expired"
+    },
+    "to": {
+     "Battery": "Below",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "Faulted",
+     "CleanArm": "DoorsOpen",
+     "Tether": "Held"
+    }
+   },
+   {
+    "event": "c_hold",
+    "from": {
+     "Battery": "Below",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "Faulted",
+     "CleanArm": "OverCar",
+     "Tether": "Expired"
+    },
+    "to": {
+     "Battery": "Below",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "Faulted",
+     "CleanArm": "OverCar",
+     "Tether": "Held"
+    }
+   },
+   {
+    "event": "c_hold",
+    "from": {
+     "Battery": "Below",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "UnderRepair",
+     "CleanArm": "DoorsOpen",
+     "Tether": "Expired"
+    },
+    "to": {
+     "Battery": "Below",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "UnderRepair",
+     "CleanArm": "DoorsOpen",
+     "Tether": "Held"
+    }
+   },
+   {
+    "event": "c_hold",
+    "from": {
+     "Battery": "Below",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "UnderRepair",
+     "CleanArm": "OverCar",
+     "Tether": "Expired"
+    },
+    "to": {
+     "Battery": "Below",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "UnderRepair",
+     "CleanArm": "OverCar",
+     "Tether": "Held"
+    }
+   },
+   {
+    "event": "c_hold",
+    "from": {
+     "Battery": "Full",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "Faulted",
+     "CleanArm": "DoorsOpen",
+     "Tether": "Expired"
+    },
+    "to": {
+     "Battery": "Full",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "Faulted",
+     "CleanArm": "DoorsOpen",
+     "Tether": "Held"
+    }
+   },
+   {
+    "event": "c_hold",
+    "from": {
+     "Battery": "Full",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "Faulted",
+     "CleanArm": "OverCar",
+     "Tether": "Expired"
+    },
+    "to": {
+     "Battery": "Full",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "Faulted",
+     "CleanArm": "OverCar",
+     "Tether": "Held"
+    }
+   },
+   {
+    "event": "c_hold",
+    "from": {
+     "Battery": "Full",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "UnderRepair",
+     "CleanArm": "DoorsOpen",
+     "Tether": "Expired"
+    },
+    "to": {
+     "Battery": "Full",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "UnderRepair",
+     "CleanArm": "DoorsOpen",
+     "Tether": "Held"
+    }
+   },
+   {
+    "event": "c_hold",
+    "from": {
+     "Battery": "Full",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "UnderRepair",
+     "CleanArm": "OverCar",
+     "Tether": "Expired"
+    },
+    "to": {
+     "Battery": "Full",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "UnderRepair",
+     "CleanArm": "OverCar",
+     "Tether": "Held"
+    }
+   }
+  ]
+ },
+ "strict_r2_difference": {
+  "states_lost_vs_r2": 132,
+  "transitions_lost_vs_r2": 438
+ },
+ "supervisor_equals_requirements_only": {
+  "input_states": 302,
+  "input_transitions": 831,
+  "same_states": true,
+  "same_transitions": true
+ },
+ "variants": {
+  "post_cell": {
+   "blocking_states": 0,
+   "controllable_ok": true,
+   "derived_by_synthesis_by_event": {},
+   "derived_by_synthesis_total": 0,
+   "derived_examples": [],
+   "disabled_by_event": {
+    "c_clean_enter": 26,
+    "c_depart_ready": 9,
+    "c_emergency_release": 24,
+    "c_hold": 8,
+    "c_mate_start": 15,
+    "c_release": 36,
+    "c_stop_charge": 6,
+    "c_unlatch": 8
+   },
+   "disabled_by_requirement": {
+    "R1_no_mate_on_out_of_service": 12,
+    "R2_no_hold_for_clean_on_out_of_service": 8,
+    "R3a_no_mate_while_clean_arm_out": 9,
+    "R3b_no_unlatch_while_cleaning": 8,
+    "R3c_no_clean_entry_while_charge_arm_moves": 26,
+    "R3d_emergency_release_needs_arms_home": 24,
+    "R3d_release_needs_arms_home": 36,
+    "R4_ready_only_when_served": 9,
+    "R5_no_charge_stopped_short": 6
+   },
+   "disabled_total": 132,
+   "events_never_enabled": [
+    "c_emergency_release",
+    "c_stop_charge"
+   ],
+   "g506_hold_examples": [],
+   "g506_hold_transitions": 0,
+   "marked_states": 15,
+   "nonblocking_ok": true,
+   "requirements": {
+    "R1_no_mate_on_out_of_service": "c_mate_start needs not OutOfService",
+    "R2_no_hold_for_clean_on_out_of_service": "c_hold needs not OutOfService or CleanArm.Returning",
+    "R3a_no_mate_while_clean_arm_out": "c_mate_start needs CleanArm.Home or CleanArm.DoorsOpen",
+    "R3b_no_unlatch_while_cleaning": "c_unlatch needs CleanArm.Home or OutOfService",
+    "R3c_no_clean_entry_while_charge_arm_moves": "c_clean_enter needs ChargeArm.Stowed or ChargeArm.Latched",
+    "R3d_emergency_release_needs_arms_home": "c_emergency_release needs ChargeArm.Stowed and CleanArm.Home",
+    "R3d_release_needs_arms_home": "c_release needs ChargeArm.Stowed and CleanArm.Home",
+    "R4_ready_only_when_served": "c_depart_ready needs Battery.Full and Cabin.Clean",
+    "R5_no_charge_stopped_short": "c_stop_charge needs Battery.Full"
+   },
+   "states": 302,
+   "supervisor_guards_not_true": {},
+   "synth_log_controlled_states": 302,
+   "transitions": 831,
+   "uncontrollable_missing": []
+  },
+  "post_cell_pre0792": {
+   "blocking_states": 0,
+   "controllable_ok": true,
+   "derived_by_synthesis_by_event": {},
+   "derived_by_synthesis_total": 0,
+   "derived_examples": [],
+   "disabled_by_event": {
+    "c_clean_enter": 26,
+    "c_depart_ready": 9,
+    "c_emergency_release": 24,
+    "c_mate_start": 15,
+    "c_release": 36,
+    "c_stop_charge": 6,
+    "c_unlatch": 8
+   },
+   "disabled_by_requirement": {
+    "R1_no_mate_on_out_of_service": 12,
+    "R3a_no_mate_while_clean_arm_out": 9,
+    "R3b_no_unlatch_while_cleaning": 8,
+    "R3c_no_clean_entry_while_charge_arm_moves": 26,
+    "R3d_emergency_release_needs_arms_home": 24,
+    "R3d_release_needs_arms_home": 36,
+    "R4_ready_only_when_served": 9,
+    "R5_no_charge_stopped_short": 6
+   },
+   "disabled_total": 124,
+   "events_never_enabled": [
+    "c_emergency_release",
+    "c_stop_charge"
+   ],
+   "g506_hold_examples": [
+    {
+     "Battery": "Below",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "Faulted",
+     "CleanArm": "DoorsOpen",
+     "Tether": "Expired"
+    },
+    {
+     "Battery": "Below",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "Faulted",
+     "CleanArm": "OverCar",
+     "Tether": "Expired"
+    },
+    {
+     "Battery": "Below",
+     "Cabin": "Dirty",
+     "Car": "OnCharger",
+     "ChargeArm": "Stowed",
+     "Charger": "UnderRepair",
+     "CleanArm": "DoorsOpen",
+     "Tether": "Expired"
+    }
+   ],
+   "g506_hold_transitions": 8,
+   "marked_states": 15,
+   "nonblocking_ok": true,
+   "requirements": {
+    "R1_no_mate_on_out_of_service": "c_mate_start needs not OutOfService",
+    "R3a_no_mate_while_clean_arm_out": "c_mate_start needs CleanArm.Home or CleanArm.DoorsOpen",
+    "R3b_no_unlatch_while_cleaning": "c_unlatch needs CleanArm.Home or OutOfService",
+    "R3c_no_clean_entry_while_charge_arm_moves": "c_clean_enter needs ChargeArm.Stowed or ChargeArm.Latched",
+    "R3d_emergency_release_needs_arms_home": "c_emergency_release needs ChargeArm.Stowed and CleanArm.Home",
+    "R3d_release_needs_arms_home": "c_release needs ChargeArm.Stowed and CleanArm.Home",
+    "R4_ready_only_when_served": "c_depart_ready needs Battery.Full and Cabin.Clean",
+    "R5_no_charge_stopped_short": "c_stop_charge needs Battery.Full"
+   },
+   "states": 302,
+   "supervisor_guards_not_true": {},
+   "synth_log_controlled_states": 302,
+   "transitions": 839,
+   "uncontrollable_missing": []
+  },
+  "post_cell_strict_r2": {
+   "blocking_states": 0,
+   "controllable_ok": true,
+   "derived_by_synthesis_by_event": {
+    "c_clean_start": 24,
+    "c_mate_abort": 16,
+    "c_unlatch": 16
+   },
+   "derived_by_synthesis_total": 56,
+   "derived_examples": [
+    [
+     {
+      "Battery": "Below",
+      "Cabin": "Clean",
+      "Car": "OnCharger",
+      "ChargeArm": "Latched",
+      "Charger": "Faulted",
+      "CleanArm": "Returning",
+      "Tether": "Charging"
+     },
+     "c_unlatch"
+    ],
+    [
+     {
+      "Battery": "Below",
+      "Cabin": "Clean",
+      "Car": "OnCharger",
+      "ChargeArm": "Latched",
+      "Charger": "UnderRepair",
+      "CleanArm": "Returning",
+      "Tether": "Charging"
+     },
+     "c_unlatch"
+    ],
+    [
+     {
+      "Battery": "Below",
+      "Cabin": "Dirty",
+      "Car": "OnCharger",
+      "ChargeArm": "Approach",
+      "Charger": "Available",
+      "CleanArm": "DoorsOpen",
+      "Tether": "Mate"
+     },
+     "c_mate_abort"
+    ],
+    [
+     {
+      "Battery": "Below",
+      "Cabin": "Dirty",
+      "Car": "OnCharger",
+      "ChargeArm": "Approach",
+      "Charger": "Available",
+      "CleanArm": "Returning",
+      "Tether": "Mate"
+     },
+     "c_mate_abort"
+    ]
+   ],
+   "disabled_by_event": {
+    "c_clean_enter": 8,
+    "c_clean_start": 24,
+    "c_depart_ready": 9,
+    "c_emergency_release": 24,
+    "c_mate_abort": 16,
+    "c_mate_start": 15,
+    "c_release": 12,
+    "c_stop_charge": 6,
+    "c_unlatch": 24
+   },
+   "disabled_by_requirement": {
+    "R1_no_mate_on_out_of_service": 12,
+    "R3a_no_mate_while_clean_arm_out": 9,
+    "R3b_no_unlatch_while_cleaning": 8,
+    "R3c_no_clean_entry_while_charge_arm_moves": 8,
+    "R3d_emergency_release_needs_arms_home": 24,
+    "R3d_release_needs_arms_home": 12,
+    "R4_ready_only_when_served": 9,
+    "R5_no_charge_stopped_short": 6
+   },
+   "disabled_total": 138,
+   "events_never_enabled": [
+    "c_emergency_release",
+    "c_hold",
+    "c_stop_charge"
+   ],
+   "g506_hold_examples": [],
+   "g506_hold_transitions": 0,
+   "marked_states": 15,
+   "nonblocking_ok": true,
+   "requirements": {
+    "R1_no_mate_on_out_of_service": "c_mate_start needs not OutOfService",
+    "R2_strict_no_hold_on_out_of_service": "c_hold needs not OutOfService",
+    "R3a_no_mate_while_clean_arm_out": "c_mate_start needs CleanArm.Home or CleanArm.DoorsOpen",
+    "R3b_no_unlatch_while_cleaning": "c_unlatch needs CleanArm.Home or OutOfService",
+    "R3c_no_clean_entry_while_charge_arm_moves": "c_clean_enter needs ChargeArm.Stowed or ChargeArm.Latched",
+    "R3d_emergency_release_needs_arms_home": "c_emergency_release needs ChargeArm.Stowed and CleanArm.Home",
+    "R3d_release_needs_arms_home": "c_release needs ChargeArm.Stowed and CleanArm.Home",
+    "R4_ready_only_when_served": "c_depart_ready needs Battery.Full and Cabin.Clean",
+    "R5_no_charge_stopped_short": "c_stop_charge needs Battery.Full"
+   },
+   "states": 170,
+   "supervisor_guards_not_true": {
+    "c_clean_start": "(Battery.Full or Charger.Occupied or (Charger.UnderRepair or not Tether.Expired)) and ((Battery.Full or Charger.Occupied or (Charger.UnderRepair or not Tether.Demate)) and (Battery.Full or (not Charger.UnderRepair or not Tether.Expired))) and ((Battery.Full or (not Charger.UnderRepair or not Tether.Demate)) and ((Battery.Below or not Tether.None and not Tether.Expired) and (Battery.Below or Tether.None or (Tether.Charging or Tether.Expired))))",
+    "c_mate_abort": "CleanArm.Home or CleanArm.OverCar",
+    "c_unlatch": "CleanArm.Home"
+   },
+   "synth_log_controlled_states": 170,
+   "transitions": 393,
+   "uncontrollable_missing": []
+  }
+ }
+}

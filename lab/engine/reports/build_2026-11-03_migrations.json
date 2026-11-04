@@ -1,0 +1,128 @@
+{
+ "seconds": 11.1,
+ "files": 731,
+ "by_status": {
+  "ok": 77,
+  "failed": 641,
+  "skipped_pending": 13
+ },
+ "by_header_class": {
+  "ledger": {
+   "ok": 43,
+   "failed": 589
+  },
+  "APPLIED-NO-LEDGER-ROW": {
+   "ok": 5,
+   "failed": 44
+  },
+  "UNVERIFIED-NO-LEDGER-ROW": {
+   "ok": 29,
+   "failed": 8
+  },
+  "PENDING": {
+   "skipped_pending": 13
+  }
+ },
+ "first_errors_top": [
+  [
+   "function public.ottoq_certification_in_flight(boolean) does not exist",
+   182
+  ],
+  [
+   "relation \"public.ottoq_cert_lineage\" does not exist",
+   72
+  ],
+  [
+   "relation \"public.ottoq_run_scope_registry\" does not exist",
+   10
+  ],
+  [
+   "function public.ottoq_check_run_scope_registry() does not exist",
+   7
+  ],
+  [
+   "N abort: release_depot drifted (mdN NfNdNfNcfNdNbcdcN)",
+   5
+  ],
+  [
+   "N abort: reset_fleet drifted (mdN aeNcNbbNbNdNafNdNdffd)",
+   5
+  ],
+  [
+   "query string argument of EXECUTE is null",
+   5
+  ],
+  [
+   "function \"public.ottoq_activity_feed(uuid,integer,uuid,boolean,integer)\" does not exist",
+   5
+  ],
+  [
+   "relation \"public.ottoq_site_buildouts\" does not exist",
+   5
+  ],
+  [
+   "relation \"public.ottoq_policy_catalog_gap\" does not exist",
+   4
+  ],
+  [
+   "N PN: public.ottoq_decide_tick is not the body this file patches",
+   4
+  ],
+  [
+   "N abort: run_boot_draw drifted (mdN NedNadfdbNddNfNaN)",
+   3
+  ],
+  [
+   "N abort: public.ottoq_decide_tick drifted (mdN NeaNeeaNbcbNeeNdcaNdbN)",
+   3
+  ],
+  [
+   "function public.ottoq_cert_recert_floor() does not exist",
+   3
+  ],
+  [
+   "N PN: twin.ottoq_sim_confirm_commands is not the body this file patches",
+   3
+  ],
+  [
+   "N PN: twin.ottoq_sim_advance_service_flow is not the body this file patches",
+   3
+  ],
+  [
+   "column e.sim_run_id does not exist",
+   2
+  ],
+  [
+   "query returned no rows",
+   2
+  ],
+  [
+   "N abort: decide_and_dispatch drifted (mdN NdNbfNbcNcNbNbNbe)",
+   2
+  ],
+  [
+   "N abort: decide_tick drifted (mdN NeaNeeaNbcbNeeNdcaNdbN)",
+   2
+  ],
+  [
+   "N abort: public.ottoq_tick_invariance_reset_fleet drifted (mdN aeNcNbbNbNdNafNdNdffd)",
+   2
+  ],
+  [
+   "N pin mismatch ottoq_determinism_pair: acNdNcNcNeNceNbaNbNba",
+   2
+  ],
+  [
+   "function public.ottoq_default_target_soc() does not exist",
+   2
+  ],
+  [
+   "function \"public.ottoq_tick_invariance_reset_fleet(uuid,bigint,timestamptz)\" does not exist",
+   2
+  ],
+  [
+   "function \"public.ottoq_build_decision_frame(uuid,uuid)\" does not exist",
+   2
+  ]
+ ]
+}

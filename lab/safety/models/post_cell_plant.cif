@@ -1,0 +1,190 @@
+// lab/safety/models/post_cell_plant.cif -- the PLANT of one robotic DC fast-charging post cell (E3 v0).
+//
+// One post as otto-q-core ran it on demo run 8c0b2e04 (2026-11-02 CT, the twin depot 11111111-...): its charger, its
+// OTTO-CHARGE ARM, its overhead OTTO-CLEAN ARM, the engine's robotic tether, and ONE car's visit to the post, from
+// "assigned to this post" to "gone" (ready for work, or re-queued with its open needs to its next post).
+//
+// Conventions. Every event is declared controllable (c_*: the engine, or the post's robot controller, decides it) or
+// uncontrollable (u_*: physics, time, the world). Plants say what CAN happen, including the hazards the requirements
+// forbid (a mate commanded on a dead charger, a car released with an arm still at it). Plants never encode a rule we
+// want synthesis to derive. Each element names the SQL function, renderer file or rule it stands for.
+//
+// What is deliberately abstracted (see README.md, "What the model does not cover"): time (no clocks; the order of
+// events only), the booking calendar, the re-queue threshold's soc arithmetic, mate retries, other posts and cars, and
+// the arms' geometry (taken from the renderer's clearance tests, not checked here).
+
+// -- Controllable events ---------------------------------------------------------------------------------------------
+controllable c_admit;              // the car is seated in the post: vehicles.current_stall_id := the post (car_arrived)
+controllable c_mate_start;         // twin.ottoq_sim_start_charge_session: the session opens and arm.mate_started fires
+controllable c_mate_abort;         // the charge arm abandons a mate under way (renderer roboticService: a faulted
+                                   //   charger "starts no mate and abandons one under way")
+controllable c_stop_charge;        // the depot ends a session below target (rule 9 forbids it: R5)
+controllable c_unlatch;            // twin.ottoq_sim_stop_charge_session, demate branch: arm.demate_started, the tether
+                                   //   goes 'demate' with until = now + robotic_demate_seconds (11.5 s)
+controllable c_emergency_release;  // ...its re-queue branch (v_requeue: a fault more than 5 points under target):
+                                   //   arm.emergency_release, the car's stall pointer cleared at the fault instant
+controllable c_clean_start;        // public.ottoq_start_concurrent_atoms starts the post's cleaning arm on the car
+                                   //   (interior_tidy performed_by 'stall_cabin_robot': 0758, routine 0764, redo 0767)
+controllable c_clean_enter;        // the cleaning arm leaves home for the car (renderer cleanGate: mayEnter)
+controllable c_clean_abort;        // the cleaning step ends early: the arm "comes out the way it went in"
+                                   //   (renderer cleanArmClearance.test.ts); no credit
+controllable c_hold;               // public.ottoq_release_expired_tethers keeps an expired demate tether this tick
+                                   //   (the hold 0760 added, narrowed by 0792)
+controllable c_release;            // ...or releases it: tether cleared, vehicles.current_stall_id and the stall freed
+controllable c_depart_ready;       // the car leaves the cell ready for work (public.ottoq_departure_clear, 0543)
+controllable c_requeue;            // the car leaves the cell for its next charger, bay or staging, needs open (rule 9)
+
+// -- Uncontrollable events -------------------------------------------------------------------------------------------
+uncontrollable u_fault;            // the charger faults (twin: calibrated fault injection per ChargerHelp mix)
+uncontrollable u_repair_start;     // a technician starts the repair
+uncontrollable u_repaired;         // twin.ottoq_sim_recover_chargers: 'Available' again after repair_minutes
+uncontrollable u_at_inlet;         // the charge arm is at the inlet (unstow, approach, align done)
+uncontrollable u_latched;          // arm.mate_latched
+uncontrollable u_charge_complete;  // the session reaches the car's target (charge.session_completed)
+uncontrollable u_unlatched;        // the connector is unlatched
+uncontrollable u_extracted;        // the connector is out of the port
+uncontrollable u_cleared;          // arm.demate_cleared: the charge arm is clear and stowed. For a demate tether this is
+                                   //   also the window's end: on 8c0b2e04 all 38 demates cleared at the first tick at or
+                                   //   after demate_started + window_s, i.e. when robotic_tether_until had passed
+uncontrollable u_clean_finished;   // both sides cleaned: the atom is done and credited (done_at)
+uncontrollable u_clean_home;       // the cleaning arm is home and the doors are shut
+uncontrollable u_tick;             // the next engine tick, i.e. the sweep's next run (one per tick)
+
+// -- The post is out of service: the engine's station_state 'Faulted' covers both plant states below ----------------
+alg bool OutOfService = Charger.Faulted or Charger.UnderRepair;
+
+// -- The charger: ottoq_ocpp_chargers.station_state, through stalls.ocpp_charger_id ---------------------------------
+plant Charger:
+  location Available:
+    initial; marked;
+    edge c_mate_start goto Occupied;          // a session opens
+    edge c_mate_abort;                        // a mate abandoned after a repair: no session left to close
+    edge u_fault goto Faulted;                // 0550: a charger can be reported faulted with no car on it
+  location Occupied:                          // a session is open on the charger
+    marked;
+    edge u_charge_complete, c_stop_charge, c_mate_abort goto Available;
+    edge u_fault goto Faulted;                // the fault ends the session ('faulted'); the car's charge is cut
+  location Faulted:
+    marked;
+    edge c_mate_start;                        // a dead charger can still be COMMANDED to mate: R1 is what forbids it
+    edge c_mate_abort, c_emergency_release;
+    edge u_repair_start goto UnderRepair;
+  location UnderRepair:                       // a refinement: the engine has no separate repair state
+    marked;
+    edge c_mate_start;
+    edge c_mate_abort, c_emergency_release;
+    edge u_repaired goto Available;
+end
+
+// -- The OTTO-CHARGE ARM: arm.* events; renderer lib/ottoChargeArm/armStateMachine (stowed ... clear) --------------
+plant ChargeArm:
+  location Stowed:
+    initial; marked;
+    edge c_mate_start goto Approach;          // arm.mate_started (phase unstow; mate window 18.5 s)
+  location Approach:                          // unstow, approach, align
+    edge u_at_inlet goto Insert;
+    edge c_mate_abort goto Retract;
+  location Insert:                            // insert and latch
+    edge u_latched goto Latched;
+    edge c_mate_abort goto Retract;
+  location Latched:                           // the connector is in the port (tether phase 'charging')
+    edge u_charge_complete, c_stop_charge;    // current flows only through a latched connector
+    edge c_unlatch when not Charger.Occupied goto Unlatch;   // an energised connector is never pulled: the session ends
+                                                             // first (completed, faulted, or stopped)
+    edge c_emergency_release goto Retract;    // arm.emergency_release: the engine lets the car go with no demate window
+  location Unlatch:
+    edge u_unlatched goto Extract;
+  location Extract:
+    edge u_extracted goto Retract;
+  location Retract:
+    edge u_cleared goto Stowed;               // arm.demate_cleared (phase 'clear')
+end
+
+// -- The OTTO-CLEAN ARM: the interior_tidy atom performed_by 'stall_cabin_robot' with robot_stall_id = this post -----
+//    Renderer phases (ottoCleanArm/cleanArmSpec.ts CLEAN_CHAIN): home | doors_open | swing_a .. raise_b, return (out
+//    over the car) | doors_close. The engine's atom is in_progress over the whole cycle (DoorsOpen .. Returning).
+plant CleanArm:
+  location Home:                              // folded over the roof, doors shut
+    initial; marked;
+    edge c_clean_start goto DoorsOpen;        // atom started_at
+  location DoorsOpen:                         // doors open, the arm still at its home pose (renderer waits here)
+    edge c_clean_enter goto OverCar;
+    edge c_clean_abort goto Returning;
+  location OverCar:                           // out over the car and in the cabin, one flank then the other
+    edge u_clean_finished goto Returning;     // the cycle's work is done: atom done_at, credited
+    edge c_clean_abort goto Returning;        // the step ends early: 0764 cancels a routine, 0758 re-pends a needed tidy
+  location Returning:                         // withdrawing from the car, doors closing
+    edge u_clean_home goto Home;
+end
+
+// -- The robotic tether: vehicles.robotic_tether_{direction,until,phase,stall_id}, the engine's clock for the arm ----
+plant Tether:
+  location None:
+    initial; marked;
+    edge c_mate_start goto Mate;              // direction 'mate', until = start + 18.5 s
+    edge c_release;                           // a car that never mated leaves with no tether
+    edge u_cleared;                           // the charge arm stows after an emergency release: no tether is left
+  location Mate:
+    edge u_latched goto Charging;             // direction 'charging', renewed while the session runs
+    edge c_mate_abort goto Demate;            // an abandoned mate retracts like a demate
+  location Charging:
+    edge c_unlatch goto Demate;               // direction 'demate', until = now + 11.5 s
+    edge c_emergency_release goto None;       // the re-queue branch clears the tether with the car's pointer
+  location Demate:
+    edge u_cleared goto Expired;              // until <= now and the arm reports clear
+  location Expired:                           // the sweep decides in THIS tick (see Sweep): release or hold
+    edge c_release goto None;                 // clears the tether, vehicles.current_stall_id and the stall
+    edge c_hold when not CleanArm.Home goto Held;   // 0760: kept while the stall's cleaning arm is at work in the car
+  location Held:
+    edge u_tick goto Expired;                 // the next tick's sweep decides again
+end
+
+// -- The sweep runs inside the engine tick: once a demate tether has expired, the sweep decides (release or hold)
+//    before anything else in the cell moves. This is the model's one timing assumption (README.md). -------------------
+plant Sweep:
+  location:
+    initial; marked;
+    edge u_fault, u_repair_start, u_repaired, u_at_inlet, u_latched, u_charge_complete, u_unlatched, u_extracted,
+         u_cleared, u_clean_finished, u_clean_home, u_tick when not Tether.Expired;
+end
+
+// -- The car of this post's session: vehicles.current_stall_id and its visit's needs --------------------------------
+plant Car:
+  location Inbound:                           // assigned to this post, not on it yet
+    initial;
+    edge c_admit goto AtPost;
+  location AtPost:                            // parked in the post, no arm at it yet
+    edge c_mate_start goto OnCharger;
+    edge c_clean_start, c_clean_enter;        // the cleaning arm works on a car standing in the post
+    edge c_release goto Left;                 // leaves without charging (e.g. the charger is out of service)
+  location OnCharger:                         // a charge-arm cycle has begun on this car
+    edge c_clean_start, c_clean_enter;
+    edge c_release, c_emergency_release goto Left;   // car_left: the sweep's release, or the stop path's re-queue
+  location Left:                              // off the post
+    edge c_depart_ready goto Ready;
+    edge c_requeue goto Requeued;
+  location Ready:                             // released to work
+    marked;
+  location Requeued:                          // to its next post with its open needs (0543's recheck, 0767's redo)
+    marked;
+end
+
+// -- The car's charge against its target: rule 9, 100% (public.ottoq_effective_target_soc_at, 0539) -----------------
+plant Battery:
+  location Below:
+    initial; marked;
+    edge u_charge_complete goto Full;
+    edge c_stop_charge;                       // a session ended by the depot leaves the car below target
+  location Full:
+    marked;
+end
+
+// -- The car's cabin-clean need: 0764, every car that charges on a robotic post gets the arm's clean -----------------
+plant Cabin:
+  location Dirty:
+    initial; marked;
+    edge c_clean_start;                       // only a cabin still to clean is cleaned
+    edge u_clean_finished goto Clean;
+  location Clean:
+    marked;
+end
