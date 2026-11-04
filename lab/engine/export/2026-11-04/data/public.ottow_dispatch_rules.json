@@ -1,0 +1,15 @@
+{
+"table": "public.ottow_dispatch_rules",
+"filter": "depot_id is null or depot_id = '11111111-1111-1111-1111-111111111111'::uuid",
+"why": "work-side dispatch rules",
+"read_at": "2026-11-04 22:01:08.026852+00",
+"count": 6,
+"rows": [
+"(39743e61-e8e6-49ef-a218-bb7ff9092711,11111111-1111-1111-1111-111111111111,\"Standard Queue for Review\",t,,standard,,queue_for_review,f,15.00,,50,\"2026-04-07 18:36:55.137747+00\",\"2026-04-07 18:36:55.137747+00\")",
+"(4e1c8a67-9702-4359-a5a4-f98edc1e81d8,11111111-1111-1111-1111-111111111111,\"Critical Collision Auto-Dispatch\",t,collision,critical,,auto_dispatch,t,15.00,{flatbed},20,\"2026-04-07 18:36:55.137747+00\",\"2026-04-07 18:36:55.137747+00\")",
+"(8fc8dd04-904d-43dd-b450-d157b52fca68,11111111-1111-1111-1111-111111111111,\"Low Priority Queue\",t,,low,,queue_for_review,f,15.00,,60,\"2026-04-07 18:36:55.137747+00\",\"2026-04-07 18:36:55.137747+00\")",
+"(bb566009-e06f-49e1-8958-45f445885968,11111111-1111-1111-1111-111111111111,\"Battery Thermal Auto-Dispatch\",t,battery_thermal,,,auto_dispatch,t,15.00,{flatbed},10,\"2026-04-07 18:36:55.137747+00\",\"2026-04-07 18:36:55.137747+00\")",
+"(c0fb58ec-e077-45d3-8bcc-69624ba0b444,11111111-1111-1111-1111-111111111111,\"High Priority Auto-Create\",t,,high,,auto_dispatch,f,15.00,,40,\"2026-04-07 18:36:55.137747+00\",\"2026-04-07 18:36:55.137747+00\")",
+"(cd790d97-de95-445b-84fd-92ec16f8a8c7,11111111-1111-1111-1111-111111111111,\"Critical Priority Auto-Dispatch\",t,,critical,,auto_dispatch,t,15.00,,30,\"2026-04-07 18:36:55.137747+00\",\"2026-04-07 18:36:55.137747+00\")"
+]
+}

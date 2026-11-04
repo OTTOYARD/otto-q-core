@@ -1,0 +1,21 @@
+{
+"table": "public.ottoq_specialization_strategies",
+"filter": "true",
+"why": "specialization strategies",
+"read_at": "2026-11-04 22:01:06.799988+00",
+"count": 12,
+"rows": [
+"(00cba754-35f5-48ce-b88c-8e7a8bc8f55b,vehicle_arrival_eta_minutes,per_oem,t,2000,30,5.0,\"Per-OEM dispatch pattern model\",\"2026-05-14 18:46:52.838755+00\")",
+"(2421ffd4-e926-4170-9e5d-0335569b92a2,charge_duration_minutes,generic,t,500,14,0.0,\"Baseline shared across all OEMs\",\"2026-05-14 18:46:52.838755+00\")",
+"(3bdfd635-49ee-4a1d-806e-71d87277de85,demand_kw,generic,t,1000,14,0.0,Baseline,\"2026-05-14 18:46:52.838755+00\")",
+"(3ece0e11-ad74-43f3-b295-3a4927fa25d1,vehicle_arrival_eta_minutes,generic,t,500,14,0.0,Baseline,\"2026-05-14 18:46:52.838755+00\")",
+"(4e85f088-b5c9-4d7d-9a27-d204857806e0,charge_duration_minutes,per_vehicle_class,t,5000,60,8.0,\"Per-(OEM × vehicle_class) model if data + performance support it\",\"2026-05-14 18:46:52.838755+00\")",
+"(5652ffe6-4ee7-4e90-9948-e7aa4750af73,demand_kw,per_oem,f,0,0,0.0,\"Per-OEM demand has limited signal vs per-depot; disabled by default\",\"2026-05-14 18:46:52.838755+00\")",
+"(680290a8-3e78-4544-9779-95adab0a5b60,anomaly_score,per_vehicle_class,t,500,14,0.0,\"Per-class baseline distributions for anomaly z-scores\",\"2026-05-14 18:46:52.838755+00\")",
+"(694f21f0-50f2-469b-8f6a-214e4317de04,service_duration_minutes,per_vehicle_class,t,2000,30,5.0,\"Per-vehicle-class wash/calibration duration\",\"2026-05-14 18:46:52.838755+00\")",
+"(855cc569-33bf-4d70-80e7-88adca556569,charge_duration_minutes,per_oem,t,2000,30,5.0,\"Each OEM gets its own model if performance beats generic by 5%\",\"2026-05-14 18:46:52.838755+00\")",
+"(9f5c4302-7bfc-4ecf-8cd3-16a096f417ac,service_duration_minutes,generic,t,500,14,0.0,Baseline,\"2026-05-14 18:46:52.838755+00\")",
+"(badd0892-2a38-4ef7-b40c-fed00991a7cb,vehicle_health_degradation_score,per_vehicle_class,t,5000,90,10.0,\"Per-class battery-degradation model\",\"2026-05-14 18:46:52.838755+00\")",
+"(d10fee67-3d24-492a-be1e-14a99aadb438,oem_acceptance_latency_seconds,per_oem,t,500,14,0.0,\"Per-OEM dispatch API response time model\",\"2026-05-14 18:46:52.838755+00\")"
+]
+}

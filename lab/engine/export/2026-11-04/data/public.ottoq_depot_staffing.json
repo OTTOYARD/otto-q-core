@@ -1,0 +1,12 @@
+{
+"table": "public.ottoq_depot_staffing",
+"filter": "depot_id is null or depot_id = '11111111-1111-1111-1111-111111111111'::uuid",
+"why": "technician pools",
+"read_at": "2026-11-04 22:00:48.29211+00",
+"count": 3,
+"rows": [
+"(11111111-1111-1111-1111-111111111111,general_tech,10,\"Founder spec: ~10 techs in the charging zones — plug in, 3-5 min interior clean, inspect, later unplug + confirm in OTTO-PULSE\",\"2026-07-26 01:12:24.28858+00\")",
+"(11111111-1111-1111-1111-111111111111,service_tech,3,\"Founder spec: service techs for calibration, larger inspections and tuning. Count self-specified (founder said \"\"obviously service technicians\"\" without a number) — CHANGE IF WRONG\",\"2026-07-26 01:12:24.28858+00\")",
+"(11111111-1111-1111-1111-111111111111,wash_supervisor,2,\"Founder spec: \"\"a couple of wash bay supervisors\"\" — own the 8-10 min exterior wash lanes\",\"2026-07-26 01:12:24.28858+00\")"
+]
+}

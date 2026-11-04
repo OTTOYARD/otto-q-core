@@ -1,0 +1,21 @@
+{
+"table": "public.ottoq_command_actor_registry",
+"filter": "true",
+"why": "command actors",
+"read_at": "2026-11-04 22:01:02.853401+00",
+"count": 12,
+"rows": [
+"(cockpit_recall,operator,\"a human recalling a vehicle from the OTTOYARD cockpit\",\"2026-09-13 23:32:01.689496+00\")",
+"(cockpit,operator,\"a human at an OTTOYARD console\",\"2026-09-13 23:32:01.689496+00\")",
+"(decide_tick,self,\"the decide path, if it ever acks directly\",\"2026-09-13 23:32:01.689496+00\")",
+"(oem_fleet,external,\"an OEM fleet backend -- ottoq_ack_vehicle_command's default actor\",\"2026-09-13 23:32:01.689496+00\")",
+"(otto_q_preflight_error,self,\"the emitter closing a command after an error\",\"2026-09-13 23:32:01.689496+00\")",
+"(otto_q_preflight_refusal,self,\"the emitter refusing its own command pre-flight\",\"2026-09-13 23:32:01.689496+00\")",
+"(otto_q_preflight_supersede,self,\"the emitter superseding its own earlier command\",\"2026-09-13 23:32:01.689496+00\")",
+"(otto_q_preflight,self,\"the emitter accepting its own command pre-flight\",\"2026-09-13 23:32:01.689496+00\")",
+"(robovac_bridge,external,\"the hardware-lab robot bridge\",\"2026-09-13 23:32:01.689496+00\")",
+"(run_finalizer,self,\"run teardown expiring commands the run left open\",\"2026-09-13 23:32:01.689496+00\")",
+"(twin_auto_tech,self,\"the twin standing in for a technician\",\"2026-09-13 23:32:01.689496+00\")",
+"(vehicle,external,\"the asset itself\",\"2026-09-13 23:32:01.689496+00\")"
+]
+}

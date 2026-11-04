@@ -23,9 +23,11 @@
 --
 -- What is real here and what is a stand-in:
 --   REAL      uuid-ossp, pgcrypto, btree_gist, pg_stat_statements (schema
---             extensions), postgis (schema public), pg_cron (schema cron; the
---             server runs with cron.launch_active_jobs = off, so no job ever
---             launches -- see README).
+--             extensions), postgis (schema public).
+--   STAND-IN  cron.*   since 2026-11-04 (sql/12_cron_standin.sql): pg_cron 1.6's
+--                      tables and the functions the engine calls, with no
+--                      scheduler behind them -- the server does not load
+--                      pg_cron, so no job can launch (see README).
 --   STAND-IN  auth.*   Supabase's own definitions of uid()/role()/jwt()/email():
 --                      they read the request.jwt.* settings, which nothing sets
 --                      here, so each returns NULL. auth.users is empty.
@@ -46,7 +48,7 @@
 -- ---------------------------------------------------------------- settings
 DO $settings$
 BEGIN
-  -- the database this runs in (the build creates ottoq_lab; pg_cron below requires that
+  -- the database this runs in (the build creates ottoq_lab; before 2026-11-04 pg_cron required that
   -- it is also the server's cron.database_name)
   EXECUTE format('ALTER DATABASE %I SET search_path TO "$user", public, extensions', current_database());
   EXECUTE format('ALTER DATABASE %I SET timezone TO %L', current_database(), 'UTC');
@@ -79,7 +81,8 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto            WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS btree_gist          WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements  WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS postgis             WITH SCHEMA public;
-CREATE EXTENSION IF NOT EXISTS pg_cron;            -- objects in schema cron
+-- pg_cron is NOT installed: sql/12_cron_standin.sql gives the lab its cron schema (2026-11-04: a real
+-- scheduler holds a session in the lab database, and CREATE DATABASE ... TEMPLATE refuses a busy template).
 
 -- ---------------------------------------------------------------- schema ACLs
 -- As production reads today (pg_namespace.nspacl).

@@ -1,4 +1,4 @@
-lab read 2026-11-04 21:45:13.235283+00; production read 2026-11-04 21:45:14.216493+00
+lab read 2026-11-04 22:18:08.022997+00; production read 2026-11-04 22:18:08.947947+00
 kind        schema                 definition_dif        differs      identical
 acl         ottoq                                                            90
 acl         public                                                         1485

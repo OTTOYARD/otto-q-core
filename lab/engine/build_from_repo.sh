@@ -3,13 +3,12 @@
 # repository into the local PostgreSQL 17 research lab. Never touches production.
 #
 #   lab/engine/build_from_repo.sh            # (re)build database ottoq_lab
-#   LAB_PORT=55433 ...                       # overrides (defaults shown below); LAB_DB must
-#                                            # equal the server's cron.database_name (pg_cron)
+#   LAB_PORT=55433 ...                       # overrides (defaults in lib/lab_server.sh)
 #
 # What it does, in order (each step's result lands in lab/engine/reports/):
 #   0. makes sure the lab server is up (initdb + config on first use)
 #   1. drops and recreates the lab database
-#   2. 00_roles.sql (cluster roles), 10_supabase_shims.sql, 20_repo_gaps.sql
+#   2. 00_roles.sql (cluster roles), 10_supabase_shims.sql, 12_cron_standin.sql, 20_repo_gaps.sql
 #   3. db/baseline/ via lib/load_baseline.py (statement by statement, to a fixpoint)
 #   4. every post-baseline migration that is not PENDING, one transaction each,
 #      via lib/apply_migrations.py
@@ -42,6 +41,7 @@ echo "== (re)creating database $LAB_DB"
 echo "== roles, Supabase shims, repo gaps"
 "${PSQL[@]}" -d postgres -f "$HERE/sql/00_roles.sql"
 "${PSQL[@]}" -d "$LAB_DB" -f "$HERE/sql/10_supabase_shims.sql"
+"${PSQL[@]}" -d "$LAB_DB" -f "$HERE/sql/12_cron_standin.sql"
 "${PSQL[@]}" -d "$LAB_DB" -f "$HERE/sql/20_repo_gaps.sql"
 
 # ---- 3. baseline -------------------------------------------------------------

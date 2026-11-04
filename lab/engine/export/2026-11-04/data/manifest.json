@@ -1,0 +1,772 @@
+{
+ "exported_by": "lab/engine/lib/export_reference_data.py",
+ "depot": "11111111-1111-1111-1111-111111111111",
+ "finished_at": "2026-11-04T22:01:10+00:00",
+ "world_fingerprint": {
+  "before": {
+   "jsonb_build_object": {
+    "n": {
+     "bess": 1,
+     "stalls": 158,
+     "chargers": 30,
+     "vehicles": 116,
+     "need_profile": 116
+    },
+    "bess": "d2ec26a99b2e79e3cc083734c52f6e97",
+    "stalls": "3e03db4aa74a4655b6bb10f20b450a48",
+    "chargers": "7524bdaebedc49918d0c0de013af3483",
+    "combined": "3f2aa2ac0bcc532e35f36c8bc257ff0e",
+    "vehicles": "4a6711b77cd2a24979c9483e363f6c92",
+    "need_profile": "957366ad19a751faedf5e3b9d35c1f6e"
+   }
+  },
+  "before_read_at": "2026-11-04 22:00:45.300637+00",
+  "after": {
+   "jsonb_build_object": {
+    "n": {
+     "bess": 1,
+     "stalls": 158,
+     "chargers": 30,
+     "vehicles": 116,
+     "need_profile": 116
+    },
+    "bess": "d2ec26a99b2e79e3cc083734c52f6e97",
+    "stalls": "3e03db4aa74a4655b6bb10f20b450a48",
+    "chargers": "7524bdaebedc49918d0c0de013af3483",
+    "combined": "3f2aa2ac0bcc532e35f36c8bc257ff0e",
+    "vehicles": "4a6711b77cd2a24979c9483e363f6c92",
+    "need_profile": "957366ad19a751faedf5e3b9d35c1f6e"
+   }
+  },
+  "after_read_at": "2026-11-04 22:01:10.947006+00",
+  "stable_during_export": true
+ },
+ "tables": [
+  {
+   "table": "public.depots",
+   "rows": 1,
+   "bytes": 3850,
+   "sha256": "39538f1cf904d54641efa5809480344ea00f81c04f15350d16c919349c283dba",
+   "read_at": "2026-11-04 22:00:45.562829+00"
+  },
+  {
+   "table": "public.stalls",
+   "rows": 158,
+   "bytes": 71947,
+   "sha256": "bbda2315bd2a2ec2411413bbdc4a3e12d08c405b99ca8834e29dd22c013b4fce",
+   "read_at": "2026-11-04 22:00:45.815187+00"
+  },
+  {
+   "table": "public.ottoq_ocpp_chargers",
+   "rows": 45,
+   "bytes": 26246,
+   "sha256": "a0c6e9a6bc49aca599492a17e3cc15c971379104013db702e493ea0cc67b3a9e",
+   "read_at": "2026-11-04 22:00:46.168084+00"
+  },
+  {
+   "table": "public.ottoq_site_structures",
+   "rows": 28,
+   "bytes": 12224,
+   "sha256": "b96d7acfe147a84d1c750bb7247487efa3e7450c51b7b81f81643fc6a9fa2d65",
+   "read_at": "2026-11-04 22:00:46.397615+00"
+  },
+  {
+   "table": "public.ottoq_service_point_capabilities",
+   "rows": 6314,
+   "bytes": 820975,
+   "sha256": "347fd2f343018f74530355c62e9e8285ed88442f7901367608c126229331ba32",
+   "read_at": "2026-11-04 22:00:46.646789+00"
+  },
+  {
+   "table": "public.ottoq_bess_units",
+   "rows": 1,
+   "bytes": 1006,
+   "sha256": "e75601cea0ebb81a4dfa4bb1c0b4289016ae0fe7854b2061c2388c5585079b74",
+   "read_at": "2026-11-04 22:00:47.084412+00"
+  },
+  {
+   "table": "public.ottoq_canopy_state",
+   "rows": 4,
+   "bytes": 787,
+   "sha256": "e4cc2352a846f8e1c081010fb0183a7d38f7b9f71dbe6b5050ad66f833dab407",
+   "read_at": "2026-11-04 22:00:47.332392+00"
+  },
+  {
+   "table": "public.ottoq_tariff_windows",
+   "rows": 11,
+   "bytes": 1829,
+   "sha256": "dd04500ac2a4b408b79b3c23b926985545d9ef4e2587534fb7950323f9a56f2b",
+   "read_at": "2026-11-04 22:00:47.559886+00"
+  },
+  {
+   "table": "public.ottoq_depot_tariffs",
+   "rows": 3,
+   "bytes": 2783,
+   "sha256": "e9df29f6c202ddb767c6741ae0c574bae210ae699a79110b157466100644cf83",
+   "read_at": "2026-11-04 22:00:47.809232+00"
+  },
+  {
+   "table": "public.tariff_schedules",
+   "rows": 2,
+   "bytes": 2165,
+   "sha256": "02839f0fcd9d507303e7f13bda0e01f202fe206c238f0375301031379eb92ff7",
+   "read_at": "2026-11-04 22:00:48.03603+00"
+  },
+  {
+   "table": "public.ottoq_depot_staffing",
+   "rows": 3,
+   "bytes": 924,
+   "sha256": "54842106f978eae44271ad64926a3abd84427564063acd4ee438da30efe97aef",
+   "read_at": "2026-11-04 22:00:48.29211+00"
+  },
+  {
+   "table": "public.ottoq_depot_shifts",
+   "rows": 0,
+   "bytes": 215,
+   "sha256": "0375382db35b53fc4ccfaad2b100b171673419153b94ce45187d46a88173327a",
+   "read_at": "2026-11-04 22:00:48.547613+00"
+  },
+  {
+   "table": "public.waves",
+   "rows": 3,
+   "bytes": 1310,
+   "sha256": "9bd9cc30f4039ba1e977f06ecd76699debc0f2c876eb9994d728a741dfa2da6e",
+   "read_at": "2026-11-04 22:00:48.785817+00"
+  },
+  {
+   "table": "public.ottoq_grid_events",
+   "rows": 5,
+   "bytes": 2284,
+   "sha256": "0510c880eee3b9e4a7bcf76ba61e449dfb26a09c9a5ed22f967c1a3f86b3be3b",
+   "read_at": "2026-11-04 22:00:49.058771+00"
+  },
+  {
+   "table": "public.ottoq_site_buildouts",
+   "rows": 11,
+   "bytes": 261493,
+   "sha256": "99df975982adf7f2ef648e6a5a3e817a4ede8f2a44ef0971bc46e96a4d427d64",
+   "read_at": "2026-11-04 22:00:49.293448+00"
+  },
+  {
+   "table": "public.ottoq_site_buildout_active",
+   "rows": 0,
+   "bytes": 238,
+   "sha256": "5b06e2f68739da8823f2ef5bd70e02a71b616c625c5885e3cfe2090d1bcb681d",
+   "read_at": "2026-11-04 22:00:49.610752+00"
+  },
+  {
+   "table": "public.ottoq_site_base_history",
+   "rows": 30,
+   "bytes": 433514,
+   "sha256": "d21f2b161e253a5d1835e3c5f41e2d3578030401013f0d2abc63b27bce00fd64",
+   "read_at": "2026-11-04 22:00:49.924253+00"
+  },
+  {
+   "table": "public.ottoq_fleet_buildouts",
+   "rows": 2,
+   "bytes": 1148,
+   "sha256": "5384365c20092fb7ce47cc08d293fc0bc0b24fd5b8387a1f2408ff0dabc8c57e",
+   "read_at": "2026-11-04 22:00:50.276658+00"
+  },
+  {
+   "table": "public.ottoq_fleet_buildout_active",
+   "rows": 0,
+   "bytes": 245,
+   "sha256": "96257361387602bdce58add4aac7b31384a4737012b9f6c512b30a4a61a005c1",
+   "read_at": "2026-11-04 22:00:50.516971+00"
+  },
+  {
+   "table": "public.engine_config",
+   "rows": 1,
+   "bytes": 471,
+   "sha256": "aab08d3a1496cd60323c97384f0a236cbabea19ab9a7599a4e90fb95a05f5fd1",
+   "read_at": "2026-11-04 22:00:50.802093+00"
+  },
+  {
+   "table": "public.action_guardrails",
+   "rows": 8,
+   "bytes": 1792,
+   "sha256": "7a452f8780d1a2f10e10527d72bc314d2acea3ab94ac427b21f48fabf66070b5",
+   "read_at": "2026-11-04 22:00:51.104928+00"
+  },
+  {
+   "table": "public.accuracy_slos",
+   "rows": 10,
+   "bytes": 2424,
+   "sha256": "c5dda857a4c92251227f791f83752cb65f4453f15610b3b3acb0c515af49f6bf",
+   "read_at": "2026-11-04 22:00:51.344434+00"
+  },
+  {
+   "table": "public.model_parameters",
+   "rows": 6,
+   "bytes": 3288,
+   "sha256": "5ee5ac92ef0304a9b837078cf5de375df716c5833de0d111c7abbefe5f01fb71",
+   "read_at": "2026-11-04 22:00:51.636093+00"
+  },
+  {
+   "table": "public.model_versions",
+   "rows": 6,
+   "bytes": 4551,
+   "sha256": "bfa31c33df7b067267d4909b5cda8bb6936783bf81aae1ab96681dac1655f829",
+   "read_at": "2026-11-04 22:00:51.888209+00"
+  },
+  {
+   "table": "public.service_definitions",
+   "rows": 9,
+   "bytes": 2752,
+   "sha256": "6fc73160023cb514c24afe755545d20e7786055edf0a759d34a9b52fb139b885",
+   "read_at": "2026-11-04 22:00:52.218357+00"
+  },
+  {
+   "table": "public.schedule_tasks",
+   "rows": 113,
+   "bytes": 54321,
+   "sha256": "89684fe3e2676def7490df6b7899938785193cf3fd3ddab45e13857b760b99da",
+   "read_at": "2026-11-04 22:00:52.449401+00"
+  },
+  {
+   "table": "public.vehicle_schedules",
+   "rows": 54,
+   "bytes": 17387,
+   "sha256": "d09cc43aef74300df079629a09b16ad961d6565ef0d0a4b24ccc09fc88e33bfd",
+   "read_at": "2026-11-04 22:00:52.716943+00"
+  },
+  {
+   "table": "public.external_factor_sources",
+   "rows": 6,
+   "bytes": 4467,
+   "sha256": "82205f29fcfe0cf72de3f9c2f7b82377fac13df830e10ad490b6a210124b3ddf",
+   "read_at": "2026-11-04 22:00:53.050195+00"
+  },
+  {
+   "table": "public.ottoq_rule_overrides",
+   "rows": 0,
+   "bytes": 235,
+   "sha256": "4606e0dc1060f3c90d632a217ef1f5793521e6fa1181c6e0b1bd797132bcfe63",
+   "read_at": "2026-11-04 22:00:53.293651+00"
+  },
+  {
+   "table": "public.ottoq_model_routes",
+   "rows": 72,
+   "bytes": 20340,
+   "sha256": "0c713e6ddfa218ec2ef1a9b64fb132e6019c72b5807cba28afc6e12e477808d9",
+   "read_at": "2026-11-04 22:00:53.519243+00"
+  },
+  {
+   "table": "public.ottoq_scenarios",
+   "rows": 8,
+   "bytes": 5514,
+   "sha256": "c29b4e0642a9d6e5a644115fb702ec94921d8c4da3f637c70074278bad40b5c9",
+   "read_at": "2026-11-04 22:00:53.736321+00"
+  },
+  {
+   "table": "twin.ottoq_twin_operators",
+   "rows": 2,
+   "bytes": 606,
+   "sha256": "29d8571989575bb39e5aa78369b182e0ac20d51e09e0e121b9530b78e1ab4e01",
+   "read_at": "2026-11-04 22:00:53.995374+00"
+  },
+  {
+   "table": "public.vehicles",
+   "rows": 120,
+   "bytes": 283142,
+   "sha256": "d3c688ea32353bc557fef38288ea2d13e5a85aaf0842692d0d9016d7998110f1",
+   "read_at": "2026-11-04 22:00:54.230599+00"
+  },
+  {
+   "table": "public.vehicle_need_profile",
+   "rows": 116,
+   "bytes": 60934,
+   "sha256": "ad66217d7aff27879d66618f34f05e40b1d93ae7eef32b36331bd82c7ab64956",
+   "read_at": "2026-11-04 22:00:54.526985+00"
+  },
+  {
+   "table": "public.ottoq_charge_clock_fits",
+   "rows": 25,
+   "bytes": 1053800,
+   "sha256": "55cebc0d9c892a9079af93954f88122da8d94677ec60a36f040668c1ecd90549",
+   "read_at": "2026-11-04 22:00:54.741637+00"
+  },
+  {
+   "table": "public.ottoq_charge_fault_fits",
+   "rows": 28,
+   "bytes": 29659,
+   "sha256": "1bd5adc574f221e887f8bb3d76222ec538739b7aeaa516a0a5db9a14c78848cc",
+   "read_at": "2026-11-04 22:00:55.085541+00"
+  },
+  {
+   "table": "public.ottoq_charge_window_calibration",
+   "rows": 1,
+   "bytes": 3857,
+   "sha256": "e7aa7d9e83d93456789ea2d44e877903aea8f6eb542f71a3e3e39adada329a95",
+   "read_at": "2026-11-04 22:00:55.324681+00"
+  },
+  {
+   "table": "public.ottoq_learned_estimates",
+   "rows": 62,
+   "bytes": 252230,
+   "sha256": "283a5ac4d6236aba304340d8346fd196d544e924597a7fc18802ae791df36841",
+   "read_at": "2026-11-04 22:00:55.635045+00"
+  },
+  {
+   "table": "public.ottoq_evidence_regimes",
+   "rows": 1,
+   "bytes": 1010,
+   "sha256": "ff7f2f9e459d6553d596905fd3b5195bba51bbb7e7ced290b44a7d811af4474b",
+   "read_at": "2026-11-04 22:00:55.90789+00"
+  },
+  {
+   "table": "public.fleet_operators",
+   "rows": 4,
+   "bytes": 3033,
+   "sha256": "99af068fe15e75deaaf08cf20b1e82d05846e3ee722beaf3a86c9ce5999752ff",
+   "read_at": "2026-11-04 22:00:56.152121+00"
+  },
+  {
+   "table": "public.ottoq_fleet_operator_slas",
+   "rows": 4,
+   "bytes": 2588,
+   "sha256": "8747f6ead791a296a6f212a3b870b5599087f9e3d341cc0677a2165f08b01504",
+   "read_at": "2026-11-04 22:00:56.394037+00"
+  },
+  {
+   "table": "public.ottoq_oem_webhook_patterns",
+   "rows": 3,
+   "bytes": 2064,
+   "sha256": "60f1ed417bf68e2bccfdde54d06facc0f5fadb2f0214ef47a76ca50f09100382",
+   "read_at": "2026-11-04 22:00:56.621749+00"
+  },
+  {
+   "table": "public.ottoq_service_tariffs",
+   "rows": 18,
+   "bytes": 2937,
+   "sha256": "65fa8ffb2f22bb27bd4c7a406109666a20394ff2152791f8e048a3a987701981",
+   "read_at": "2026-11-04 22:00:56.874016+00"
+  },
+  {
+   "table": "public.ottoq_rules",
+   "rows": 54,
+   "bytes": 37648,
+   "sha256": "02e211285445292e8e0ff8cbd18aaa689a664f5deac3a3aefed9f9dd057b87fb",
+   "read_at": "2026-11-04 22:00:57.137317+00"
+  },
+  {
+   "table": "public.ottoq_rule_parameters",
+   "rows": 0,
+   "bytes": 156,
+   "sha256": "f82ad9eddaedad7f76477608e55aebdb73d12a3e8b6f3e1722f3af03a43fce10",
+   "read_at": "2026-11-04 22:00:57.615779+00"
+  },
+  {
+   "table": "public.ottoq_policy_param_catalog",
+   "rows": 252,
+   "bytes": 118683,
+   "sha256": "640d45c1cb946b6c3ed4a02f0de19e8a360a12863d1dd5cece64857506dd7446",
+   "read_at": "2026-11-04 22:00:57.867437+00"
+  },
+  {
+   "table": "public.ottoq_policy_params",
+   "rows": 91,
+   "bytes": 12491,
+   "sha256": "d5b7ddff063eb578eb64bd6d922ee95da1b92acbda5d9ff33e91c9ae7849fbd7",
+   "read_at": "2026-11-04 22:00:58.153778+00"
+  },
+  {
+   "table": "public.ottoq_event_types_catalog",
+   "rows": 155,
+   "bytes": 29861,
+   "sha256": "3a4bfa106c7f7c17b5d3279e001ca21f89de8f4c82fbcd764e0480343650ea6b",
+   "read_at": "2026-11-04 22:00:58.430508+00"
+  },
+  {
+   "table": "public.ottoq_state_transitions",
+   "rows": 132,
+   "bytes": 37045,
+   "sha256": "5b3d5c4097d1c61622d4f4571e295a62f1013505d5db48e855b7fd2e90b4715f",
+   "read_at": "2026-11-04 22:00:58.654105+00"
+  },
+  {
+   "table": "public.ottoq_variability_catalog",
+   "rows": 47,
+   "bytes": 12321,
+   "sha256": "f17c9b4dc35ebb75c9a204b6275d830754a21790bb41ee03ae33268fef7ea803",
+   "read_at": "2026-11-04 22:00:58.971885+00"
+  },
+  {
+   "table": "public.ottoq_calibration_datasets",
+   "rows": 9,
+   "bytes": 6736,
+   "sha256": "4d36008ec3c76a1a42d5405588a13184a506dfcf8b9ab4cbce8c6d4034eaf40f",
+   "read_at": "2026-11-04 22:00:59.212953+00"
+  },
+  {
+   "table": "public.ottoq_calibration_distributions",
+   "rows": 41,
+   "bytes": 34185,
+   "sha256": "a4dc0643b706dc9936f7efd246f850783e4205317337ce8c19430caeab6154b4",
+   "read_at": "2026-11-04 22:00:59.471897+00"
+  },
+  {
+   "table": "public.ottoq_calibration_correlations",
+   "rows": 1,
+   "bytes": 319,
+   "sha256": "75c8483ac6ef49e4d4ca09eb66f920d61fec6bd1c825fb06fdc226034f4ba8b0",
+   "read_at": "2026-11-04 22:00:59.680704+00"
+  },
+  {
+   "table": "public.ottoq_calibration_profiles",
+   "rows": 8,
+   "bytes": 4211,
+   "sha256": "3d449baa5300f07bdd2884ee0893470e3289ee661db003c2584381096d7248e7",
+   "read_at": "2026-11-04 22:00:59.911237+00"
+  },
+  {
+   "table": "public.ottoq_dtc_catalog",
+   "rows": 22,
+   "bytes": 2792,
+   "sha256": "223e81f1bf6118cd6ee80b622c5395b213ee35b93d6697a65ccfe4ee9297729b",
+   "read_at": "2026-11-04 22:01:00.262185+00"
+  },
+  {
+   "table": "public.service_cadence_policy",
+   "rows": 17,
+   "bytes": 4887,
+   "sha256": "f42995b00851bd79fa19a65049b5b01e81fdf2a8599a5b9ae374003f2c70d52e",
+   "read_at": "2026-11-04 22:01:00.530802+00"
+  },
+  {
+   "table": "public.ottoq_operation_catalog",
+   "rows": 23,
+   "bytes": 2863,
+   "sha256": "f4753c30380e7f597d71e9bd661a89f37e4c583c8fe3d795583b72c8562042c5",
+   "read_at": "2026-11-04 22:01:00.757628+00"
+  },
+  {
+   "table": "public.ottoq_vehicle_classes",
+   "rows": 9,
+   "bytes": 4124,
+   "sha256": "1cf763b7e2cd16aee040a835b20074fb7921649876ee9368f290ed14f9540cbb",
+   "read_at": "2026-11-04 22:01:01.045282+00"
+  },
+  {
+   "table": "public.ottoq_feed_plans",
+   "rows": 12,
+   "bytes": 30611,
+   "sha256": "a6aee42140a22bd924832416b82542888681697aa346852a965999921a9a7476",
+   "read_at": "2026-11-04 22:01:01.419592+00"
+  },
+  {
+   "table": "public.ottoq_sim_scenarios",
+   "rows": 10,
+   "bytes": 5860,
+   "sha256": "69d9f6d3e323ca32b449c1f7cab5bc1b9ca4597a8d71bd1dc8251964621d6859",
+   "read_at": "2026-11-04 22:01:01.697795+00"
+  },
+  {
+   "table": "public.ottoq_proposer_precedence",
+   "rows": 4,
+   "bytes": 1083,
+   "sha256": "6046f81a87b645b5330e6c3181d22fe1830373f1544d626317e2d2b697eb0a16",
+   "read_at": "2026-11-04 22:01:02.119245+00"
+  },
+  {
+   "table": "public.ottoq_certified_proposers",
+   "rows": 3,
+   "bytes": 1151,
+   "sha256": "c47c3868d4219b1d7cf2eae4010922532b2703af24153f7e7b9288ecc20c2a19",
+   "read_at": "2026-11-04 22:01:02.345913+00"
+  },
+  {
+   "table": "public.ottoq_recall_implementations",
+   "rows": 3,
+   "bytes": 1487,
+   "sha256": "919ce421f5d49ac15939f24237767b292542ef475589d594ead74f6045ead043",
+   "read_at": "2026-11-04 22:01:02.564276+00"
+  },
+  {
+   "table": "public.ottoq_command_actor_registry",
+   "rows": 12,
+   "bytes": 1465,
+   "sha256": "35359fd4694da1553cdcc093130e45ee86038eae7f4730f6e130b35637c18fd2",
+   "read_at": "2026-11-04 22:01:02.853401+00"
+  },
+  {
+   "table": "public.ottoq_enactment_branches",
+   "rows": 6,
+   "bytes": 3957,
+   "sha256": "e9d5dd035620cf358a10981fc90cce4f683c5f9ccb19ef64d74232131aac4fbe",
+   "read_at": "2026-11-04 22:01:03.742029+00"
+  },
+  {
+   "table": "public.ottoq_emergency_protocols",
+   "rows": 9,
+   "bytes": 6571,
+   "sha256": "374e681d52807a6f2484b1d6a79476e54f1acc50c6e04d3722830042c3888e34",
+   "read_at": "2026-11-04 22:01:04.098955+00"
+  },
+  {
+   "table": "public.ottoq_energy_rates",
+   "rows": 3,
+   "bytes": 1906,
+   "sha256": "d53070725f0cadd8ee576b8f39930758b7ecec7d6b5b913b91efa0135bc3da35",
+   "read_at": "2026-11-04 22:01:04.351777+00"
+  },
+  {
+   "table": "public.ottoq_margin_prices",
+   "rows": 3,
+   "bytes": 2770,
+   "sha256": "54e290162a1b46791da4a41009d27beca93a0574be29d89c2ac948dc8ebfe48d",
+   "read_at": "2026-11-04 22:01:04.607304+00"
+  },
+  {
+   "table": "public.ottoq_reward_weights",
+   "rows": 1,
+   "bytes": 942,
+   "sha256": "4fa29629b42702d391c4a03d8fdea2a76e8e6679399a6bedf91cb94bc45614dd",
+   "read_at": "2026-11-04 22:01:04.846074+00"
+  },
+  {
+   "table": "public.ottoq_kpi_touch_actor_types",
+   "rows": 21,
+   "bytes": 2249,
+   "sha256": "0e3230f2cd276958ba9b6ecbe46ea431bed42e8c9702f24965a33faaafe215ed",
+   "read_at": "2026-11-04 22:01:05.139734+00"
+  },
+  {
+   "table": "public.ottoq_kpi_touch_lanes",
+   "rows": 8,
+   "bytes": 1479,
+   "sha256": "e1b77e5df2ec04d23f11f198688830fb0742f17216329dfccbd619ff89c9d5bf",
+   "read_at": "2026-11-04 22:01:05.355238+00"
+  },
+  {
+   "table": "public.ottoq_v2_signal_ttl",
+   "rows": 42,
+   "bytes": 4659,
+   "sha256": "200f0b4a7c0d8713f41b6ff4fbcaa00a24e1bdc2e44d3410802cfca06238113a",
+   "read_at": "2026-11-04 22:01:05.593126+00"
+  },
+  {
+   "table": "public.ottoq_features",
+   "rows": 22,
+   "bytes": 7895,
+   "sha256": "c152cf259f9351de9a8edde624e3a8d989e87e8ac89a920a14b19196253ce057",
+   "read_at": "2026-11-04 22:01:05.82689+00"
+  },
+  {
+   "table": "public.ottoq_anomaly_detectors",
+   "rows": 9,
+   "bytes": 5217,
+   "sha256": "f732337e0583d95f17f5e25cb893baf2f34567a946dbdd6fcc2376f9e74b2c0e",
+   "read_at": "2026-11-04 22:01:06.057369+00"
+  },
+  {
+   "table": "public.ottoq_prediction_types_catalog",
+   "rows": 8,
+   "bytes": 4719,
+   "sha256": "efa5ddb91d7c6ddd985d3243601444ce55830fdcb1b9b46710f8950baf29a617",
+   "read_at": "2026-11-04 22:01:06.324874+00"
+  },
+  {
+   "table": "public.ottoq_prediction_rule_links",
+   "rows": 7,
+   "bytes": 2607,
+   "sha256": "6eb6cb328bbe2328eee927793ab05428503fe585c5c9060445e51d74faced5d5",
+   "read_at": "2026-11-04 22:01:06.572149+00"
+  },
+  {
+   "table": "public.ottoq_specialization_strategies",
+   "rows": 12,
+   "bytes": 2159,
+   "sha256": "e65bad51bb1caa53019f58438cb6792b561cfd643bbcc6b2816199ca4448e9b8",
+   "read_at": "2026-11-04 22:01:06.799988+00"
+  },
+  {
+   "table": "public.ottoq_retraining_triggers",
+   "rows": 5,
+   "bytes": 1311,
+   "sha256": "cceb82e8d74421655be270263da18ddfa0eaae1e074390cc62501531c527559f",
+   "read_at": "2026-11-04 22:01:07.018147+00"
+  },
+  {
+   "table": "public.ottoq_intelligence_sources",
+   "rows": 18,
+   "bytes": 6085,
+   "sha256": "aee141d93c4092304975aee7bc1e160a28677cc7fcac2bcef86cfccbc615a179",
+   "read_at": "2026-11-04 22:01:07.250978+00"
+  },
+  {
+   "table": "public.downstream_action_contracts",
+   "rows": 13,
+   "bytes": 15480,
+   "sha256": "4c8dde0672266cd3096ad34ef26ebf4ced42cc137247f9cd5aa59d3332960ae4",
+   "read_at": "2026-11-04 22:01:07.501526+00"
+  },
+  {
+   "table": "public.ottoq_agent_prompts",
+   "rows": 3,
+   "bytes": 50798,
+   "sha256": "1a8a2cd6993c1713df80cd6dccdaf330bee3f3b73e8ef78e03eb49050f9bc82d",
+   "read_at": "2026-11-04 22:01:07.793656+00"
+  },
+  {
+   "table": "public.ottow_dispatch_rules",
+   "rows": 6,
+   "bytes": 1572,
+   "sha256": "6504fbbd4fab7f58b008758ee84094bb07a036189de8c3d1754595df64c84319",
+   "read_at": "2026-11-04 22:01:08.026852+00"
+  },
+  {
+   "table": "public.ottoq_run_scope_registry",
+   "rows": 266,
+   "bytes": 51719,
+   "sha256": "916b9a6d085d3ddf3dc87aa7ba45417b7f76230b9f7ca07b8712d400523b6e2c",
+   "read_at": "2026-11-04 22:01:08.262958+00"
+  },
+  {
+   "table": "public.ottoq_retention_policy",
+   "rows": 2,
+   "bytes": 1082,
+   "sha256": "49c2da1d7b138528395dc64c3608d62724e31399bb2af89e6607bd65f1efeab0",
+   "read_at": "2026-11-04 22:01:08.522097+00"
+  },
+  {
+   "table": "public.ottoq_retention_state",
+   "rows": 2,
+   "bytes": 282,
+   "sha256": "65469d7fbfb47881a5501e2e63c04aecb25d7e537e38705d0fac823ecdce194c",
+   "read_at": "2026-11-04 22:01:08.83101+00"
+  },
+  {
+   "table": "public.ottoq_retention_engine_allowlist",
+   "rows": 7,
+   "bytes": 1865,
+   "sha256": "3b8f9312b807d4e71492bee6d25dde0b5a5a59a2b2221170689911586f4725a1",
+   "read_at": "2026-11-04 22:01:09.058777+00"
+  },
+  {
+   "table": "public.ottoq_write_slimming_policy",
+   "rows": 1,
+   "bytes": 906,
+   "sha256": "11ec27a6b167eeae8dda721708e464890031f5ec55581b978fb688e67bdee843",
+   "read_at": "2026-11-04 22:01:09.405681+00"
+  },
+  {
+   "table": "public.ottoq_cert_columns",
+   "rows": 9,
+   "bytes": 1900,
+   "sha256": "3246b7bf6bad8d6c06a98fdaecc7a9697195974585447799a3338526a2694906",
+   "read_at": "2026-11-04 22:01:09.660508+00"
+  },
+  {
+   "table": "public.ottoq_cert_lineage",
+   "rows": 591,
+   "bytes": 460289,
+   "sha256": "d504ca02b360fa8f052c73e26f5556c1fbf2d7afe8cd9cadbf75a883aa0628eb",
+   "read_at": "2026-11-04 22:01:09.899367+00"
+  },
+  {
+   "table": "public.ottoq_signing_keys",
+   "rows": 1,
+   "bytes": 398,
+   "sha256": "6dc727659cbb4fefff8a9b0aa6ac3fa8967e139e2dec2f2c492078ec56b70909",
+   "read_at": "2026-11-04 22:01:10.400607+00"
+  }
+ ],
+ "excluded": {
+  "personal data or credentials": [
+   "ottoq_oauth_auth_requests",
+   "ottoq_oauth_clients",
+   "ottoq_oauth_device_codes",
+   "ottoq_oauth_grants",
+   "ottoq_oauth_tokens",
+   "ottoq_owner_accounts",
+   "staff_users",
+   "retail_members",
+   "ottoq_agent_demo_passcode",
+   "ottow_api_keys",
+   "ottoq_service_tokens",
+   "ottoq_agent_principals",
+   "api_integrations",
+   "ottoq_v2_signing_keys",
+   "ottow_drivers",
+   "notifications",
+   "ottoq_audit_bundles",
+   "ottoq_service_endpoints"
+  ],
+  "history, logs and outputs (the past, not an input)": [
+   "vehicle_state_log",
+   "bess_snapshots",
+   "depot_state_snapshots",
+   "ai_decision_log",
+   "autonomous_action_log",
+   "data_quality_errors",
+   "decision_fusion_log",
+   "demand_management_log",
+   "early_recall_log",
+   "emergency_queue_insertions",
+   "external_factors_log",
+   "fleet_features_daily",
+   "integration_health",
+   "maintenance_log",
+   "ocpp_meter_values",
+   "ottoq_agent_call_ledger",
+   "ottoq_anomaly_observations",
+   "ottoq_arbiter_assessments",
+   "ottoq_audit_reports",
+   "ottoq_calibration_metrics",
+   "ottoq_counterfactuals",
+   "ottoq_data_drift_metrics",
+   "ottoq_depot_benchmarks_daily",
+   "ottoq_depot_cost_daily",
+   "ottoq_emergency_invocations",
+   "ottoq_feature_values",
+   "ottoq_incident_reports",
+   "ottoq_inference_log",
+   "ottoq_intelligence_snapshot",
+   "ottoq_predictions",
+   "ottoq_prediction_accuracy_heatmap",
+   "ottoq_recommendations",
+   "ottoq_sla_conformance_daily",
+   "ottoq_sla_violations",
+   "ottoq_visit_cost_attribution",
+   "prediction_accuracy_daily",
+   "prediction_explanations",
+   "prediction_outcomes",
+   "progression_decisions",
+   "schedule_modifications",
+   "model_tuning_runs",
+   "tuning_iterations",
+   "ottoq_training_runs",
+   "ab_tests",
+   "accuracy_alerts",
+   "depot_visit_reports",
+   "dispatch_commands",
+   "ottow_mission_events",
+   "ottow_missions",
+   "ottow_notifications",
+   "vehicle_telemetry",
+   "ottoq_research_findings",
+   "ottoq_schema_snapshots",
+   "ottoq_benchmark_frames",
+   "charger_cooldowns",
+   "charger_health_scores",
+   "demand_shaping_plans",
+   "maintenance_schedules"
+  ],
+  "the research wing's and certification's own state (the lab starts its own)": [
+   "ottoq_throughput_sweep_cells",
+   "ottoq_throughput_sweeps",
+   "ottoq_dial_experiments",
+   "ottoq_cert_queue",
+   "ottoq_proposal_replay",
+   "ottoq_run_once_claim"
+  ],
+  "registry class engine / run_ledger / evidence": [
+   "(every table so registered; checked at export time)"
+  ],
+  "scratch, proof and backup tables": [
+   "(names matching the scratch patterns; schema only, no rows)"
+  ]
+ }
+}

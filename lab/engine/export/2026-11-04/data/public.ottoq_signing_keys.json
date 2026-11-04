@@ -1,0 +1,10 @@
+{
+"table": "public.ottoq_signing_keys",
+"filter": "true",
+"why": "signing key REGISTRY (secret_ref only; the secrets stay in production's vault)",
+"read_at": "2026-11-04 22:01:10.400607+00",
+"count": 1,
+"rows": [
+"(system:v1,system,,HMAC-SHA-256,vault:ottoq_signing_key_system_v1,t,\"2026-05-14 18:08:35.639607+00\",,,migration:20260514_layer1_event_journal,\"2026-05-14 18:08:35.639607+00\")"
+]
+}

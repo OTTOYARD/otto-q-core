@@ -1,0 +1,10 @@
+{
+"table": "public.ottoq_write_slimming_policy",
+"filter": "true",
+"why": "write slimming policy",
+"read_at": "2026-11-04 22:01:09.405681+00",
+"count": 1,
+"rows": [
+"(ottoq_events,t,\"{vehicle.state_changed,stall.state_changed}\",t,\"Stop storing redundant copies of new_state. `.created` rows: new_state is the same expression as payload->'new' in the same statement, so it is dropped whenever the two are byte-equal. `*.state_changed` rows in chain_event_types: new_state is rebuilt by folding payload->'diff'->key->'to' forward from the day's anchor. Read either back with public.ottoq_event_new_state(event_id). Emergency stop: UPDATE this row SET enabled=false; belt-and-braces: ALTER TABLE public.ottoq_events DISABLE TRIGGER ottoq_events_slim_new_state_bi; 0015: stall.state_changed added to the chain cut (measured 1,174 B of redundant new_state per row).\",\"2026-08-07 01:31:20.358228+00\")"
+]
+}

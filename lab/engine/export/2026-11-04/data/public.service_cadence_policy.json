@@ -1,0 +1,26 @@
+{
+"table": "public.service_cadence_policy",
+"filter": "true",
+"why": "the live service catalogue",
+"read_at": "2026-11-04 22:01:00.530802+00",
+"count": 17,
+"rows": [
+"(charge,\"Charge to target\",energy,anchor,25,,,soc,0.00,1.00,1.25,1.60,due,45,41.8,10,\"Anchor atom. must_do_at=due preserves today's exact behaviour. CHARGING WORKS - do not retune.\",t,\"2026-08-02 00:21:08.545128+00\")",
+"(cosmetic_repair,\"Cosmetic repair\",cosmetic,service_bay,60,,,event,0.70,1.00,1.25,1.60,never,2,1.9,70,\"Cosmetic only, never blocks redeploy. Carried forward honestly.\",t,\"2026-08-02 00:21:08.545128+00\")",
+"(data_offload,\"Data offload\",data,digital,27,,,event,0.75,1.00,1.25,1.60,always,,,52,\"0695 (Part A item 3, docs/DATA_OFFLOAD.md). An autonomous car's logged data, off over a wired uplink at a charger or a service bay: raised by the deriver from the observation data_offload_hours, sized hours x 60 / 4.5 minutes (1 TB an hour kept, 10 Gbps per uplink), 10 to 40. Lane digital: it takes no technician and no bay; ottoq_svc_to_stall_type maps the lane to NULL. Must-do once raised (CLAUDE.md rule 9): the car does not leave with it open, and an unfinished transfer holds its car on its uplink stall (ottoq.ottoq_uplink_transfer_holds).\",t,\"2026-10-10 11:36:09.958495+00\")",
+"(exterior_wash,\"Exterior wash\",cleanliness,wash_bay,10,72,,time_or_soil,0.70,1.00,1.25,1.75,overdue,3,36.4,40,\"3 wash bays, 10 min: ample headroom. Escalates at 1.25x cadence.\",t,\"2026-08-02 00:21:08.545128+00\")",
+"(fault_repair,\"Fault repair\",mechanical,service_bay,76,,,event,0.50,1.00,1.25,1.60,always,2,14.1,30,\"Safety. Always must_do regardless of cadence - unchanged. due_soon_ratio=0.50 so severity 99 (no fault, pseudo-ratio 0.00) grades ok, not due_soon.\",t,\"2026-08-02 00:27:04.40864+00\")",
+"(interior_deep_clean,\"Interior deep clean\",cleanliness,detail,20,336,,time_or_condition,0.70,1.00,1.08,1.40,overdue,0,56.7,45,\"Detail staff lane clears 57%. Also escalated by cabin_condition soiled/biohazard.\",t,\"2026-08-02 00:21:08.545128+00\")",
+"(interior_inspection,\"Interior inspection\",cleanliness,cabin,4,,,event,0.00,1.00,1.25,1.60,always,,,20,\"Cheap tech-pool lane at the charge stall.\",t,\"2026-08-02 00:21:08.545128+00\")",
+"(interior_tidy,\"Interior tidy\",cleanliness,cabin,5,,,event,0.00,1.00,1.25,1.60,always,,,25,\"Cheap tech-pool lane, 3-5 min at the charge stall.\",t,\"2026-08-02 00:21:08.545128+00\")",
+"(item_retrieval,\"Passenger item retrieval\",items,cabin,4,,,event,0.00,1.00,1.25,1.60,always,,,12,\"Customer property. Cabin lane, always mandatory.\",t,\"2026-08-02 00:21:08.545128+00\")",
+"(mechanical_pm,\"Mechanical PM\",mechanical,service_bay,40,,8000,km,0.80,1.00,1.20,1.40,critical,2,1.8,60,\"SERVICE_BAY STARVED. Escalates only at critical. Also driven by tire/brake wear.\",t,\"2026-08-02 00:21:08.545128+00\")",
+"(perimeter_walkaround,\"Perimeter walkaround\",inspection,exterior,12,,,event,0.00,1.00,1.25,1.60,always,,,27,\"0383/G86. Night-shift walkaround raised by the asset observer, performed at the vehicle where it stands (the atom carries at_perimeter:true) and metered against the general_tech pool exactly like sensor_clean. Declared here to close ottoq_assert_service_vocabulary, which reported this as the only observed-but-undeclared service. lane=exterior deliberately: ottoq_svc_to_stall_type maps that lane to NULL, so the service consumes a technician and never a bay. est_min_default 12 matches derive's own COALESCE((p_obs->>'perimeter_walkaround_min')::int, 12). must_do_at=always mirrors sensor_clean and fault_repair: event-raised, and mandatory once raised.\",t,\"2026-09-20 16:18:46.722758+00\")",
+"(readiness_check,\"Readiness gate\",gate,gate,3,,,event,0.00,1.00,1.25,1.60,always,,,90,\"Final gate, always mandatory.\",t,\"2026-08-02 00:21:08.545128+00\")",
+"(remote_diagnostics,\"Remote diagnostics\",diagnostic,digital,5,,,event,0.70,1.00,1.25,1.60,never,,,75,\"Advisory, never blocks redeploy.\",t,\"2026-08-02 00:21:08.545128+00\")",
+"(sensor_calibration,\"Sensor calibration\",sensor,service_bay,60,250,,time_or_km,0.80,1.00,1.20,1.45,critical,2,1.7,55,\"SERVICE_BAY STARVED (2 bays/116 vehicles, 1.7% cleared). Escalates only at critical. 0573: 60 min typical (30-120), public static calibration times.\",t,\"2026-08-02 00:21:08.545128+00\")",
+"(sensor_clean,\"Sensor clean\",sensor,exterior,5,,,event,0.00,1.00,1.25,1.60,always,,,25,\"Cheap tech-pool lane, safety-relevant perception hygiene.\",t,\"2026-08-02 00:21:08.545128+00\")",
+"(software_update,\"Software update\",software,digital,30,,,version,0.70,1.00,1.25,1.60,overdue,,87.1,50,\"Digital lane, no physical stall. Two versions behind = overdue.\",t,\"2026-08-02 00:21:08.545128+00\")",
+"(triage_check,Triage,diagnostic,cabin,3,,,event,0.00,1.00,1.25,1.60,always,,,15,\"Cheap tech-pool lane, always mandatory.\",t,\"2026-08-02 00:21:08.545128+00\")"
+]
+}

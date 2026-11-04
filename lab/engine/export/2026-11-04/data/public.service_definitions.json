@@ -1,0 +1,18 @@
+{
+"table": "public.service_definitions",
+"filter": "depot_id is null or depot_id = '11111111-1111-1111-1111-111111111111'::uuid",
+"why": "service catalogue (fallback)",
+"read_at": "2026-11-04 22:00:52.218357+00",
+"count": 9,
+"rows": [
+"(4155b9c2-07bb-493e-8155-6bccd14ac609,11111111-1111-1111-1111-111111111111,\"Multi-Point Inspection\",inspection,\"Comprehensive vehicle inspection\",service_bay,20,,,f,\"[\"\"autonomous\"\", \"\"retail\"\"]\",50,t,\"2026-04-04 20:06:44.146169+00\",\"2026-04-04 20:06:44.146169+00\")",
+"(4e2e8dfa-412c-46fd-a380-34333ea8451d,11111111-1111-1111-1111-111111111111,\"Full Detail\",full_detail,\"Interior + exterior deep clean\",detail_bay,60,,,f,\"[\"\"autonomous\"\", \"\"retail\"\"]\",30,t,\"2026-04-04 20:06:44.146169+00\",\"2026-04-04 20:06:44.146169+00\")",
+"(4fa39cd3-f61d-4883-9ed2-13f961db8408,11111111-1111-1111-1111-111111111111,\"L2 Overnight Charge\",l2_charge,\"Level 2 AC charging (slower, cheaper)\",l2,240,,,t,\"[\"\"autonomous\"\", \"\"retail\"\"]\",10,t,\"2026-04-04 20:06:44.146169+00\",\"2026-04-04 20:06:44.146169+00\")",
+"(8459d84b-3e65-40c7-9666-b7f32e2a8cb3,11111111-1111-1111-1111-111111111111,\"Tire Rotation\",tire_rotation,\"Rotate tires per manufacturer spec\",service_bay,25,,,f,\"[\"\"autonomous\"\", \"\"retail\"\"]\",40,t,\"2026-04-04 20:06:44.146169+00\",\"2026-04-04 20:06:44.146169+00\")",
+"(9cae99e9-7bea-498e-b981-75f2a98f06b2,11111111-1111-1111-1111-111111111111,\"Cabin Filter Replace\",cabin_filter,\"Replace cabin air filter\",service_bay,15,,,f,\"[\"\"autonomous\"\", \"\"retail\"\"]\",40,t,\"2026-04-04 20:06:44.146169+00\",\"2026-04-04 20:06:44.146169+00\")",
+"(a064e7e5-207f-433b-9f3d-8d214a530c4b,11111111-1111-1111-1111-111111111111,\"Wiper Replacement\",wiper_replace,\"Replace windshield wiper blades\",service_bay,10,,,f,\"[\"\"autonomous\"\", \"\"retail\"\"]\",40,t,\"2026-04-04 20:06:44.146169+00\",\"2026-04-04 20:06:44.146169+00\")",
+"(ac749b7c-3e2b-43eb-bcc4-95bfb6b3c7c1,11111111-1111-1111-1111-111111111111,\"Exterior Wash\",exterior_wash,\"Automated exterior wash cycle\",wash_bay,15,,,f,\"[\"\"autonomous\"\", \"\"retail\"\"]\",20,t,\"2026-04-04 20:06:44.146169+00\",\"2026-04-04 20:06:44.146169+00\")",
+"(ad666183-2344-4178-864e-8760518191cd,11111111-1111-1111-1111-111111111111,\"Interior Detail\",interior_detail,\"Full interior vacuum and wipe\",detail_bay,30,,,f,\"[\"\"autonomous\"\", \"\"retail\"\"]\",30,t,\"2026-04-04 20:06:44.146169+00\",\"2026-04-04 20:06:44.146169+00\")",
+"(e42df262-7bd8-4e8e-bbd8-f8e00791d0b8,11111111-1111-1111-1111-111111111111,\"DCFC Fast Charge\",dcfc_charge,\"DC fast charge to target SOC\",dcfc,45,,,t,\"[\"\"autonomous\"\", \"\"retail\"\"]\",10,t,\"2026-04-04 20:06:44.146169+00\",\"2026-04-04 20:06:44.146169+00\")"
+]
+}

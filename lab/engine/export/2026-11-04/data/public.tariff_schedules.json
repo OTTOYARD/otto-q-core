@@ -1,0 +1,11 @@
+{
+"table": "public.tariff_schedules",
+"filter": "depot_id is null or depot_id = '11111111-1111-1111-1111-111111111111'::uuid",
+"why": "tariff schedules",
+"read_at": "2026-11-04 22:00:48.03603+00",
+"count": 2,
+"rows": [
+"(3a7fd640-31f2-4281-bf60-fac6531b120c,11111111-1111-1111-1111-111111111111,\"TVA Weekday Rate\",\"Tennessee Valley Authority\",2026-01-01,,1,\"[{\"\"label\"\": \"\"off_peak\"\", \"\"end_time\"\": \"\"06:00\"\", \"\"start_time\"\": \"\"00:00\"\", \"\"rate_per_kwh\"\": 0.055, \"\"demand_charge_per_kw\"\": 0}, {\"\"label\"\": \"\"mid_peak\"\", \"\"end_time\"\": \"\"10:00\"\", \"\"start_time\"\": \"\"06:00\"\", \"\"rate_per_kwh\"\": 0.085, \"\"demand_charge_per_kw\"\": 8.50}, {\"\"label\"\": \"\"on_peak\"\", \"\"end_time\"\": \"\"14:00\"\", \"\"start_time\"\": \"\"10:00\"\", \"\"rate_per_kwh\"\": 0.125, \"\"demand_charge_per_kw\"\": 15.00}, {\"\"label\"\": \"\"super_peak\"\", \"\"end_time\"\": \"\"18:00\"\", \"\"start_time\"\": \"\"14:00\"\", \"\"rate_per_kwh\"\": 0.165, \"\"demand_charge_per_kw\"\": 22.00}, {\"\"label\"\": \"\"on_peak\"\", \"\"end_time\"\": \"\"22:00\"\", \"\"start_time\"\": \"\"18:00\"\", \"\"rate_per_kwh\"\": 0.125, \"\"demand_charge_per_kw\"\": 15.00}, {\"\"label\"\": \"\"off_peak\"\", \"\"end_time\"\": \"\"23:59\"\", \"\"start_time\"\": \"\"22:00\"\", \"\"rate_per_kwh\"\": 0.055, \"\"demand_charge_per_kw\"\": 0}]\",t,\"2026-04-04 20:06:44.146169+00\",\"2026-04-04 20:06:44.146169+00\")",
+"(5cf589e3-21b4-414c-86ca-ea4269194f7c,11111111-1111-1111-1111-111111111111,\"TVA Weekend Rate\",\"Tennessee Valley Authority\",2026-01-01,,1,\"[{\"\"label\"\": \"\"off_peak\"\", \"\"end_time\"\": \"\"08:00\"\", \"\"start_time\"\": \"\"00:00\"\", \"\"rate_per_kwh\"\": 0.045, \"\"demand_charge_per_kw\"\": 0}, {\"\"label\"\": \"\"mid_peak\"\", \"\"end_time\"\": \"\"20:00\"\", \"\"start_time\"\": \"\"08:00\"\", \"\"rate_per_kwh\"\": 0.075, \"\"demand_charge_per_kw\"\": 6.00}, {\"\"label\"\": \"\"off_peak\"\", \"\"end_time\"\": \"\"23:59\"\", \"\"start_time\"\": \"\"20:00\"\", \"\"rate_per_kwh\"\": 0.045, \"\"demand_charge_per_kw\"\": 0}]\",t,\"2026-04-04 20:06:44.146169+00\",\"2026-04-04 20:06:44.146169+00\")"
+]
+}

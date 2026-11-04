@@ -1,108 +1,105 @@
-# `lab/engine/` — the OTTO-Q engine, rebuilt from this repository in a local PostgreSQL 17
+# `lab/engine/` — the research lab's copy of the OTTO-Q engine, in a local PostgreSQL 17
 
-This is the first piece of the research lab (`docs/FRONTIER_PLAN_2026-11-03.md`, item E1, on branch
-`claude/frontier-plan-certified-intelligence`): a private copy of the engine's database, outside
-production, built only from what this repository holds, and measured object by object against
-production. It runs nothing. It holds no run data and no reference data.
+The research lab of `docs/FRONTIER_PLAN_2026-11-03.md` (item E1): a private copy of the engine's database,
+outside production, that runs the twin unpaced, forks a run at any tick, and runs several replicas at once.
+It holds the twin depot's reference data and nothing else: no run data, no other depot, no person, no secret
+(rule 8, rule 10).
 
-**Read `reports/fidelity_2026-11-03.md` before using it.** On 2026-11-03 the copy matched production on
-300 of 1,037 routines and 177 of 453 tables. The repository alone cannot rebuild the engine today, and
-the report says why, file by file.
+**Two ways to build it, and only one is faithful.**
+
+| build | from | matches production | use |
+|---|---|---|---|
+| `build_from_prod.sh` (since 2026-11-04) | an export of production's catalog and the twin depot's reference data, read through the Management API's read-only endpoint | every routine, table, trigger, index, policy, type, sequence, comment, ACL and cron job, and the ledger's versions (6 objects differ only as semantically identical deparse round-trips); the twin depot's world fingerprint exactly | **the lab** |
+| `build_from_repo.sh` (2026-11-03) | `db/baseline/` + `db/migrations/` | 300 of 1,037 routines, 177 of 453 tables (G509) | measuring the repository as a record |
+
+Read `reports/e1_acceptance_2026-11-04.md` for what the lab measured on 2026-11-04 (its three acceptance
+tests, and what they found), and `reports/fidelity_2026-11-03.md` for why the repository alone cannot rebuild
+the engine.
+
+## Quick start
+
+```bash
+bash lab/engine/install_server.sh                       # once, as root: PostgreSQL 17 + PostGIS from PGDG
+bash lab/engine/build_from_prod.sh lab/engine/export/2026-11-04 lab/engine/export/2026-11-04/data
+PY=/var/tmp/ottoq_lab_venv/bin/python; D="host=/var/tmp port=55433 dbname=ottoq_lab user=postgres"
+$PY -I lab/engine/acceptance/fidelity.py   --dsn "$D" --data lab/engine/export/2026-11-04/data --out /tmp/fidelity.json
+$PY -I lab/engine/acceptance/forks.py      --dsn "$D" --out /tmp/forks.json
+$PY -I lab/engine/acceptance/throughput.py --dsn-base "host=/var/tmp port=55433 user=postgres" --out /tmp/throughput.json
+```
+
+The build takes about 15 seconds. The committed export needs no token. A fresh export does:
+
+```bash
+export SUPABASE_ACCESS_TOKEN=...   # or Supabase_Key, the name the session environment used on 2026-11-04
+python3 -I lab/engine/lib/export_prod.py --out lab/engine/export/$(date -u +%F)
+python3 -I lab/engine/lib/export_reference_data.py --export lab/engine/export/$(date -u +%F) --out lab/engine/export/$(date -u +%F)/data
+```
 
 ## What is here
 
 | path | what it is |
 |---|---|
-| `build_from_repo.sh` | (re)builds database `ottoq_lab` on the lab server; every step's result lands in `reports/` |
-| `sql/00_roles.sql` | the cluster roles the engine's SQL names (production's, all `NOLOGIN` here) |
-| `sql/10_supabase_shims.sql` | Supabase stand-ins: `auth`, `net`, `vault`, `storage`, `supabase_migrations`, extensions, default privileges, the database's locale-sensitive settings |
-| `sql/20_repo_gaps.sql` | objects production has and no repo file creates, without which the baseline cannot load: schemas `ottoq`/`twin`, 26 enum types, 2 composite types (labels read from production's catalog, dated) |
-| `sql/30_post_build.sql` | marks every pg_cron job inactive; writes `lab.build_info` (commit, branch, cutoff) |
-| `sql/fidelity_objects.sql` | the object census run identically on the lab and on production |
-| `sql/reference_closure.sql` | the call closure of the demo-run start and the tick, and the tables it names |
-| `lib/sqlsplit.py` | statement splitter for the baseline dump (quotes, dollar quotes, comments) |
-| `lib/load_baseline.py` | loads `db/baseline/` statement by statement, to a fixpoint |
-| `lib/apply_migrations.py` | applies `db/migrations/` one file per transaction, in ledger order |
-| `lib/classify_failures.py` | sorts migration failures by what stopped them |
-| `lib/compare_ledger_text.py` | checks each migration file against the SQL the production ledger says ran |
-| `lib/fidelity.py` | lab-side census, the production queries (printed, never run from here), the summary tables |
-| `reports/` | build results (`build_<date>_*`), the fidelity report and its evidence (`fidelity_<date>/`) |
+| `install_server.sh` | installs PostgreSQL 17 and PostGIS from PGDG (the steps run on 2026-11-04; no Docker daemon was available to test a container) |
+| `build_from_prod.sh` | builds `ottoq_lab` from a production export: roles, shims, the cron stand-in, the schema to a fixpoint, the reference data, `lab.build_info` |
+| `build_from_repo.sh` | builds `ottoq_lab` from this repository (G509's measurement) |
+| `export/<date>/` | a production export: `NN_<phase>.sql` (one statement per `-- @@ kind identity` marker), `manifest.json` (read times, counts, file digests, production's engine hash), `data/` (the twin depot's reference data, one JSON file per table, and its manifest with production's world fingerprint) |
+| `lib/prod_read.py` | the only way the lab reads production: `POST /v1/projects/{ref}/database/query/read-only` (runs as `supabase_read_only_user`, `transaction_read_only = on`), one project, token from the environment, never printed |
+| `lib/export_prod.py` | the schema export: production's own deparsers with `search_path = ''`; refuses object kinds it does not reproduce and any statement shaped like a secret |
+| `lib/export_reference_data.py` | the twin depot's reference data: an explicit list of 90 tables with a filter and a reason each, and the list of what is never copied (personal data, credentials, history, run data, evidence) |
+| `lib/load_export.py` | loads an export phase by phase, to a fixpoint; default privileges go on last |
+| `lib/load_reference_data.py` | loads the reference data with triggers off, then reports every foreign key whose parent was not copied |
+| `lib/lab_server.sh` | the lab server's settings and bootstrap, shared by both builds; refuses to build if a job scheduler is loaded |
+| `lib/lab_run.py` | the tick driver and fork driver: an arm started exactly as one arm of `ottoq_determinism_pair`, ticked, digested with `ottoq_ab_arm_atoms` and per tick, forked with savepoints |
+| `lib/fidelity_full.py` | the object-by-object comparison with production (the 2026-11-03 census plus `sql/fidelity_extra.sql`) |
+| `acceptance/fidelity.py`, `forks.py`, `throughput.py` | E1's three acceptance tests |
+| `sql/00_roles.sql`, `sql/10_supabase_shims.sql` | production's roles (all `NOLOGIN`) and the Supabase stand-ins: `auth`, `net` (no outbound HTTP), `vault` (empty), `storage`, `supabase_migrations`, extensions, the database's locale settings |
+| `sql/12_cron_standin.sql` | the `cron` schema without a scheduler (see "The lab server") |
+| `sql/20_repo_gaps.sql`, `sql/30_post_build.sql`, `lib/load_baseline.py`, `lib/apply_migrations.py`, `lib/classify_failures.py`, `lib/compare_ledger_text.py`, `lib/fidelity.py`, `lib/sqlsplit.py` | the repository build and its 2026-11-03 measurement |
+| `sql/31_post_build_prod.sql` | the production build's last step: every cron job inactive, `lab.build_info` records the export |
+| `reports/` | build results, fidelity measurements, the acceptance report and its evidence |
 
 ## The lab server
 
 | | |
 |---|---|
-| PostgreSQL | 17.11 from apt.postgresql.org (`postgresql-17`, `postgresql-17-postgis-3` 3.7.0, `postgresql-17-cron` 1.6.8) |
+| PostgreSQL | 17.11 from apt.postgresql.org, PostGIS 3.7.0 (production: 17.6, PostGIS 3.3.7; extension-owned objects are left out of every comparison) |
 | data / socket / port | `/var/tmp/ottoq_lab_pg17`, `/var/tmp`, `55433` (no TCP listener) |
-| started as | the `postgres` OS user: `pg_ctl -D /var/tmp/ottoq_lab_pg17 -l /var/tmp/ottoq_lab_pg17/startup.log start` |
-| beside it | the PG16 scratch server the repo's tests use (`/var/tmp`, port `55432`) is a separate cluster and is not touched |
-| pg_cron | real, preloaded, `cron.database_name = ottoq_lab`, **`cron.launch_active_jobs = off`** (no job ever launches), and the build marks every job inactive as well |
-| outbound HTTP | none: neither the `http` extension nor `pg_net` is installed; `net.http_get/post/delete` are stubs that return a fresh id and do nothing |
-| locale | database `ottoq_lab` is ICU `en-US` (collation version 153.121, the same version production reports) with LC_COLLATE/LC_CTYPE `en_US.UTF-8`, so text sorts as it does in production |
+| started as | the `postgres` OS user, by `lib/lab_server.sh` on first use |
+| job scheduler | **none.** pg_cron is not installed or loaded. Its scheduler held a session open in the lab database even with `cron.launch_active_jobs = off`, and `CREATE DATABASE … TEMPLATE` refuses a template anyone is connected to, which the parallel replicas and long forks need (measured 2026-11-04). `sql/12_cron_standin.sql` gives the lab pg_cron 1.6's tables and the functions the engine calls; production's 24 jobs are rows in it, all inactive, and no process exists to run them. |
+| outbound HTTP | none: neither the `http` extension nor `pg_net` is installed; `net.http_get/post/delete` return a fresh id and do nothing. So the agent's and the solvers' calls go nowhere, and a certification arm (cuOpt quiesced at run scope, 0152) runs the deterministic core alone, as in production. |
+| locale | database `ottoq_lab` is ICU `en-US` (collation version 153.121, the version production reports), `LC_COLLATE`/`LC_CTYPE` `en_US.UTF-8`, `extra_float_digits = 0`, `jit = off`, as production |
+| one deliberate difference | production's `statement_timeout` is 120 s; the lab keeps 0, because research runs are long transactions |
 
-Install once (root): add the PGDG apt source, put `create_main_cluster = false` in
-`/etc/postgresql-common/createcluster.conf` (so no default cluster appears on port 5432/5433), then
-`apt-get install postgresql-17 postgresql-17-postgis-3 postgresql-17-cron`. The script does the rest:
-`initdb` on first use, the `en_US.UTF-8` libc locale, a Python venv with psycopg 3.3.7 at
-`/var/tmp/ottoq_lab_venv`.
+## How the copy is made, and what it is not
 
-## Rebuild
+- **Read-only, enforced by production.** Every read runs as `supabase_read_only_user` in a read-only
+  transaction (statement_timeout 2 min). The token in this session's environment can see three projects;
+  `lib/prod_read.py` reads one.
+- **What ran, not what was filed.** Definitions come from production's catalog, deparsed with
+  `search_path = ''` so every name is schema-qualified, as `pg_dump` writes them. Six objects re-parse to
+  a different tree than production stores (three CHECKs whose `BETWEEN`-born nested AND flattens; three views
+  whose second `UNION` branch's unused column name re-derives as `text`). Their meaning is identical;
+  `pg_dump` has the same round-trip.
+- **ACLs exactly.** Objects are created with no default privileges in force, then each non-null ACL is
+  rebuilt in its own array order, then production's default privileges are installed.
+- **The twin depot only (rule 8).** 90 tables, 9,278 rows: the depot, its stalls, chargers, structures,
+  battery, tariffs, staffing, scenarios, its 120 cars and their need profiles, the learned fits the kernel
+  reads, the owners' contracts, and the engine's catalogs and settings (global and the twin depot's dial
+  settings; never a past run's). Two foreign keys point at rows deliberately not copied: two fleet
+  build-outs (`fleet150`, `fleet200`, both inactive) borrow 34 and 84 cars from the Benchmark depot, and two
+  twin operators name API keys. So those build-outs cannot be switched on in the lab until their lent cars
+  are copied too.
+- **No run data, no evidence, no history, no people, no secrets.** `vault.secrets` is empty; event signing
+  finds no key and records events unsigned, as production does when its vault is unreadable.
+- **No other Supabase.** No PostgREST, GoTrue, Storage or Realtime. `postgres` is a superuser here and is
+  not on Supabase.
 
-```bash
-bash lab/engine/build_from_repo.sh          # as root (it uses su postgres for initdb/pg_ctl), ~15 s
-```
+## Forks and replicas
 
-It drops and recreates `ottoq_lab`, then: roles → shims → repo gaps → `db/baseline/` → every
-post-baseline migration that is not `PENDING` → post-build. Outputs:
-`reports/build_<date>_baseline.{tsv,json}`, `reports/build_<date>_migrations.{tsv,json,log}`;
-`lib/classify_failures.py reports/build_<date>_migrations.tsv` adds the failure causes.
-
-**Baseline cutoff: ledger version `20260803210034`.** `db/baseline/README.md` verified its export against
-a ledger of exactly 621 rows on 2026-08-04. On 2026-11-03 production's
-`supabase_migrations.schema_migrations` holds exactly 621 versions below `0002`'s (`20260804140958`), the
-last of them `20260803210034`. So the baseline stands for ledger rows up to that version and
-`db/migrations/` starts at `0002`.
-
-**Order.** Files with a ledger version are applied in version order. A file whose header says
-`APPLIED-NO-LEDGER-ROW` or `UNVERIFIED-NO-LEDGER-ROW` has no version to sort by; it is placed straight
-after its numeric predecessor's version (an inference: file numbers and versions disagree in 153
-places). `PENDING` files are skipped and listed.
-
-**Each file is one transaction:** `psql -X -1 -v ON_ERROR_STOP=1 -f FILE` (every file has at most one
-`BEGIN`/`COMMIT` pair and nothing after it). A file whose first error is an undefined-object error
-(42P01/42883/42703/42704/3F000) is retried once with `check_function_bodies = off` and recorded as
-`ok_bodies_unchecked`; any other error is final, because production (which creates functions with
-`check_function_bodies = on`) would have refused the file too. A file that applies and carries a ledger
-version gets its row in the lab's `supabase_migrations.schema_migrations` (statements = the file's text).
-
-## Measuring fidelity again
-
-```bash
-D="host=/var/tmp port=55433 dbname=ottoq_lab user=postgres"
-O=lab/engine/reports/fidelity_$(date -u +%F)
-/var/tmp/ottoq_lab_venv/bin/python -I lab/engine/lib/fidelity.py lab --dsn "$D" --out $O
-/var/tmp/ottoq_lab_venv/bin/python -I lab/engine/lib/fidelity.py prod-sql aggregate --out $O   # also: routines, relations, types
-```
-
-`prod-sql` prints a single read-only `SELECT`. Run it against production through a read-only channel
-(on 2026-11-03: the Supabase MCP tool's `execute_sql`) and save the answer as
-`$O/prod_routines_classified.txt` etc., in the format of the 2026-11-03 files. The lab's objects travel
-inside the query as 20-character tokens (identity and content digests), so production returns only
-counts and the names of what differs or is missing: no function body and no row leaves production.
-`fidelity.py summarize --out $O` prints the routine table the report quotes.
-
-## What this copy is not
-
-- **Not production's engine.** See the report: 557 of 1,037 routines and 255 of 453 tables are missing,
-  177 routines and 21 tables differ, and 233 of 236 triggers are missing (the baseline export carries no
-  triggers at all).
-- **No run data and no reference data.** No depot, stall, vehicle, rule row, policy catalog row or
-  calibration. The report lists the tables a demo run at the twin depot reads, with production's row
-  counts for that depot; copying them is a separate, approved step.
-- **No secrets.** `vault.secrets` starts empty and nothing is copied into it. The engine's signing keys
-  live in production's vault; signing code finds no key here.
-- **Supabase shims, not Supabase.** `auth.*` reads `request.jwt.*` settings nothing sets (so every
-  function returns NULL); there is no PostgREST, GoTrue, Storage or Realtime. Roles exist only so that
-  grants and `SET ROLE` resolve. `postgres` is a superuser here and is not on Supabase.
-- **Settings differ in one deliberate place:** production's `statement_timeout` is 120 s (configuration
-  file); the lab keeps 0, because research runs are long transactions.
+A fork is a `SAVEPOINT` in an arm's transaction (`lib/lab_run.py`): run to tick F, take the savepoint, run a
+branch, digest it, `ROLLBACK TO SAVEPOINT`, run the next. Two things do not roll back: sequences (ids minted
+in a later branch are higher) and `gen_random_uuid()`. Thirteen atoms are blind to both; the end state is not,
+because it hashes the `robot_leg_id` 0764 mints into each cleaned visit's atoms (G510; `0794` is the fix,
+PENDING). Each branch sets `ottoq.sim_run_id` itself (the GUC hazard of `0329`/`0421`). A replica is
+`CREATE DATABASE … TEMPLATE ottoq_lab`, for running arms in parallel or forks longer than one transaction
+should hold.

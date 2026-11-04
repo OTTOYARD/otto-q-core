@@ -11,9 +11,9 @@
 #               depot's reference data); loaded with triggers off, after the schema
 #
 # Steps (each step's result lands in lab/engine/reports/):
-#   0. the lab server is up (lib/lab_server.sh; cron.launch_active_jobs must be off)
+#   0. the lab server is up (lib/lab_server.sh; no job scheduler may be loaded)
 #   1. drops and recreates the lab database (production's locale)
-#   2. 00_roles.sql, 10_supabase_shims.sql; then the shims' default privileges are cleared,
+#   2. 00_roles.sql, 10_supabase_shims.sql, 12_cron_standin.sql; then the shims' default privileges are cleared,
 #      so the export's objects get production's explicit ACLs and nothing else
 #   3. the export, phase by phase, to a fixpoint (lib/load_export.py)
 #   4. the reference data, if given (lib/load_reference_data.py)
@@ -41,6 +41,7 @@ echo "== (re)creating database $LAB_DB"
 echo "== roles, Supabase shims"
 "${PSQL[@]}" -d postgres -f "$HERE/sql/00_roles.sql"
 "${PSQL[@]}" -d "$LAB_DB" -f "$HERE/sql/10_supabase_shims.sql"
+"${PSQL[@]}" -d "$LAB_DB" -f "$HERE/sql/12_cron_standin.sql"
 # The shims install a guess at postgres' default privileges in public. Production's are in the
 # export (phase 23) and go on last; until then none may apply, or every object the export
 # creates would carry grants production's does not.

@@ -1,0 +1,12 @@
+{
+"table": "public.ottoq_certified_proposers",
+"filter": "true",
+"why": "certified proposers",
+"read_at": "2026-11-04 22:01:02.345913+00",
+"count": 3,
+"rows": [
+"(cuopt,\"0241 seed. 1 proposal, 1 certification run, 2026-08-30. The cuOpt proposer is quiesced inside a cert by 0152 (cuopt_propose_enabled=0, run-scoped) and by 0056 before it; registered so that quiesce stays the single mechanism that silences it, rather than this registry silently becoming a second one.\",\"2026-09-09 05:19:17.833337+00\",postgres)",
+"(greedy_constrained,\"0241 seed. 12,403 proposals across 542 certification runs since 2026-08-29. The local deterministic stall proposer; inserts directly.\",\"2026-09-09 05:19:17.833337+00\",postgres)",
+"(ottoq_service_priority,\"0241 seed. 1,904 proposals across 821 certification runs since 2026-08-29. ottoq_service_priority_propose, called from ottoq_sim_decide_and_dispatch -- INSIDE the certified tick. Reaches the table by BOTH paths (direct insert and through ottoq_submit_external_proposal, 372 of them), which is why a door ban would have removed a certified proposer.\",\"2026-09-09 05:19:17.833337+00\",postgres)"
+]
+}

@@ -1,0 +1,10 @@
+{
+"table": "public.ottoq_evidence_regimes",
+"filter": "depot_id is null or depot_id = '11111111-1111-1111-1111-111111111111'::uuid",
+"why": "evidence regimes the fits honour (0625)",
+"read_at": "2026-11-04 22:00:55.90789+00",
+"count": 1,
+"rows": [
+"(1,charge_time_v2,dcfc,11111111-1111-1111-1111-111111111111,\"2026-09-30 11:53:08+00\",\"0573 rebuilt the twin's fast-charge physics: each battery's DC acceptance curve (the Tesla Model Y's measured, the Jaguar I-PACE's fitted to its published times, the median of 99 measured curves for every other car) and two cars' facts (the I-PACE to 84.7 kWh and 104 kW, the Zoox to 133 kWh and 100 kW). Fast charges before it ran on the old shape and facts: against the clock, Zoox 1.14, Waymo 0.21 and Tesla -0.09 in log above the charges since. Its L2 branch was not touched, and 19.2 kW is every car's limit on L2.\",\"migration 0573 (20260930115308); found by ottoq_evidence_regime_scan (0625 V0); recorded by 0625\",postgres,\"2026-10-08 21:49:32.255301+00\")"
+]
+}

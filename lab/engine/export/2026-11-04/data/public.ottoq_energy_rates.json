@@ -1,0 +1,12 @@
+{
+"table": "public.ottoq_energy_rates",
+"filter": "true",
+"why": "energy rates",
+"read_at": "2026-11-04 22:01:04.351777+00",
+"count": 3,
+"rows": [
+"(nes_evc,\"EVC (EV charging, no demand charge)\",21.773,2.515,f,100,\"[{\"\"url\"\": \"\"https://www.nespower.com/-/media/project/nes/common/pdfs/commercial-rates/2025/april/evc.pdf\"\", \"\"title\"\": \"\"NES Schedule EVC, effective October 2024\"\", \"\"retrieved\"\": \"\"2026-09-30\"\"}]\",\"Separately metered EV charging, 50-5,000 kW. The same price every hour, no demand charge; customer charge $100 a month.\",\"2026-09-30 11:56:50.777467+00\")",
+"(nes_gsa3,\"GSA-3 (standard)\",4.785,2.515,t,2091.71,\"[{\"\"url\"\": \"\"https://www.nespower.com/-/media/project/nes/common/pdfs/commercial-rates/2025/april/gsa-123.pdf\"\", \"\"title\"\": \"\"NES Schedule GSA, Part 3, effective October 2024\"\", \"\"retrieved\"\": \"\"2026-07-09\"\"}]\",\"Flat energy. Demand $21.40/kW first 1,000 kW and $21.78 above (summer), $20.34 / $20.73 otherwise, on the highest 30 minutes of the month (ottoq_depot_tariffs). Fixed as recorded there.\",\"2026-09-30 11:56:50.777467+00\")",
+"(nes_tgsa3,\"TGSA-3 (time-of-use)\",,2.515,t,1571.37,\"[{\"\"url\"\": \"\"https://www.nespower.com/-/media/project/nes/common/pdfs/commercial-rates/2025/april/tgsa.pdf\"\", \"\"title\"\": \"\"NES Schedule TGSA, effective October 2024\"\", \"\"retrieved\"\": \"\"2026-09-30\"\"}, {\"\"url\"\": \"\"https://www.nespower.com/rates/\"\", \"\"title\"\": \"\"NES rates page: fuel cost adjustment, September\"\", \"\"retrieved\"\": \"\"2026-09-30\"\"}]\",\"Energy priced hour by hour by ottoq_tariff_windows (0574: summer 5.667 c on-peak 1-7 PM, 4.209 c off-peak; winter 5.204 / 4.539 c; transition 4.672 c; each + 2.515 c). Demand as GSA-3 (ottoq_depot_tariffs). Fixed: service charge $934.50 + TVA grid access $636.87 (over 150,000 kWh a month).\",\"2026-09-30 11:56:50.777467+00\")"
+]
+}

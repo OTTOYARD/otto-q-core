@@ -1,0 +1,16 @@
+{
+"table": "public.ottoq_retention_engine_allowlist",
+"filter": "true",
+"why": "retention allowlist",
+"read_at": "2026-11-04 22:01:09.058777+00",
+"count": 7,
+"rows": [
+"(ottoq_bay_binding_witness,\"2026-09-09 13:45:46.477828+00\",\"Per-tick bay-binding observations, 1.46M rows for 380 MB. Working state; no KPI and no verdict atom reads it.\")",
+"(ottoq_comms_messages,\"2026-09-09 13:45:46.477828+00\",\"Simulated comms traffic. Working state; nothing downstream reads it after the run ends.\")",
+"(ottoq_events,\"2026-09-09 13:45:46.477828+00\",\"Already deleted nightly by ottoq_retention_purge_worker at a 7-day wall-clock keep; 96% of its lifetime rows are already gone. Adding it here deletes the same class of row by run rather than by age. No new loss class.\")",
+"(ottoq_itinerary_legs,\"2026-09-09 13:45:46.477828+00\",\"Run-scoped movement working state. No inbound foreign key from any table.\")",
+"(ottoq_rule_evaluations,\"2026-09-09 13:45:46.477828+00\",\"Same as ottoq_events: already on the nightly worker at a 7-day keep. The L1 shield evaluation log is regenerable working state, and h_rule is run-scoped.\")",
+"(ottoq_stall_bookings,\"2026-09-09 13:45:46.477828+00\",\"G23 target. 66% of every heap block this database has ever read, 84% of it owned by runs that ended days ago. The pair reads it run-scoped -- ottoq_determinism_pair: FROM ottoq_stall_bookings k WHERE k.sim_run_id = v_run -- so purging other runs cannot move h_bkg (0164 Q2). Cost of purging: KPI 2 and KPI 4 can no longer be recomputed for a purged run, and it cannot be replayed.\")",
+"(ottoq_variability_cards,\"2026-09-09 13:45:46.477828+00\",\"The twin per-run variability draws. Regenerable from (seed, entity, sim-seconds) by construction -- twin.ottoq_sim_seeded_random is a pure hash with no sequence -- so these rows are a cache of a function, not evidence.\")"
+]
+}

@@ -1,0 +1,14 @@
+{
+"table": "public.ottoq_grid_events",
+"filter": "depot_id is null or depot_id = '11111111-1111-1111-1111-111111111111'::uuid",
+"why": "grid events (EN.004/EN.005 read them)",
+"read_at": "2026-11-04 22:00:49.058771+00",
+"count": 5,
+"rows": [
+"(261d0597-8a53-4320-9692-b1ff46150912,11111111-1111-1111-1111-111111111111,curtailment_request,safety_critical,\"2026-05-14 20:02:47.943437+00\",,emergency_cascade,\"{\"\"reason\"\": \"\"arrival_pause_emergency\"\", \"\"invocation_id\"\": \"\"42f96208-8c69-4a10-bf5a-be3e017fc99a\"\", \"\"protocol_code\"\": \"\"FIRE.depot_alarm\"\"}\",\"2026-05-14 20:02:47.943437+00\",\"2026-05-14 20:02:47.943437+00\")",
+"(47e0a225-b49d-4fcf-ab6a-fe9bc73df279,11111111-1111-1111-1111-111111111111,curtailment_request,safety_critical,\"2026-05-14 20:02:11.371397+00\",,emergency_cascade,\"{\"\"reason\"\": \"\"arrival_pause_emergency\"\", \"\"invocation_id\"\": \"\"04514cb1-5fc0-49d4-9a06-ea768f684911\"\", \"\"protocol_code\"\": \"\"WX.severe_weather\"\"}\",\"2026-05-14 20:02:11.371397+00\",\"2026-05-14 20:02:11.371397+00\")",
+"(5057c452-c474-4d17-83de-28cf68854893,11111111-1111-1111-1111-111111111111,curtailment_request,safety_critical,\"2026-05-14 20:04:06.282411+00\",,emergency_cascade,\"{\"\"reason\"\": \"\"arrival_pause_emergency\"\", \"\"invocation_id\"\": \"\"b0c4fe7f-3f8f-4f46-adfb-c90352db3107\"\", \"\"protocol_code\"\": \"\"FIRE.depot_alarm\"\"}\",\"2026-05-14 20:04:06.282411+00\",\"2026-05-14 20:04:06.282411+00\")",
+"(74494819-57ed-4d1b-9616-8b9b934197c8,11111111-1111-1111-1111-111111111111,curtailment_request,safety_critical,\"2026-05-14 18:15:48.878777+00\",,emergency_cascade,\"{\"\"reason\"\": \"\"arrival_pause_emergency\"\", \"\"invocation_id\"\": \"\"af306e72-c618-4a62-b93e-8990b24e6348\"\", \"\"protocol_code\"\": \"\"FIRE.depot_alarm\"\"}\",\"2026-05-14 18:16:28.014969+00\",\"2026-05-14 18:15:48.878777+00\")",
+"(98f1056c-db38-4d71-a9a6-352a0eb172dc,11111111-1111-1111-1111-111111111111,curtailment_request,safety_critical,\"2026-05-14 20:04:36.810917+00\",,emergency_cascade,\"{\"\"reason\"\": \"\"arrival_pause_emergency\"\", \"\"invocation_id\"\": \"\"5e6b6c3a-3909-4f70-9d65-3e3c7eac1904\"\", \"\"protocol_code\"\": \"\"OPS.killswitch\"\"}\",\"2026-05-14 20:04:36.810917+00\",\"2026-05-14 20:04:36.810917+00\")"
+]
+}

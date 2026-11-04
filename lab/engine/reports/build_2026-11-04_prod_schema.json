@@ -4,7 +4,7 @@
  "failed": 0,
  "retry_rounds": 1,
  "recovered_on_retry": 61,
- "seconds": 5.3,
+ "seconds": 3.9,
  "by_phase": {
   "01_schemas": {
    "ok": 2,

@@ -1,0 +1,10 @@
+{
+"table": "public.ottoq_calibration_correlations",
+"filter": "true",
+"why": "calibration correlations",
+"read_at": "2026-11-04 22:00:59.680704+00",
+"count": 1,
+"rows": [
+"(aef14e85-d82a-4b1e-b608-c8f90ed5e1e2,acn_data,dwell_time_minutes,energy_delivered_kwh,0.3842,pearson,3948,\"2026-05-22 03:27:39.729512+00\")"
+]
+}

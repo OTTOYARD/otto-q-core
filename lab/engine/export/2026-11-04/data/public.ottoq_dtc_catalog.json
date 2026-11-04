@@ -1,0 +1,31 @@
+{
+"table": "public.ottoq_dtc_catalog",
+"filter": "true",
+"why": "fault code catalog",
+"read_at": "2026-11-04 22:01:00.262185+00",
+"count": 22,
+"rows": [
+"(AV-H0001,hardware,minor,\"Steering motor temp high\",\"EPS motor temperature above warning threshold\",20260613_a4_3)",
+"(AV-H0010,hardware,moderate,\"Brake pad wear advisory\",\"Front brake pads near minimum thickness\",20260613_a4_3)",
+"(AV-H0050,hardware,safety_critical,\"Compute unit fault\",\"Primary AV compute encountered an error; failover engaged\",20260613_a4_3)",
+"(AV-O0001,operator,info,\"Manual override engaged\",\"Safety driver took manual control\",20260613_a4_3)",
+"(AV-O0010,operator,minor,\"Passenger door obstruction\",\"Door cycle blocked; possible passenger interference\",20260613_a4_3)",
+"(AV-P0001,perception,minor,\"Camera occlusion (FL)\",\"Front-left camera reports possible occlusion / dirt\",20260613_a4_3)",
+"(AV-P0002,perception,minor,\"Camera occlusion (FR)\",\"Front-right camera occlusion\",20260613_a4_3)",
+"(AV-P0003,perception,moderate,\"LIDAR rotation slow\",\"Spinning LIDAR rotation rate below threshold\",20260613_a4_3)",
+"(AV-P0010,perception,major,\"Stereo calibration drift\",\"Front stereo cameras calibration drifted beyond tolerance\",20260613_a4_3)",
+"(AV-PL001,planning,info,\"Path replan elevated\",\"Re-plan rate above normal — complex traffic situation\",20260613_a4_3)",
+"(AV-PL010,planning,moderate,\"Path planner timeout\",\"Planning solution did not converge within timing budget (single instance)\",20260613_a4_3)",
+"(AV-PT001,powertrain,minor,\"Coolant temperature high\",\"Battery coolant temp elevated\",20260613_a4_3)",
+"(AV-PT010,powertrain,major,\"Motor inverter fault\",\"Power inverter reported transient fault\",20260613_a4_3)",
+"(AV-S0001,software,info,\"Software update pending\",\"OTA update available\",20260613_a4_3)",
+"(AV-S0010,software,moderate,\"Telemetry buffer overflow\",\"Telemetry packets dropped due to buffer overflow\",20260613_a4_3)",
+"(AV-SN001,sensor,minor,\"Tire pressure low (FL)\",\"Front-left tire pressure below threshold\",20260613_a4_3)",
+"(AV-SN002,sensor,minor,\"Tire pressure low (FR)\",\"Front-right tire pressure below threshold\",20260613_a4_3)",
+"(AV-SN003,sensor,minor,\"Tire pressure low (RL)\",\"Rear-left tire pressure below threshold\",20260613_a4_3)",
+"(AV-SN004,sensor,minor,\"Tire pressure low (RR)\",\"Rear-right tire pressure below threshold\",20260613_a4_3)",
+"(AV-SN010,sensor,moderate,\"Battery sensor noisy\",\"SOC reading variance above normal (sensor drift suspected)\",20260613_a4_3)",
+"(AV-W0001,weather_road,info,\"Heavy rain detected\",\"Wiper speed elevated; vision confidence reduced\",20260613_a4_3)",
+"(AV-W0010,weather_road,moderate,\"Road surface slick\",\"Wheel-slip events detected\",20260613_a4_3)"
+]
+}

@@ -1,0 +1,13 @@
+{
+"table": "public.ottoq_fleet_operator_slas",
+"filter": "true",
+"why": "their contracts",
+"read_at": "2026-11-04 22:00:56.394037+00",
+"count": 4,
+"rows": [
+"(37bb4385-4f16-44f8-99f1-5faa3af31dfa,55555555-5555-5555-5555-555555555555,OTTOYARD-DEPOT-MSA-2026-LOCALE,\"2026-07-19 23:07:56.063112+00\",,active,1,80,90,100,80,,30,45,,,,{},{},f,180,auto_accept,,oem_webhook_final_only,,,t,,,per_visit,f,2555,t,{},\"Seeded 2026-07-19. Codifies the previously-hardcoded 80% deploy floor as a real per-operator SLA value (founder decision). Prior to this the table was empty and every 80 in the proposer, manifest generator, auto-dispatch gate and shield rule SLA.001 was an undefended constant.\",,,,\"2026-07-19 23:07:56.063112+00\",\"2026-07-19 23:07:56.063112+00\",)",
+"(57f77ad1-c54b-48bc-96ca-282efbac981a,22222222-2222-2222-2222-222222222222,OTTOYARD-DEPOT-MSA-2026-WAYMON,\"2026-07-19 23:07:56.063112+00\",,active,1,80,90,100,80,,30,45,,,,{},{},f,180,auto_accept,,oem_webhook_final_only,,,t,,,per_visit,f,2555,t,{},\"Seeded 2026-07-19. Codifies the previously-hardcoded 80% deploy floor as a real per-operator SLA value (founder decision). Prior to this the table was empty and every 80 in the proposer, manifest generator, auto-dispatch gate and shield rule SLA.001 was an undefended constant.\",,,,\"2026-07-19 23:07:56.063112+00\",\"2026-07-19 23:07:56.063112+00\",)",
+"(6423df35-8faf-4305-9dc0-7c036d49c206,44444444-4444-4444-4444-444444444444,OTTOYARD-DEPOT-MSA-2026-ZOOXSO,\"2026-07-19 23:07:56.063112+00\",,active,1,80,90,100,80,,30,45,,,,{},{},f,180,auto_accept,,oem_webhook_final_only,,,t,,,per_visit,f,2555,t,{},\"Seeded 2026-07-19. Codifies the previously-hardcoded 80% deploy floor as a real per-operator SLA value (founder decision). Prior to this the table was empty and every 80 in the proposer, manifest generator, auto-dispatch gate and shield rule SLA.001 was an undefended constant.\",,,,\"2026-07-19 23:07:56.063112+00\",\"2026-07-19 23:07:56.063112+00\",)",
+"(9129e0ba-2117-49bd-b83e-2c5191e8edad,33333333-3333-3333-3333-333333333333,OTTOYARD-DEPOT-MSA-2026-TESLAR,\"2026-07-19 23:07:56.063112+00\",,active,1,80,90,100,80,,30,45,,,,{},{},f,180,auto_accept,,oem_webhook_final_only,,,t,,,per_visit,f,2555,t,{},\"Seeded 2026-07-19. Codifies the previously-hardcoded 80% deploy floor as a real per-operator SLA value (founder decision). Prior to this the table was empty and every 80 in the proposer, manifest generator, auto-dispatch gate and shield rule SLA.001 was an undefended constant.\",,,,\"2026-07-19 23:07:56.063112+00\",\"2026-07-19 23:07:56.063112+00\",)"
+]
+}

@@ -1,0 +1,14 @@
+{
+"table": "public.ottoq_retraining_triggers",
+"filter": "true",
+"why": "retraining triggers",
+"read_at": "2026-11-04 22:01:07.018147+00",
+"count": 5,
+"rows": [
+"(1115b147-f8c8-4b25-b6d6-48a165346a4b,arrival_time_periodic,vehicle_arrival_eta_minutes,time_based,\"{\"\"interval_days\"\": 14}\",t,\"Retrain every 14 days\",,0,\"2026-05-14 18:45:06.322316+00\")",
+"(46cad439-6464-4cf8-a902-c0ffcacdcea2,anomaly_baseline_update,anomaly_score,sample_threshold,\"{\"\"new_samples\"\": 10000}\",t,\"Refresh anomaly baselines every 10K new observations\",,0,\"2026-05-14 18:45:06.322316+00\")",
+"(67a0110e-2955-4b77-bfe6-9dac2dadcb87,charge_curve_accuracy,charge_duration_minutes,accuracy_decline,\"{\"\"rolling_days\"\": 7, \"\"mape_threshold\"\": 15}\",t,\"Retrain if 7-day rolling MAPE > 15%\",,0,\"2026-05-14 18:45:06.322316+00\")",
+"(7184adf2-9fb3-4e0e-8b7e-2fd96de2a0bd,demand_forecast_calibration,demand_kw,calibration_decline,\"{\"\"coverage_80_min\"\": 0.7}\",t,\"Retrain if 80% interval coverage falls below 70%\",,0,\"2026-05-14 18:45:06.322316+00\")",
+"(b302226e-3a37-45dc-b4a0-226b3aa982a0,charge_curve_drift,charge_duration_minutes,drift_psi,\"{\"\"psi_threshold\"\": 0.25, \"\"min_feature_count\"\": 3}\",t,\"Retrain if 3+ features show PSI > 0.25 in last 7d\",,0,\"2026-05-14 18:45:06.322316+00\")"
+]
+}
