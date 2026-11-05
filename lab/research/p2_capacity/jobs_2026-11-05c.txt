@@ -1,0 +1,25 @@
+# The lab days of 2026-11-05, third list. A 12-hour lab day starts with the whole fleet charging at 6 AM and most cars
+# come back only once inside it, so it measures the start-up wave, not steady operations; the 24-hour days (288 ticks)
+# below are the capacity curve proper. Run unattended in the lab (Chase approved unattended lab runs, 2026-11-05).
+# battery: the day plan with a typical day's shape (the other day's EV charging), the plan otherwise as it runs
+normal_day_116_171717_shape|--fleet 116 --scenario normal_day --seed 171717 --lab-sql lab/research/p2_capacity/whatif_ev_shape_normal_day_116_424242.sql --tag shape
+normal_day_116_424242_shape_dr0res0|--fleet 116 --scenario normal_day --seed 424242 --dial bess_plan_dr_reserve_kwh=0 --lab-sql lab/research/p2_capacity/whatif_reserve_no_surge_jump.sql --lab-sql lab/research/p2_capacity/whatif_ev_shape_normal_day_116_171717.sql --tag shape_dr0res0
+# the 12-hour stress test's top end
+normal_day_250_171717|--fleet 250 --scenario normal_day --seed 171717
+# the capacity curve proper: whole days
+normal_day_116_171717_24h|--fleet 116 --scenario normal_day --seed 171717 --ticks 288 --tag 24h
+normal_day_150_171717_24h|--fleet 150 --scenario normal_day --seed 171717 --ticks 288 --tag 24h
+normal_day_200_171717_24h|--fleet 200 --scenario normal_day --seed 171717 --ticks 288 --tag 24h
+normal_day_116_424242_24h|--fleet 116 --scenario normal_day --seed 424242 --ticks 288 --tag 24h
+normal_day_150_424242_24h|--fleet 150 --scenario normal_day --seed 424242 --ticks 288 --tag 24h
+normal_day_200_424242_24h|--fleet 200 --scenario normal_day --seed 424242 --ticks 288 --tag 24h
+# rule 14: the kernel's exit-first key (0781) off, owner by owner
+normal_day_116_171717_exit0|--fleet 116 --scenario normal_day --seed 171717 --dial charge_order_exit_first=0 --tag exit0
+# G517 on the day the battery started 71% full
+normal_day_116_171717_dr0res0|--fleet 116 --scenario normal_day --seed 171717 --dial bess_plan_dr_reserve_kwh=0 --lab-sql lab/research/p2_capacity/whatif_reserve_no_surge_jump.sql --tag dr0res0
+# the 12-hour stress test on the second seed, a busier day, a third service bay
+normal_day_150_424242|--fleet 150 --scenario normal_day --seed 424242
+normal_day_200_424242|--fleet 200 --scenario normal_day --seed 424242
+busy_day_116_171717|--fleet 116 --scenario busy_day --seed 171717
+busy_day_150_171717|--fleet 150 --scenario busy_day --seed 171717
+normal_day_200_171717_svc3|--fleet 200 --scenario normal_day --seed 171717 --add-stall service_bay=1 --tag svc3
