@@ -1,0 +1,99 @@
+DROP TABLE
+SELECT 1110
+DROP TABLE
+SELECT 370
+== (1) owners per decision
+ owners | count 
+--------+-------
+      3 |   370
+
+== (2) in hindsight, by the grader's label (the depot's lexicographic verdict)
+    outcome    | decisions | good_for_every_owner | trades_owners | bad_for_every_owner | no_owner_changes 
+---------------+-----------+----------------------+---------------+---------------------+------------------
+ missed_win    |       143 |                   30 |           113 |                   0 |                0
+ right_refusal |       195 |                    0 |           115 |                  40 |               40
+ right_take    |        21 |                    5 |            16 |                   0 |                0
+ wrong_take    |        11 |                    0 |             6 |                   5 |                0
+               |       370 |                   35 |           250 |                  45 |               40
+
+== (3) the orders the referee TOOK: which owners did each one make worse off, in hindsight
+  outcome   |       hindsight_class        | orders |                 owners_made_worse                  
+------------+------------------------------+--------+----------------------------------------------------
+ right_take | good_for_every_owner         |      5 | 
+ right_take | trades_one_owner_for_another |     16 | Tesla Robotaxi TN, Waymo Nashville, Zoox Southeast
+ wrong_take | bad_for_every_owner          |      5 | Tesla Robotaxi TN, Waymo Nashville, Zoox Southeast
+ wrong_take | trades_one_owner_for_another |      6 | Tesla Robotaxi TN, Zoox Southeast
+
+== (4) each owner: in how many decisions the agent's order was better / worse / no different for its cars (hindsight)
+    owner_name     | decisions | agent_better | agent_worse | no_different | taken_better | taken_worse 
+-------------------+-----------+--------------+-------------+--------------+--------------+-------------
+ Tesla Robotaxi TN |       370 |          145 |         180 |           45 |           15 |          17
+ Waymo Nashville   |       370 |          182 |         146 |           42 |           22 |          10
+ Zoox Southeast    |       370 |          153 |         171 |           46 |           15 |          16
+
+== (5) where an owner loses, at what level (hindsight)
+    owner_name     |  decided_at   | agent_worse | agent_better 
+-------------------+---------------+-------------+--------------
+ Tesla Robotaxi TN | contract_wait |          76 |           58
+ Tesla Robotaxi TN | flow          |          10 |           12
+ Tesla Robotaxi TN | lateness      |          83 |           69
+ Tesla Robotaxi TN | on_time       |          11 |            6
+ Waymo Nashville   | contract_wait |          56 |           72
+ Waymo Nashville   | flow          |           8 |            8
+ Waymo Nashville   | lateness      |          79 |          101
+ Waymo Nashville   | on_time       |           3 |            1
+ Zoox Southeast    | contract_wait |          72 |           56
+ Zoox Southeast    | flow          |          11 |           11
+ Zoox Southeast    | lateness      |          86 |           85
+ Zoox Southeast    | on_time       |           2 |            1
+
+== (6) the owner guard (0784) applied to every decision: refuse when the check EXPECTS any owner worse off
+ taken | guard_would_refuse |       hindsight_class        | count 
+-------+--------------------+------------------------------+-------
+ f     | f                  | bad_for_every_owner          |     2
+ f     | f                  | good_for_every_owner         |     2
+ f     | f                  | no_owner_changes             |     6
+ f     | f                  | trades_one_owner_for_another |    33
+ f     | t                  | bad_for_every_owner          |    38
+ f     | t                  | good_for_every_owner         |    28
+ f     | t                  | no_owner_changes             |    34
+ f     | t                  | trades_one_owner_for_another |   195
+ t     | f                  | bad_for_every_owner          |     1
+ t     | f                  | good_for_every_owner         |     1
+ t     | f                  | trades_one_owner_for_another |     3
+ t     | t                  | bad_for_every_owner          |     4
+ t     | t                  | good_for_every_owner         |     4
+ t     | t                  | trades_one_owner_for_another |    19
+
+== (7) the check's expected per-owner verdict against hindsight, owner by owner
+ expected | hindsight | count 
+----------+-----------+-------
+       -1 |        -1 |   253
+       -1 |         0 |    50
+       -1 |         1 |   205
+        0 |        -1 |    17
+        0 |         0 |    32
+        0 |         1 |    15
+        1 |        -1 |   227
+        1 |         0 |    51
+        1 |         1 |   260
+
+== (8) independence: decisions and (scenario, seed) keys behind them
+ decisions | runs 
+-----------+------
+       370 |   25
+
+== (9) how much an owner loses when a TAKEN order makes its cars worse off (hindsight, minutes for that owner's cars)
+  decided_at   | owner_losses | median_lateness_min | median_contract_wait_min | on_time_cars_lost 
+---------------+--------------+---------------------+--------------------------+-------------------
+ contract_wait |            9 |                0.08 |                    36.68 |                 0
+ flow          |            2 |                   0 |                     0.44 |                 0
+ lateness      |           31 |                3.53 |                    24.88 |                 0
+ on_time       |            1 |               32.76 |                        0 |                -1
+               |           43 |                1.97 |                    23.09 |                -1
+
+== (10) when the check expected NO owner worse off, how often hindsight found one (the guard's passes)
+ guard_passes | some_owner_worse_in_hindsight 
+--------------+-------------------------------
+           48 |                            39
+

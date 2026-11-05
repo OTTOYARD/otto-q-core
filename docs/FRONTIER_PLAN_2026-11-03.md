@@ -598,6 +598,11 @@ These run in parallel. None touches production. Building the Lab runs a few simu
    - Re-run the pure scheduler on the stored snapshots for the per-owner split.
    - Report which verdicts flip with the price and which do not. This shows how much the judge's answer depends on the
      prices D4 has not yet set.
+
+   *Status 2026-11-04: done, both halves. Depot totals: G508 (`db/checks/0476`). Per owner, in the lab (`0478`, G511):
+   the lab re-grades all 370 past decisions exactly as production's grader did, and owner by owner most of the
+   referee's wins move one owner's minutes onto another; of the 32 orders it took, 5 were good for every owner. The
+   check's per-owner expectation is close to a coin, so E2 is built per owner (E7) on calibrated estimates (E4).*
 3. **E3 v0.** Build the G506 cell in CIF, synthesize the supervisor and replay the monitors on `8c0b2e04`.
 
 ### Phase 1: the judge and the promises
