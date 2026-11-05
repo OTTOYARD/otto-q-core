@@ -638,6 +638,14 @@ Run E5 on finished runs:
 
 The regret split ranks Phase 4's targets.
 
+*Status 2026-11-05 (4:21 PM CT): the clairvoyant bound is built and run on the research lab's first full day
+(`lab/research/p2_perfect_day/`, normal_day, 116 cars, 12 hours). Minutes from arrival to ready: 24,332 real, about 17,100
+best found in the engine's own job order, 15,307 proven bound; holding every owner to no worse than the real day still
+gives each owner 25-36% less (the gap is not a trade between owners). By lane, rescheduling the charging posts recovers more
+of it than the bays, so Phase 4's first target stays the charge-line key. The battery's half: perfect foresight $849
+against the day plan's $1,147 and no battery's $1,463 on the same day. The penalty (information relaxation) is not built;
+more days and fleet sizes are running (`lab/research/p2_capacity/`).*
+
 ### Phase 4: the inventor. Needs D3.
 
 E6 in the Lab, on the target with the most regret in Phase 3: the charge-line key unless E5 says otherwise.
