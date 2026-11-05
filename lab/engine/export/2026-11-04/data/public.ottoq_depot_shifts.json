@@ -1,0 +1,8 @@
+{
+"table": "public.ottoq_depot_shifts",
+"filter": "depot_id is null or depot_id = '11111111-1111-1111-1111-111111111111'::uuid",
+"why": "shifts",
+"read_at": "2026-11-04 22:00:48.547613+00",
+"count": 0,
+"rows": []
+}

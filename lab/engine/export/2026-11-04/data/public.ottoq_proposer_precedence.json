@@ -1,0 +1,13 @@
+{
+"table": "public.ottoq_proposer_precedence",
+"filter": "true",
+"why": "proposer precedence",
+"read_at": "2026-11-04 22:01:02.119245+00",
+"count": 4,
+"rows": [
+"(cuopt_fallback,11,t,f,\"0335. Local cuOpt fallback. Lower priority than CP-SAT and hosted cuOpt.\",\"2026-09-12 20:52:02.020843+00\",postgres)",
+"(cuopt,10,t,t,\"0335. NVIDIA cuOpt specialist and service-failure fallback. Lower priority than CP-SAT.\",\"2026-09-12 20:52:02.020843+00\",postgres)",
+"(forward_lex,0,t,t,\"0335. Primary deterministic CP-SAT assignment proposer selected by the agent objective.\",\"2026-09-12 20:52:02.020843+00\",postgres)",
+"(llm_advisor,20,t,t,\"0259. The language-model advisor (bridge/llm_proposer.py): a model's PHYSICAL proposals through the same door, so the L1 shield disposes them -- the path the dial-writing Nemotron agent never had. Ranked after the CP-SAT proposer. 0 rows at seed time; NOT a certified proposer (0241); reaches a certification only by replay, which is what makes a nondeterministic proposer safe to consume.\",\"2026-09-12 20:52:02.020843+00\",postgres)"
+]
+}

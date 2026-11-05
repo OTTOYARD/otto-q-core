@@ -1,0 +1,8 @@
+{
+"table": "public.ottoq_rule_overrides",
+"filter": "depot_id is null or depot_id = '11111111-1111-1111-1111-111111111111'::uuid",
+"why": "per-depot rule overrides",
+"read_at": "2026-11-04 22:00:53.293651+00",
+"count": 0,
+"rows": []
+}

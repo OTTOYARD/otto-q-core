@@ -1,0 +1,11 @@
+{
+"table": "public.ottoq_retention_policy",
+"filter": "true",
+"why": "retention policy",
+"read_at": "2026-11-04 22:01:08.522097+00",
+"count": 2,
+"rows": [
+"(engine_rows,t,48:00:00,f,\"Keep window for RUN-SCOPED engine rows, deleted by ottoq_retention_purge_runs per ottoq_run_scope_registry class='engine'. Distinct from policy_key='events', which is a WALL-CLOCK walk over three tables and also covers production rows (sim_run_id IS NULL) that no run purge can reach. day_aligned is false on purpose: the unit here is a run, not a day. The run row itself is never deleted -- ottoq_cert_matrix reads every canon from ottoq_sim_runs.validation_notes (0164).\",\"2026-09-09 13:32:54.9813+00\")",
+"(events,t,\"7 days\",t,\"Keep one week of raw ottoq_events / ottoq_rule_evaluations / ottoq_incident_reports, rounded out to whole UTC days. Per-run history is preserved indefinitely by ottoq_run_archives, which retention may never touch. Widen or narrow by updating keep_interval here -- cron job 11 passes '48 hours' and this row overrides it.\",\"2026-08-05 14:27:11.16993+00\")"
+]
+}

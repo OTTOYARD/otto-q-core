@@ -1,0 +1,392 @@
+{
+ "tables": [
+  {
+   "table": "public.accuracy_slos",
+   "rows": 10
+  },
+  {
+   "table": "public.action_guardrails",
+   "rows": 8
+  },
+  {
+   "table": "public.depots",
+   "rows": 1
+  },
+  {
+   "table": "public.downstream_action_contracts",
+   "rows": 13
+  },
+  {
+   "table": "public.engine_config",
+   "rows": 1
+  },
+  {
+   "table": "public.external_factor_sources",
+   "rows": 6
+  },
+  {
+   "table": "public.fleet_operators",
+   "rows": 4
+  },
+  {
+   "table": "public.model_parameters",
+   "rows": 6
+  },
+  {
+   "table": "public.model_versions",
+   "rows": 6
+  },
+  {
+   "table": "public.ottoq_agent_prompts",
+   "rows": 3
+  },
+  {
+   "table": "public.ottoq_anomaly_detectors",
+   "rows": 9
+  },
+  {
+   "table": "public.ottoq_bess_units",
+   "rows": 1
+  },
+  {
+   "table": "public.ottoq_calibration_correlations",
+   "rows": 1
+  },
+  {
+   "table": "public.ottoq_calibration_datasets",
+   "rows": 9
+  },
+  {
+   "table": "public.ottoq_calibration_distributions",
+   "rows": 41
+  },
+  {
+   "table": "public.ottoq_calibration_profiles",
+   "rows": 8
+  },
+  {
+   "table": "public.ottoq_canopy_state",
+   "rows": 4
+  },
+  {
+   "table": "public.ottoq_cert_columns",
+   "rows": 9
+  },
+  {
+   "table": "public.ottoq_cert_lineage",
+   "rows": 591
+  },
+  {
+   "table": "public.ottoq_certified_proposers",
+   "rows": 3
+  },
+  {
+   "table": "public.ottoq_charge_clock_fits",
+   "rows": 25
+  },
+  {
+   "table": "public.ottoq_charge_fault_fits",
+   "rows": 28
+  },
+  {
+   "table": "public.ottoq_charge_window_calibration",
+   "rows": 1
+  },
+  {
+   "table": "public.ottoq_command_actor_registry",
+   "rows": 12
+  },
+  {
+   "table": "public.ottoq_depot_shifts",
+   "rows": 0
+  },
+  {
+   "table": "public.ottoq_depot_staffing",
+   "rows": 3
+  },
+  {
+   "table": "public.ottoq_depot_tariffs",
+   "rows": 3
+  },
+  {
+   "table": "public.ottoq_dtc_catalog",
+   "rows": 22
+  },
+  {
+   "table": "public.ottoq_emergency_protocols",
+   "rows": 9
+  },
+  {
+   "table": "public.ottoq_enactment_branches",
+   "rows": 6
+  },
+  {
+   "table": "public.ottoq_energy_rates",
+   "rows": 3
+  },
+  {
+   "table": "public.ottoq_event_types_catalog",
+   "rows": 155
+  },
+  {
+   "table": "public.ottoq_evidence_regimes",
+   "rows": 1
+  },
+  {
+   "table": "public.ottoq_features",
+   "rows": 22
+  },
+  {
+   "table": "public.ottoq_feed_plans",
+   "rows": 12
+  },
+  {
+   "table": "public.ottoq_fleet_buildout_active",
+   "rows": 0
+  },
+  {
+   "table": "public.ottoq_fleet_buildouts",
+   "rows": 2
+  },
+  {
+   "table": "public.ottoq_fleet_operator_slas",
+   "rows": 4
+  },
+  {
+   "table": "public.ottoq_grid_events",
+   "rows": 5
+  },
+  {
+   "table": "public.ottoq_intelligence_sources",
+   "rows": 18
+  },
+  {
+   "table": "public.ottoq_kpi_touch_actor_types",
+   "rows": 21
+  },
+  {
+   "table": "public.ottoq_kpi_touch_lanes",
+   "rows": 8
+  },
+  {
+   "table": "public.ottoq_learned_estimates",
+   "rows": 62
+  },
+  {
+   "table": "public.ottoq_margin_prices",
+   "rows": 3
+  },
+  {
+   "table": "public.ottoq_model_routes",
+   "rows": 72
+  },
+  {
+   "table": "public.ottoq_ocpp_chargers",
+   "rows": 45
+  },
+  {
+   "table": "public.ottoq_oem_webhook_patterns",
+   "rows": 3
+  },
+  {
+   "table": "public.ottoq_operation_catalog",
+   "rows": 23
+  },
+  {
+   "table": "public.ottoq_policy_param_catalog",
+   "rows": 252
+  },
+  {
+   "table": "public.ottoq_policy_params",
+   "rows": 91
+  },
+  {
+   "table": "public.ottoq_prediction_rule_links",
+   "rows": 7
+  },
+  {
+   "table": "public.ottoq_prediction_types_catalog",
+   "rows": 8
+  },
+  {
+   "table": "public.ottoq_proposer_precedence",
+   "rows": 4
+  },
+  {
+   "table": "public.ottoq_recall_implementations",
+   "rows": 3
+  },
+  {
+   "table": "public.ottoq_retention_engine_allowlist",
+   "rows": 7
+  },
+  {
+   "table": "public.ottoq_retention_policy",
+   "rows": 2
+  },
+  {
+   "table": "public.ottoq_retention_state",
+   "rows": 2
+  },
+  {
+   "table": "public.ottoq_retraining_triggers",
+   "rows": 5
+  },
+  {
+   "table": "public.ottoq_reward_weights",
+   "rows": 1
+  },
+  {
+   "table": "public.ottoq_rule_overrides",
+   "rows": 0
+  },
+  {
+   "table": "public.ottoq_rule_parameters",
+   "rows": 0
+  },
+  {
+   "table": "public.ottoq_rules",
+   "rows": 54
+  },
+  {
+   "table": "public.ottoq_run_scope_registry",
+   "rows": 266
+  },
+  {
+   "table": "public.ottoq_scenarios",
+   "rows": 8
+  },
+  {
+   "table": "public.ottoq_service_point_capabilities",
+   "rows": 6314
+  },
+  {
+   "table": "public.ottoq_service_tariffs",
+   "rows": 18
+  },
+  {
+   "table": "public.ottoq_signing_keys",
+   "rows": 1
+  },
+  {
+   "table": "public.ottoq_sim_scenarios",
+   "rows": 10
+  },
+  {
+   "table": "public.ottoq_site_base_history",
+   "rows": 30
+  },
+  {
+   "table": "public.ottoq_site_buildout_active",
+   "rows": 0
+  },
+  {
+   "table": "public.ottoq_site_buildouts",
+   "rows": 11
+  },
+  {
+   "table": "public.ottoq_site_structures",
+   "rows": 28
+  },
+  {
+   "table": "public.ottoq_specialization_strategies",
+   "rows": 12
+  },
+  {
+   "table": "public.ottoq_state_transitions",
+   "rows": 132
+  },
+  {
+   "table": "public.ottoq_tariff_windows",
+   "rows": 11
+  },
+  {
+   "table": "public.ottoq_v2_signal_ttl",
+   "rows": 42
+  },
+  {
+   "table": "public.ottoq_variability_catalog",
+   "rows": 47
+  },
+  {
+   "table": "public.ottoq_vehicle_classes",
+   "rows": 9
+  },
+  {
+   "table": "public.ottoq_write_slimming_policy",
+   "rows": 1
+  },
+  {
+   "table": "public.ottow_dispatch_rules",
+   "rows": 6
+  },
+  {
+   "table": "public.schedule_tasks",
+   "rows": 113
+  },
+  {
+   "table": "public.service_cadence_policy",
+   "rows": 17
+  },
+  {
+   "table": "public.service_definitions",
+   "rows": 9
+  },
+  {
+   "table": "public.stalls",
+   "rows": 158
+  },
+  {
+   "table": "public.tariff_schedules",
+   "rows": 2
+  },
+  {
+   "table": "public.vehicle_need_profile",
+   "rows": 116
+  },
+  {
+   "table": "public.vehicle_schedules",
+   "rows": 54
+  },
+  {
+   "table": "public.vehicles",
+   "rows": 120
+  },
+  {
+   "table": "public.waves",
+   "rows": 3
+  },
+  {
+   "table": "twin.ottoq_twin_operators",
+   "rows": 2
+  }
+ ],
+ "stamps_cleared": [
+  {
+   "table": "public.vehicles",
+   "column": "owning_sim_run_id",
+   "rows": 0,
+   "why": "registry class 'stamp': the fleet row is permanent, the run is not copied"
+  }
+ ],
+ "fk_orphans": [
+  {
+   "constraint": "ottoq_fleet_buildouts_lender_depot_id_fkey",
+   "child": "public.ottoq_fleet_buildouts",
+   "parent": "public.depots",
+   "columns": [
+    "lender_depot_id"
+   ],
+   "rows": 2
+  },
+  {
+   "constraint": "ottoq_twin_operators_key_id_fkey",
+   "child": "twin.ottoq_twin_operators",
+   "parent": "public.ottow_api_keys",
+   "columns": [
+    "key_id"
+   ],
+   "rows": 2
+  }
+ ]
+}

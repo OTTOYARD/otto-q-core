@@ -1,0 +1,11 @@
+{
+"table": "public.ottoq_fleet_buildouts",
+"filter": "depot_id is null or depot_id = '11111111-1111-1111-1111-111111111111'::uuid",
+"why": "fleet build-outs",
+"read_at": "2026-11-04 22:00:50.276658+00",
+"count": 2,
+"rows": [
+"(fleet150,11111111-1111-1111-1111-111111111111,22222222-2222-2222-2222-222222222222,\"150 cars: the twin's 116 and 34 lent by the Benchmark depot, in the twin's class mix\",\"{\"\"zoox_robotaxi_2024\"\": 10, \"\"waymo_jaguar_ipace_2024\"\": 13, \"\"tesla_model_y_robotaxi_2024\"\": 11}\",150,\"{\"\"mix\"\": \"\"the twin's own 36 / 46 / 34 of 116, rounded to 34\"\", \"\"asked\"\": \"\"Chase, 2026-09-29: 150-200 vehicles through 10-20 robotic DCFC\"\"}\")",
+"(fleet200,11111111-1111-1111-1111-111111111111,22222222-2222-2222-2222-222222222222,\"200 cars: the twin's 116 and 84 lent by the Benchmark depot, in the twin's class mix\",\"{\"\"zoox_robotaxi_2024\"\": 24, \"\"waymo_jaguar_ipace_2024\"\": 34, \"\"tesla_model_y_robotaxi_2024\"\": 26}\",200,\"{\"\"mix\"\": \"\"the twin's own 36 / 46 / 34 of 116, rounded to 84\"\", \"\"asked\"\": \"\"Chase, 2026-09-29: 150-200 vehicles through 10-20 robotic DCFC\"\"}\")"
+]
+}

@@ -1,0 +1,18 @@
+{
+"table": "public.ottoq_cert_columns",
+"filter": "true",
+"why": "the canon matrix's columns",
+"read_at": "2026-11-04 22:01:09.660508+00",
+"count": 9,
+"rows": [
+"(11111111-1111-1111-1111-111111111111,busy_day,171717,12,06:00:00,t,\"Flagship rotation.\",\"2026-09-12 03:36:15.267349+00\")",
+"(11111111-1111-1111-1111-111111111111,busy_day,171717,24,06:00:00,t,\"Flagship rotation. 0130's deferral coin surfaced at this horizon.\",\"2026-09-12 03:36:15.267349+00\")",
+"(11111111-1111-1111-1111-111111111111,busy_day,171717,48,24:00:00,t,\"THE COLUMN THIS MIGRATION EXISTS FOR. Longest horizon; 0108 and 0193 both broke here first, which is exactly why it must not be the one that quietly stops running. A wider max_age than the 12/24t columns because a 48t pair costs ~2x -- wider, not absent.\",\"2026-09-12 03:36:15.267349+00\")",
+"(11111111-1111-1111-1111-111111111111,busy_day,314159,12,06:00:00,t,\"Flagship rotation. Fastest column; first to show a boot-state defect.\",\"2026-09-12 03:36:15.267349+00\")",
+"(11111111-1111-1111-1111-111111111111,busy_day,424242,12,06:00:00,t,\"Flagship rotation.\",\"2026-09-12 03:36:15.267349+00\")",
+"(11111111-1111-1111-1111-111111111111,busy_day,424242,24,06:00:00,t,\"Flagship rotation.\",\"2026-09-12 03:36:15.267349+00\")",
+"(11111111-1111-1111-1111-111111111111,normal_day,171717,12,06:00:00,t,\"Flagship rotation. The only non-busy scenario -- 0134's energy-path carrier appeared here and nowhere else, so dropping it would hide a whole class.\",\"2026-09-12 03:36:15.267349+00\")",
+"(aacd0bb0-2d02-d101-72cc-33f70e950bc8,grid_smoke,239001,6,24:00:00,t,\"Grid fixture (0153). Seconds per pair, and the only column that exercises the 0132 site power gate under a tight cap.\",\"2026-09-12 03:36:15.267349+00\")",
+"(aacd0bb0-2d02-d101-72cc-33f70e950bc8,grid_smoke,424242,6,24:00:00,t,\"Grid fixture, second seed.\",\"2026-09-12 03:36:15.267349+00\")"
+]
+}

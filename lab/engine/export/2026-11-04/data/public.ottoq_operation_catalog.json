@@ -1,0 +1,32 @@
+{
+"table": "public.ottoq_operation_catalog",
+"filter": "true",
+"why": "operation catalog",
+"read_at": "2026-11-04 22:01:00.757628+00",
+"count": 23,
+"rows": [
+"(robotaxi,arrive,Arrive,movement,arrive,,,f,t,f,f,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,charge_dcfc,\"DC fast charge\",energy,charge_dcfc,charge_dcfc,charge,f,f,t,t,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,charge_l2,\"L2 charge\",energy,charge_l2,charge_l2,charge,f,f,t,t,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,cosmetic_repair,\"Cosmetic repair\",maintenance,cosmetic_repair,,cosmetic_repair,f,f,f,t,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,depart,Depart,movement,depart,,,f,t,f,f,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,detail,Detail,clean,detail,detail,,f,f,f,t,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,fault_repair,\"Fault repair\",maintenance,fault_repair,,fault_repair,f,f,f,t,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,generic_service,\"Generic service\",maintenance,service,service,,f,f,f,t,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,inspect,Inspection,inspection,inspect,inspect,interior_inspection,f,f,f,t,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,interior_deep_clean,\"Interior deep clean\",clean,interior_deep_clean,,interior_deep_clean,f,f,f,t,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,interior_tidy,\"Interior reset\",clean,interior_tidy,,interior_tidy,t,f,f,t,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,item_retrieval,\"Item retrieval\",clean,item_retrieval,,item_retrieval,t,f,f,t,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,mechanical_pm,\"Mechanical PM\",maintenance,mechanical_pm,,mechanical_pm,f,f,f,t,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,readiness_check,\"Readiness check\",inspection,,,readiness_check,t,f,f,t,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,remote_diagnostics,\"Remote diagnostics\",data,remote_diagnostics,,remote_diagnostics,t,f,f,t,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,sensor_calibration,\"ADAS/sensor calibration\",maintenance,sensor_calibration,,sensor_calibration,f,f,f,t,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,sensor_clean,\"Sensor clean\",clean,sensor_clean,,sensor_clean,t,f,f,t,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,settle,Settle,movement,settle,,,f,t,f,f,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,software_update,\"Software update\",data,software_update,,software_update,t,f,f,t,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,stage,\"Park / stage\",staging,stage,staging,,f,f,f,f,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,taxi,\"Inter-point move\",movement,taxi,,,f,t,f,f,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,triage_check,\"Triage check\",inspection,triage_check,,triage_check,t,f,f,t,\"2026-08-19 16:18:38.71325+00\")",
+"(robotaxi,wash,\"Exterior wash\",clean,wash,wash,exterior_wash,f,f,f,t,\"2026-08-19 16:18:38.71325+00\")"
+]
+}

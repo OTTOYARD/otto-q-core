@@ -1,0 +1,12 @@
+{
+"table": "public.ottoq_recall_implementations",
+"filter": "true",
+"why": "recall implementations",
+"read_at": "2026-11-04 22:01:02.564276+00",
+"count": 3,
+"rows": [
+"(1,naive_threshold_v1,ottoq_recall_naive_threshold_v1,active,\"The live rung ladder, copied from the catalog byte-for-byte under this name (0206 A1). Deliberately naive: fixed thresholds, top-down, first hit wins; no forecasting, no cost model, no learning. Every smarter successor has this baseline to beat on the same ledger.\")",
+"(2,fixed_window_dummy,ottoq_recall_fixed_window_dummy,parked,\"The swap proof and nothing more: recalls every deployed asset inside a policy window (recall_fixed_window_from_hour .. to_hour, depot-local). Not a policy anyone should run. Selecting it is a policy write; no call site changes.\")",
+"(3,interval_scheduled_v1,ottoq_recall_interval_scheduled_v1,retired,\"0448 (G181). naive_threshold_v1 with interval maintenance treated as scheduled work: no recall below recall_interval_hard_overdue_mult x the interval; above it, after recall_min_productive_min, a non-deferrable service_interval_overdue whose visit makes the atom must_do. Parked: twin runs and dial experiments only, until a human marks it active. RETIRED by 0542 (CLAUDE.md rule 9): it kept a car working past its maintenance interval, up to recall_interval_hard_overdue_mult x the interval, before recalling it. ottoq_evaluate_return_need refuses it in any run (OQ211). The evaluator function stays, unused.\")"
+]
+}

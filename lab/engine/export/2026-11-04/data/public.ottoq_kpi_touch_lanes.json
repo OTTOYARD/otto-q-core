@@ -1,0 +1,17 @@
+{
+"table": "public.ottoq_kpi_touch_lanes",
+"filter": "true",
+"why": "KPI touch lanes",
+"read_at": "2026-11-04 22:01:05.355238+00",
+"count": 8,
+"rows": [
+"(anchor,f,\"the charge: plugged by the charging robot (0511, G236, decided 2026-09-27). The founder-spec comment in ottoq_start_concurrent_atoms that has a technician plug the car in predates it.\",\"2026-09-27 15:08:22.564343+00\")",
+"(cabin,t,\"the general technician pool: one technician, one car at a time (ottoq_start_concurrent_atoms). An interior inspection or cabin triage the charger's sensors perform names them (performed_by) and is not a touch.\",\"2026-09-27 15:08:22.564343+00\")",
+"(detail,t,\"detail staff: an interior deep clean is a person's work\",\"2026-09-27 15:08:22.564343+00\")",
+"(digital,f,\"over the air: no person and no stall\",\"2026-09-27 15:08:22.564343+00\")",
+"(exterior,t,\"the general technician pool, as cabin: sensor clean, perimeter walkaround (0383)\",\"2026-09-27 15:08:22.564343+00\")",
+"(gate,f,\"the readiness check at departure: the twin's gate step (twin.ottoq_sim_advance_visit_atoms), metered against no staff pool\",\"2026-09-27 15:08:22.564343+00\")",
+"(service_bay,t,\"service technicians: sensor calibration, mechanical PM, fault and cosmetic repair\",\"2026-09-27 15:08:22.564343+00\")",
+"(wash_bay,f,\"the automatic wash: a wash supervisor watches the bay and does not work on the car (ottoq_start_concurrent_atoms' own comment)\",\"2026-09-27 15:08:22.564343+00\")"
+]
+}

@@ -1,0 +1,12 @@
+{
+"table": "public.ottoq_oem_webhook_patterns",
+"filter": "true",
+"why": "OEM webhook emulation patterns",
+"read_at": "2026-11-04 22:00:56.621749+00",
+"count": 3,
+"rows": [
+"(tesla,33333333-3333-3333-3333-333333333333,/api/oem/webhook/tesla,v1.6,420,1800,lognormal,\"{\"\"backoff_ms\"\": [500, 1000, 2000, 4000, 8000], \"\"jitter_pct\"\": 25, \"\"max_retries\"\": 5}\",0.93,0.015,0.008,0.002,0.012,0.006,0.004,\"[\"\"id\"\", \"\"arrival_timestamp\"\", \"\"gate\"\", \"\"soc\"\"]\",\"[\"\"est_charge_min\"\", \"\"alerts\"\", \"\"odo_km\"\", \"\"drive_state\"\", \"\"vehicle_state\"\"]\",\"Tesla Fleet API v1.6 — OAuth2, rate-limited, occasional wake-up latency, duplicate sends common.\",t,\"2026-05-28 05:08:48.706883+00\",\"2026-05-28 05:08:48.706883+00\",f,,)",
+"(waymo,22222222-2222-2222-2222-222222222222,/api/oem/webhook/waymo,v2.4,180,750,lognormal,\"{\"\"backoff_ms\"\": [1000, 2000, 4000], \"\"jitter_pct\"\": 15, \"\"max_retries\"\": 3}\",0.97,0.005,0.002,0.001,0.000,0.003,0.002,\"[\"\"vehicle_id\"\", \"\"arrival_at\"\", \"\"gate_id\"\", \"\"soc_pct\"\"]\",\"[\"\"estimated_service_minutes\"\", \"\"flags\"\", \"\"odometer_mi\"\", \"\"heading_deg\"\", \"\"health_status\"\"]\",\"Waymo Fleet API v2.4 — RESTful OAuth2 + signed JWT. Tight SLAs. Structured payload.\",t,\"2026-05-28 05:08:48.706883+00\",\"2026-07-20 22:33:04.338672+00\",f,https://gxdrcyphqjzjsuhxuqtg.supabase.co/functions/v1/ottoq-webhook-echo,ottoq_test_webhook_secret)",
+"(zoox,44444444-4444-4444-4444-444444444444,/api/oem/webhook/zoox,v0.9-preview,220,950,lognormal,\"{\"\"backoff_ms\"\": [1500, 3000, 6000], \"\"jitter_pct\"\": 20, \"\"max_retries\"\": 3}\",0.95,0.003,0.001,0.001,0.000,0.004,0.003,\"[\"\"vehicle_uuid\"\", \"\"gate_arrival_ts\"\", \"\"gate_node\"\", \"\"soc_pct\"\"]\",\"[\"\"telemetry_burst\"\", \"\"next_dispatch_eta_min\"\", \"\"cargo_state\"\", \"\"sensor_health\"\"]\",\"Zoox Fleet API v0.9-preview — pre-launch estimate, modeled after Waymo with richer telemetry burst.\",t,\"2026-05-28 05:08:48.706883+00\",\"2026-05-28 05:08:48.706883+00\",f,,)"
+]
+}

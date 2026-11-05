@@ -1,0 +1,27 @@
+{
+"table": "public.ottoq_service_tariffs",
+"filter": "true",
+"why": "service tariffs",
+"read_at": "2026-11-04 22:00:56.874016+00",
+"count": 18,
+"rows": [
+"(06ff7865-5980-4257-9e3c-38601674dc78,robotaxi,readiness_check,,,any,,per_event,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")",
+"(241ef8c1-5aa5-4dd8-98d0-2a2aa19b7937,robotaxi,wash,,,any,,per_event,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")",
+"(44f70b9e-97c4-460f-9d88-d98ee99f4cca,robotaxi,sensor_clean,,,any,,per_event,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")",
+"(4bc2bedb-b43b-4970-a4d3-aa7c5ecda4a6,robotaxi,mechanical_pm,,,any,,per_event,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")",
+"(56aa9621-cb7d-4d51-bdf0-3a58c54b44f9,robotaxi,interior_deep_clean,,,any,,per_event,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")",
+"(5d540eb1-e589-4b78-b47d-a025ae9bb997,robotaxi,item_retrieval,,,any,,per_event,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")",
+"(91a3cfd8-68c4-428e-9410-b9cb1aae7d65,robotaxi,triage_check,,,any,,per_event,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")",
+"(992bcb2a-2610-42c2-ab7a-8d94c2dfa341,robotaxi,charge_l2,,,any,,per_kwh,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")",
+"(9973ba68-b589-4dce-b271-889dcf053b6e,robotaxi,fault_repair,,,any,,per_event,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")",
+"(9c82dd81-f5c7-423f-b916-c8577951945b,robotaxi,software_update,,,any,,per_event,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")",
+"(a0a1936b-397f-4dbb-880c-850780fdeb73,robotaxi,cosmetic_repair,,,any,,per_event,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")",
+"(b8e7acfd-f7a1-4843-b2b2-b0230331d679,robotaxi,generic_service,,,any,,per_event,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")",
+"(c178be3a-fc95-4289-b272-990b5f8800d9,robotaxi,interior_tidy,,,any,,per_event,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")",
+"(dafa1184-40ee-4e03-9127-06bdb32092e0,robotaxi,remote_diagnostics,,,any,,per_event,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")",
+"(db9931e4-a439-446e-b30c-4ae3dfaa8288,robotaxi,inspect,,,any,,per_event,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")",
+"(e6d8e774-9716-45ae-980b-87697497886d,robotaxi,sensor_calibration,,,any,,per_event,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")",
+"(edce4346-f097-42d6-a0f2-1c7f6cacd628,robotaxi,charge_dcfc,,,any,,per_kwh,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")",
+"(f54447d4-51b9-42d5-bd75-7fb405cc2d8d,robotaxi,detail,,,any,,per_event,USD,\"2026-08-19 16:18:38.71325+00\",,t,\"2026-08-19 16:18:38.71325+00\")"
+]
+}

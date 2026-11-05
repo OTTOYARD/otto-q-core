@@ -1,0 +1,94 @@
+{
+ "statements": 14388,
+ "ok": 14388,
+ "failed": 0,
+ "retry_rounds": 1,
+ "recovered_on_retry": 61,
+ "seconds": 3.9,
+ "by_phase": {
+  "01_schemas": {
+   "ok": 2,
+   "failed": 0
+  },
+  "02_types": {
+   "ok": 27,
+   "failed": 0
+  },
+  "03_sequences": {
+   "ok": 64,
+   "failed": 0
+  },
+  "04_types_composite": {
+   "ok": 3,
+   "failed": 0
+  },
+  "05_tables": {
+   "ok": 453,
+   "failed": 0
+  },
+  "06_functions": {
+   "ok": 1037,
+   "failed": 0
+  },
+  "07_defaults": {
+   "ok": 1469,
+   "failed": 0
+  },
+  "08_sequence_owned_by": {
+   "ok": 63,
+   "failed": 0
+  },
+  "09_views": {
+   "ok": 90,
+   "failed": 0
+  },
+  "10_constraints_keys": {
+   "ok": 399,
+   "failed": 0
+  },
+  "11_constraints_check": {
+   "ok": 411,
+   "failed": 0
+  },
+  "12_constraints_fk": {
+   "ok": 345,
+   "failed": 0
+  },
+  "13_indexes": {
+   "ok": 490,
+   "failed": 0
+  },
+  "14_triggers": {
+   "ok": 237,
+   "failed": 0
+  },
+  "16_rls": {
+   "ok": 413,
+   "failed": 0
+  },
+  "17_comments": {
+   "ok": 646,
+   "failed": 0
+  },
+  "18_acl": {
+   "ok": 6757,
+   "failed": 0
+  },
+  "20_sequence_values": {
+   "ok": 74,
+   "failed": 0
+  },
+  "21_cron": {
+   "ok": 25,
+   "failed": 0
+  },
+  "22_ledger": {
+   "ok": 1337,
+   "failed": 0
+  },
+  "23_default_privileges": {
+   "ok": 46,
+   "failed": 0
+  }
+ }
+}

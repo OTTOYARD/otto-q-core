@@ -1,0 +1,10 @@
+{
+"table": "public.ottoq_reward_weights",
+"filter": "true",
+"why": "reward weights",
+"read_at": "2026-11-04 22:01:04.846074+00",
+"count": 1,
+"rows": [
+"(1,t,\"{\"\"peak_site_kw\"\": -0.15, \"\"touch_events_per_turn\"\": -0.15, \"\"p95_time_to_service_min\"\": -0.10, \"\"asset_hours_available_per_day\"\": 0.30, \"\"service_point_turns_per_point_per_day\"\": 0.30}\",\"v1, equal-ish and deliberately unclever: 0.60 of the weight on the two throughput KPIs the depot exists to produce, 0.40 spread across the three costs (energy peak, human touches, responsiveness). Signs encode direction -- negative means lower is better. These are a STARTING POINT chosen to be legible, not an optimum: nothing has been fitted, because at the moment this ships the dial ledger holds 0 rows. Change the numbers by inserting weight_version 2 and flipping is_active; every score records the version that produced it.\",\"2026-09-21 17:43:17.034768+00\")"
+]
+}

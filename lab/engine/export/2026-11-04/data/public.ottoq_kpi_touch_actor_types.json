@@ -1,0 +1,30 @@
+{
+"table": "public.ottoq_kpi_touch_actor_types",
+"filter": "true",
+"why": "KPI touch actor types",
+"read_at": "2026-11-04 22:01:05.139734+00",
+"count": 21,
+"rows": [
+"(av_vehicle,f,\"the asset itself\",\"2026-09-08 11:17:02.609515+00\")",
+"(bess_controller,f,\"a controller\",\"2026-09-08 11:17:02.609515+00\")",
+"(charger_sensors,f,\"the charger's own cabin sensors (0511, G236): an atom whose performed_by names them took no person (0528)\",\"2026-09-27 15:08:22.564343+00\")",
+"(command_center_operator,t,\"a person in the command centre; the only human type KPI-4 counted before 0213\",\"2026-09-08 11:17:02.609515+00\")",
+"(depot_supervisor,t,\"a supervisor at the depot\",\"2026-09-08 11:17:02.609515+00\")",
+"(depot_tech,t,\"a technician at the depot — the obvious name for a physical touch, and omitted until 0213\",\"2026-09-08 11:17:02.609515+00\")",
+"(external_sensor,f,\"a sensor\",\"2026-09-08 11:17:02.609515+00\")",
+"(fleet_operator_admin,t,\"the operator's admin acting on an asset\",\"2026-09-08 11:17:02.609515+00\")",
+"(fleet_operator_viewer,f,\"read-only; looking is not touching\",\"2026-09-08 11:17:02.609515+00\")",
+"(migration_script,f,\"a migration\",\"2026-09-08 11:17:02.609515+00\")",
+"(ocpp_charger,f,\"a charger\",\"2026-09-08 11:17:02.609515+00\")",
+"(oem_admin_console,t,\"a person acting through the OEM console\",\"2026-09-08 11:17:02.609515+00\")",
+"(oem_dispatch_webhook,f,\"a machine callback\",\"2026-09-08 11:17:02.609515+00\")",
+"(otto_response_agent,t,\"a dispatched response agent — a physical intervention by definition\",\"2026-09-08 11:17:02.609515+00\")",
+"(ottoq_engine,f,\"this engine\",\"2026-09-08 11:17:02.609515+00\")",
+"(ottow_dispatcher,t,\"a human dispatcher on the work side\",\"2026-09-08 11:17:02.609515+00\")",
+"(ottow_driver,t,\"a human driver on the work side\",\"2026-09-08 11:17:02.609515+00\")",
+"(solar_controller,f,\"a controller\",\"2026-09-08 11:17:02.609515+00\")",
+"(system_scheduler,f,\"a scheduler\",\"2026-09-08 11:17:02.609515+00\")",
+"(system,f,\"the system\",\"2026-09-08 11:17:02.609515+00\")",
+"(unknown,f,\"unattributed — deliberately NOT a touch: counting unknown as human would inflate KPI-4 with every unattributed row\",\"2026-09-08 11:17:02.609515+00\")"
+]
+}

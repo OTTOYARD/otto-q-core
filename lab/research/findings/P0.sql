@@ -64,3 +64,48 @@ ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
   run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
+
+-- E1, the lab (2026-11-04; Chase: "Begin frontier build step 1"). Published the same way; lab runs have no production
+-- run id, so run_ids is empty. Evidence: lab/engine/reports/e1_acceptance_2026-11-04.md, db/checks/0477, 0794.
+INSERT INTO public.ottoq_research_findings
+  (slug, phase, item, kind, status, title, summary, metrics, evidence, run_ids, measured_at)
+VALUES
+  ('p0-lab-built', 'P0', 'E1', 'lab', 'built',
+   'The research lab is now an exact copy of production''s engine, and runs a depot day in three minutes',
+   'The lab was rebuilt from production''s own records, read without changing anything, instead of from the code '
+   'repository. Every one of the engine''s 1,037 database functions and 453 tables matches production''s, and the twin '
+   'depot''s state matches production''s own fingerprint of it. It simulates a full depot day in about three minutes on '
+   'one processor (21 days an hour), and 55 an hour on four copies at once. It can branch a day at any moment and show '
+   'exactly what one decision changes: the world stays the same and only the decision''s effect differs. Nothing it '
+   'runs touches production.',
+   '{"routines_identical": 1037, "routines_total": 1037, "tables_identical": 453, "tables_total": 453,
+     "triggers_identical": 236, "acls_identical": 1693, "deparse_round_trips": 6, "reference_tables": 90,
+     "reference_rows": 9278, "world_fingerprint": "3f2aa2ac0bcc532e35f36c8bc257ff0e",
+     "depot_day_seconds_one_stream": 172.7, "depot_days_per_hour_one_stream": 20.84,
+     "depot_days_per_hour_four_replicas": 54.63, "fork_tick": 6, "changed_branch_first_differs_at_tick": 7}',
+   'otto-q-core lab/engine/reports/e1_acceptance_2026-11-04.md', '{}', '2026-11-04 23:45:10+00'),
+  ('p0-pair-minted-id', 'P0', 'E1', 'measurement', 'measured',
+   'The engine''s own repeatability check fails today on an ID it makes up, not on anything the depot does',
+   'Run twice from the same start, the twin made identical decisions, commands, bookings and energy use, over a '
+   'six-hour and a 24-hour day. The check still says failed, because since 23 October every robot-cleaned visit carries '
+   'a freshly made-up ID, different on every run, and the check''s end-of-day snapshot includes it. Nothing caught this '
+   'because the check has not run since 14 October. Production runs the same code with the same setting, so it would '
+   'fail the same way.',
+   '{"atoms": 14, "atoms_agreeing": 13, "disagreeing_atom": "end_state", "visit_needs": 116,
+     "visit_needs_differing": 90, "visit_needs_differing_without_the_id": 0, "minted_ids_12_ticks": 90,
+     "minted_ids_48_ticks": 154, "dial": "stall_cabin_robot", "dial_value": 2, "dial_set_at": "2026-10-23 14:19:53+00",
+     "last_production_pair": "2026-10-14 15:09:32+00", "finding": "G510"}',
+   'otto-q-core db/checks/0477', '{}', '2026-11-04 23:33:00+00'),
+  ('p0-end-state-fix', 'P0', 'E1', 'recommendation', 'recommended',
+   'Recommended: leave the made-up ID out of the repeatability check (0794)',
+   'A small change to the check''s end-of-day snapshot sets the made-up ID aside, as the check already does for every '
+   'other ID the engine makes up. Tried in the lab only: the check then passes on all 14 of its parts, over a six-hour '
+   'and a 24-hour day. It changes what the check measures, not what the depot does, and it waits for a person to ship '
+   'it.',
+   '{"migration": "0794", "migration_status": "PENDING", "pair_12_ticks": "passed 14 of 14",
+     "pair_48_ticks": "passed 14 of 14", "forces_recert": true, "finding": "G510"}',
+   'otto-q-core db/migrations/0794', '{}', '2026-11-04 23:33:00+00')
+ON CONFLICT (depot_id, slug) DO UPDATE SET
+  phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
+  title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
+  run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();

@@ -1,0 +1,62 @@
+phase	kind	ident	outcome	attempts	sqlstate	error
+05_tables	table	public.ottoq_agent_pass_evidence	ok	2		
+05_tables	table	public.ottoq_agent_prompts	ok	2		
+06_functions	function	public.ottoq_charge_order_grade_compute(p_order_id bigint, p_window_min numeric)	ok	2		
+06_functions	function	public.ottoq_charge_order_attribute_compute(p_order_id bigint)	ok	2		
+07_defaults	default	public.ottoq_agent_pass_evidence.pass_id	ok	2		
+07_defaults	default	public.ottoq_agent_pass_evidence.seat	ok	2		
+07_defaults	default	public.ottoq_agent_pass_evidence.levers	ok	2		
+07_defaults	default	public.ottoq_agent_pass_evidence.decision_written	ok	2		
+07_defaults	default	public.ottoq_agent_pass_evidence.recorded_at	ok	2		
+07_defaults	default	public.ottoq_agent_pass_evidence.source_kind	ok	2		
+07_defaults	default	public.ottoq_agent_prompts.first_seen_at	ok	2		
+08_sequence_owned_by	owned_by	public.ottoq_agent_pass_evidence_pass_id_seq	ok	2		
+09_views	view	public.ottoq_agent_pass_scorecard	ok	2		
+09_views	view	public.ottoq_margin_ledger	ok	2		
+09_views	view	public.ottoq_margin_summary	ok	2		
+10_constraints_keys	constraint_u	public.ottoq_agent_pass_evidence.ottoq_agent_pass_evidence_chain_id_key	ok	2		
+10_constraints_keys	constraint_p	public.ottoq_agent_pass_evidence.ottoq_agent_pass_evidence_pkey	ok	2		
+10_constraints_keys	constraint_p	public.ottoq_agent_prompts.ottoq_agent_prompts_pkey	ok	2		
+11_constraints_check	constraint_c	public.ottoq_agent_pass_evidence.ottoq_agent_pass_board_hash_matches	ok	2		
+11_constraints_check	constraint_c	public.ottoq_agent_pass_evidence.ottoq_agent_pass_consulted_coherent	ok	2		
+11_constraints_check	constraint_c	public.ottoq_agent_pass_evidence.ottoq_agent_pass_evidence_prompt_sha256_check	ok	2		
+11_constraints_check	constraint_c	public.ottoq_agent_pass_evidence.ottoq_agent_pass_outcome_class_known	ok	2		
+11_constraints_check	constraint_c	public.ottoq_agent_prompts.ottoq_agent_prompts_key_is_text_hash	ok	2		
+11_constraints_check	constraint_c	public.ottoq_agent_prompts.ottoq_agent_prompts_prompt_sha256_check	ok	2		
+13_indexes	index	public.ottoq_agent_pass_evidence_day_idx	ok	2		
+13_indexes	index	public.ottoq_agent_pass_evidence_run_idx	ok	2		
+14_triggers	trigger	public.ottoq_agent_pass_evidence.ottoq_agent_pass_evidence_append_only_trg	ok	2		
+14_triggers	trigger	public.ottoq_agent_pass_evidence.ottoq_evidence_no_truncate_trg	ok	2		
+14_triggers	trigger	public.ottoq_agent_prompts.ottoq_agent_prompts_append_only_trg	ok	2		
+16_rls	rls	public.ottoq_agent_pass_evidence	ok	2		
+16_rls	rls	public.ottoq_agent_prompts	ok	2		
+17_comments	comment	TABLE public.ottoq_agent_prompts	ok	2		
+17_comments	comment	VIEW public.ottoq_margin_summary	ok	2		
+17_comments	comment	VIEW public.ottoq_margin_ledger	ok	2		
+17_comments	comment	TABLE public.ottoq_agent_pass_evidence	ok	2		
+17_comments	comment	VIEW public.ottoq_agent_pass_scorecard	ok	2		
+17_comments	comment	FUNCTION public.ottoq_charge_order_attribute_compute(p_order_id bigint)	ok	2		
+17_comments	comment	FUNCTION public.ottoq_charge_order_grade_compute(p_order_id bigint, p_window_min numeric)	ok	2		
+18_acl	acl_reset	FUNCTION public.ottoq_charge_order_attribute_compute(p_order_id bigint)	ok	2		
+18_acl	acl_grant	FUNCTION public.ottoq_charge_order_attribute_compute(p_order_id bigint)	ok	2		
+18_acl	acl_grant	FUNCTION public.ottoq_charge_order_attribute_compute(p_order_id bigint)	ok	2		
+18_acl	acl_reset	FUNCTION public.ottoq_charge_order_grade_compute(p_order_id bigint, p_window_min numeric)	ok	2		
+18_acl	acl_grant	FUNCTION public.ottoq_charge_order_grade_compute(p_order_id bigint, p_window_min numeric)	ok	2		
+18_acl	acl_grant	FUNCTION public.ottoq_charge_order_grade_compute(p_order_id bigint, p_window_min numeric)	ok	2		
+18_acl	acl_reset	TABLE public.ottoq_agent_pass_evidence	ok	2		
+18_acl	acl_grant	TABLE public.ottoq_agent_pass_evidence	ok	2		
+18_acl	acl_grant	TABLE public.ottoq_agent_pass_evidence	ok	2		
+18_acl	acl_reset	TABLE public.ottoq_agent_pass_scorecard	ok	2		
+18_acl	acl_grant	TABLE public.ottoq_agent_pass_scorecard	ok	2		
+18_acl	acl_grant	TABLE public.ottoq_agent_pass_scorecard	ok	2		
+18_acl	acl_reset	TABLE public.ottoq_agent_prompts	ok	2		
+18_acl	acl_grant	TABLE public.ottoq_agent_prompts	ok	2		
+18_acl	acl_grant	TABLE public.ottoq_agent_prompts	ok	2		
+18_acl	acl_reset	TABLE public.ottoq_margin_ledger	ok	2		
+18_acl	acl_grant	TABLE public.ottoq_margin_ledger	ok	2		
+18_acl	acl_grant	TABLE public.ottoq_margin_ledger	ok	2		
+18_acl	acl_grant	TABLE public.ottoq_margin_ledger	ok	2		
+18_acl	acl_reset	TABLE public.ottoq_margin_summary	ok	2		
+18_acl	acl_grant	TABLE public.ottoq_margin_summary	ok	2		
+18_acl	acl_grant	TABLE public.ottoq_margin_summary	ok	2		
+18_acl	acl_grant	TABLE public.ottoq_margin_summary	ok	2		

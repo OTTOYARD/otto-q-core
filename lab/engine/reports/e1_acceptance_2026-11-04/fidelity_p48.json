@@ -1,0 +1,78 @@
+{
+ "test": "E1 acceptance 1: fidelity",
+ "started": "2026-11-04T23:05:27+00:00",
+ "seed": 171717,
+ "ticks": 48,
+ "scenario": "busy_day",
+ "lab_engine_hash": "aae920a758777a3a3c5c9652f82c6cf0",
+ "pair_wall_seconds": 1650.6,
+ "pair": {
+  "outcome": "passed",
+  "equal": true,
+  "complete": true,
+  "disagreeing_atoms": [],
+  "null_atoms": [],
+  "atoms_agreeing": 14,
+  "end_state_sections_differing": [],
+  "robot_leg_ids_in_arm_a": 154,
+  "end_state_equal_without_robot_leg_id": true,
+  "arm_runs": [
+   "071e5321-f84c-4149-a8c5-8eed1bc10bd7",
+   "56865a0f-831d-47bb-b04b-ac2ccd33d9ca"
+  ],
+  "digests_arm_a": {
+   "fp": "a5e8cbbe5a62d0fadc7478aadaa08f83",
+   "h_cmd": "95ebb3579ac1f3cc2e75e9cb0166f298",
+   "h_dec": "f88a6de5d496116f6659868b0891ec37",
+   "h_evt": "2c22d373fd76a8f43bb78db8bf65a704",
+   "h_bkg": "32048b868c2d2c02ca53351082768ea4",
+   "h_nrg": "662518a04fe18c16143c7234d93b4ac4",
+   "h_prop": "fe7bcf99b157747b884ac78913ef0d5b",
+   "h_defr": "d41d8cd98f00b204e9800998ecf8427e",
+   "h_cal": "b72a0671daa8a992a9d3f88f52422a46",
+   "h_rule": "ecbd32cb22b4c0c36a487a9e72a79f15",
+   "h_rcl": "504db531ce5b2d4dbbc54c1d3043ac42",
+   "h_sdr": "7c340c3b17503345d0bec4c12cbcd223",
+   "ticks": 48
+  }
+ },
+ "world": {
+  "lab": {
+   "n": {
+    "bess": 1,
+    "stalls": 158,
+    "chargers": 30,
+    "vehicles": 116,
+    "need_profile": 116
+   },
+   "bess": "d2ec26a99b2e79e3cc083734c52f6e97",
+   "stalls": "3e03db4aa74a4655b6bb10f20b450a48",
+   "chargers": "7524bdaebedc49918d0c0de013af3483",
+   "combined": "3f2aa2ac0bcc532e35f36c8bc257ff0e",
+   "vehicles": "4a6711b77cd2a24979c9483e363f6c92",
+   "need_profile": "957366ad19a751faedf5e3b9d35c1f6e"
+  },
+  "at_export": {
+   "n": {
+    "bess": 1,
+    "stalls": 158,
+    "chargers": 30,
+    "vehicles": 116,
+    "need_profile": 116
+   },
+   "bess": "d2ec26a99b2e79e3cc083734c52f6e97",
+   "stalls": "3e03db4aa74a4655b6bb10f20b450a48",
+   "chargers": "7524bdaebedc49918d0c0de013af3483",
+   "combined": "3f2aa2ac0bcc532e35f36c8bc257ff0e",
+   "vehicles": "4a6711b77cd2a24979c9483e363f6c92",
+   "need_profile": "957366ad19a751faedf5e3b9d35c1f6e"
+  },
+  "lab_equals_export": true,
+  "export_read_at": "2026-11-04 22:01:10.947006+00"
+ },
+ "production_run_digests": {
+  "measured": false,
+  "why": "No production pair has run on this engine: the newest verdict in ottoq_determinism_verdict_ledger is 2026-10-14 (engine hash 9b561d56...), certification has been off since 2026-10-20 (rule 12), and the only production run on this engine is a live demo run, whose tick lengths follow real time and whose agent orders arrive asynchronously. Reproducing it needs its tick clock and its agent's orders replayed."
+ },
+ "finished": "2026-11-04T23:32:58+00:00"
+}

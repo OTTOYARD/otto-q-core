@@ -1,0 +1,11 @@
+{
+"table": "public.ottoq_retention_state",
+"filter": "true",
+"why": "retention state",
+"read_at": "2026-11-04 22:01:08.83101+00",
+"count": 2,
+"rows": [
+"(engine_rows,939,8081966,\"2026-11-04 09:00:00.81773+00\")",
+"(ottoq_events,1791519725,0,\"2026-11-04 08:00:00.595906+00\")"
+]
+}

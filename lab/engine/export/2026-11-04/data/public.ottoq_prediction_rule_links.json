@@ -1,0 +1,16 @@
+{
+"table": "public.ottoq_prediction_rule_links",
+"filter": "true",
+"why": "prediction-rule links",
+"read_at": "2026-11-04 22:01:06.572149+00",
+"count": 7,
+"rows": [
+"(1a5db053-3ab8-4967-8f1b-8ee7a15047ec,charge_duration_minutes,SLA.001.min_soc_at_deployment,predicts_proximity,\"predicted_duration + current_time < scheduled_departure\",sla_floor,min_soc_at_deployment_pct,t,\"If predicted charge time exceeds remaining window, SLA.001 will fail at deploy — reroute or expedite\",20260529_layer2_layer1_integration,\"2026-05-14 18:49:13.649558+00\")",
+"(1d9519b1-fea7-4e0e-9d7b-6bbb7e533cc5,anomaly_score,HW.002.charger_state_precondition,predicts_violation,\"anomaly_score > 0.85 AND category=charging\",custom,,t,\"A charging anomaly may indicate charger state precondition will fail\",20260529_layer2_layer1_integration,\"2026-05-14 18:49:13.649558+00\")",
+"(4af02655-2968-42ed-8765-cb6ab47886e9,oem_acceptance_latency_seconds,SLA.005.oem_acceptance_timing,predicts_proximity,\"predicted_latency > sla.oem_acceptance_timeout_seconds * 0.8\",sla_floor,oem_acceptance_timeout_seconds,t,\"Approaching the acceptance timeout suggests OEM API regression; consider switching to auto-accept mode\",20260529_layer2_layer1_integration,\"2026-05-14 18:49:13.649558+00\")",
+"(54eda1c1-3447-4fb1-8b42-b90c22e54b2a,vehicle_arrival_eta_minutes,SLA.002.max_queue_depth,predicts_proximity,\"projected_queue_after_arrivals > sla.max_queue_depth\",sla_floor,max_queue_depth,t,\"Predicting near-term arrivals lets us close admission proactively rather than reactively\",20260529_layer2_layer1_integration,\"2026-05-14 18:49:13.649558+00\")",
+"(5baa3cd7-e9d1-413c-ab6a-6146190182da,service_duration_minutes,SLA.003.max_visit_duration,predicts_proximity,\"predicted_total_visit > sla.max_visit_duration_minutes\",sla_floor,max_visit_duration_minutes,t,\"Aggregate service durations + visit elapsed informs SLA violation risk\",20260529_layer2_layer1_integration,\"2026-05-14 18:49:13.649558+00\")",
+"(6cb9ec49-374d-49cf-a101-61070cf3b2d0,anomaly_score,HW.003.sensor_liveness,predicts_violation,\"anomaly_score > 0.85\",custom,,t,\"A telemetry-class anomaly may indicate the sensor liveness rule is about to fire\",20260529_layer2_layer1_integration,\"2026-05-14 18:49:13.649558+00\")",
+"(b667f06d-dcf6-4424-b37f-b51d3ba50250,demand_kw,EN.001.grid_capacity_ceiling,predicts_violation,\"predicted_kw > depot.dcfc_max_concurrent_kw\",rule_parameter,,t,\"If predicted demand exceeds engineering capacity, defer admission or engage BESS pre-emptively\",20260529_layer2_layer1_integration,\"2026-05-14 18:49:13.649558+00\")"
+]
+}
