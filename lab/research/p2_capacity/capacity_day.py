@@ -23,6 +23,7 @@ Nothing here touches production.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -98,6 +99,9 @@ def main() -> None:
     ap.add_argument("--add-stall", action="append", default=[],
                     help="type=n: n more stalls of that type (a copy of the depot's last one of it), for this lab day "
                          "only, e.g. service_bay=1")
+    ap.add_argument("--lab-sql", action="append", default=[],
+                    help="a SQL file run on this day's replica before its first tick (a what-if change to the engine, "
+                         "for this lab day only), recorded with its md5")
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--out", default=os.path.join(HERE, "results.jsonl"))
     a = ap.parse_args()
@@ -154,6 +158,11 @@ def main() -> None:
                         VALUES ('run', %s, %s, %s, 'lab_capacity_variation')
                         ON CONFLICT (scope_type, scope_id, param_key) DO UPDATE
                           SET param_value = EXCLUDED.param_value, updated_by = EXCLUDED.updated_by""", (run, k, float(v)))
+    patches = {}
+    for f in a.lab_sql:      # a what-if change to the engine, on this replica only
+        body = open(f).read()
+        conn.execute(body)
+        patches[os.path.basename(f)] = hashlib.md5(body.encode()).hexdigest()
     t0 = time.time()
     walls, err, ticks = [], None, 0
     for k in range(a.ticks):
@@ -198,7 +207,7 @@ def main() -> None:
     conn.commit()
     conn.close()
     out = {"db": db, "run": run, "scenario": a.scenario, "seed": a.seed, "fleet": a.fleet, "grown": grown,
-           "dials": dials, "tag": a.tag, "added_stalls": added,
+           "dials": dials, "tag": a.tag, "added_stalls": added, "lab_sql": patches,
            "ticks": ticks, "step_min": a.step, "sim_start": a.sim_start, "wall_s": wall_s, "clone_s": round(clone_s, 1),
            "error": err, "scorecard": score, "owners": owners, "resources": resources, "walls": walls}
     with open(a.out, "a") as f:

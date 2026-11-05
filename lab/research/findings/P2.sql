@@ -51,7 +51,7 @@ VALUES
    'assume the load then holds steady do worse than the day plan ($1,515 to $1,583): the money is in knowing the shape of '
    'the whole day, so the AI build is a forecast of the depot''s own charging demand across the day. One day, one seed.',
    '{"scenario": "normal_day", "fleet": 116, "seed": 171717, "hours": 12, "load_kwh": 6803.3,
-     "billing": "each policy pays its own highest 30-minute average at 20.34 USD/kW-month over 30 days",
+     "billing": "each policy pays its own highest 30-minute average at 21.40 USD/kW-month (NES GSA-3 summer, a September day) over 30 days",
      "no_battery": {"total_usd": 1698.86, "peak30_kw": 1679.0},
      "day_plan_energy_reserve_shave_1": {"total_usd": 1382.34, "peak30_kw": 1159.6},
      "old_rule_energy_reserve_shave_0": {"total_usd": 2224.84, "peak30_kw": 2335.7},

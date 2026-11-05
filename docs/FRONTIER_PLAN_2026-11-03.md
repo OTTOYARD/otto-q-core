@@ -647,6 +647,11 @@ against the day plan's $1,382 and no battery's $1,699 on the same day (each payi
 fixed-target rule cost $2,225). The penalty (information relaxation) is not built;
 more days and fleet sizes are running (`lab/research/p2_capacity/`).*
 
+*Status 2026-11-05 (5:29 PM CT), the battery on a second day (seed 424242): planning on a typical day's shape (the other
+lab day's load) closes 67-77% of the gap to perfect foresight on both days, and on the second day the day plan did not
+lower the peak at all, because the battery's reserve rises at every surge and the battery started 25% full (G517). The
+battery's build order is in `docs/AGENT_ARCHITECTURE.md` (where the agent earns its place, item 1).*
+
 ### Phase 4: the inventor. Needs D3.
 
 E6 in the Lab, on the target with the most regret in Phase 3: the charge-line key unless E5 says otherwise.

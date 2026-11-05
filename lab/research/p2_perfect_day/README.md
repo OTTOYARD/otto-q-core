@@ -72,3 +72,50 @@ this day. The car side of the two days is identical (every visit, every seat): t
 first cut of this tool read the month's billed peak from the day's first snapshot, which already holds the first tick's
 draw; under the older rule that hid most of its own peak (it charges hard at 6 AM). Every bill above is computed with
 nothing billed before the day.
+
+The rate is the twin depot's tariff for a September day, NES GSA-3 summer: $21.40 per kW of the month's highest half hour,
+so a day pays 1/30 of $21.40 per kW of its own highest half hour (`ottoq_depot_tariffs`; $20.34 is the winter and
+transition rate, and P2's first published metrics named it by mistake: the dollars were computed at $21.40). The tool
+applies the first-block rate to the whole peak; NES bills the kW above 1,000 at $21.78, about $8.60 a day more at a
+1,679 kW peak, for every policy whose peak is over 1,000 kW.
+
+### A typical day's shape is most of the battery's prize (two lab days; the last solve written 2026-11-05 5:22 PM CT)
+
+A second lab day, normal_day at 116 cars with seed 424242 (`ottoq_cap_normal_day_116_424242`, run `663d217a`), gives each
+day a forecast that is not the day itself: the other day's load, five minutes by five minutes, as the shape of the rest of
+the day. The plan re-solves every five minutes on what has actually happened, sees the coming load only through that shape,
+and pays the bill the true load makes (`bound_energy.py --forecast-db`). The two days' loads differ by 217 kW on average
+per five minutes, so the shape is a rough forecast, not a copy.
+
+| 12-hour normal day, 116 cars (half-hour peak) | seed 171717 | seed 424242 |
+|---|---:|---:|
+| no battery | $1,699 (1,679 kW) | $1,499 (1,475 kW) |
+| the battery's day plan, as the twin runs it | $1,382 (1,160 kW) | $1,543 (1,475 kW) |
+| re-planned every 5 minutes, the load now held flat | $1,583 | $1,351 |
+| the next hour exactly, flat beyond | $1,515 | $1,378 |
+| the next 4 hours exactly, flat beyond | $1,535 | $1,313 |
+| **a typical day's shape (the other day)** | **$1,152 (813 kW)** | **$1,243 (1,059 kW)** |
+| the next hour exactly, then the typical shape | $1,135 (798 kW) | $1,207 (1,010 kW) |
+| perfect foresight | $1,085 (735 kW) | $1,098 (850 kW) |
+
+- **The shape of the day is the money, and a rough one is enough.** Planned on another day's shape, the battery's bill
+  closes 77% of the gap between the day plan and perfect foresight on the first day ($230 of $298) and 67% on the second
+  ($300 of $445). Seeing the next hours exactly and nothing beyond does far worse, on both days.
+- **On the second day the day plan did not lower the peak at all** (1,475 kW with and without the battery). The battery
+  started the day 25% full, and the day's highest draw came in its first ten minutes (2,226 kW at 6:10 AM CT, as the boot
+  cars plugged in). The battery never discharged that day: its $44 over no battery is the energy it bought to fill itself
+  from 25% to 50% (some of it the panels' midday surplus), not money lost. Why it did not discharge is G517 below.
+- Every plan above ends the day at least as full as the real battery did (2,702 kWh on the first day, 1,508 on the
+  second); the no-battery bill does not pay for the energy the real battery stored, so it is slightly flattered.
+- Two days, one forecast each way: a reading, not a range. The build it points to is a learned forecast of the depot's own
+  charging load across the day, in the day plan's hands (0435 §4.1 names its persistence floor as the next step).
+
+### G517: the battery's reserve rises at the surge it exists for
+
+The battery may discharge only above a reserve: its own floor (10%) plus 20 points times a "forecast uncertainty", plus 3
+points of margin (`ottoq_energy_orchestrate`; `ottoq_bess_day_plan` and `ottoq_bess_reserve_target` use the same reserve).
+That uncertainty (`ottoq_forecast_uncertainty`) is the spread of the last 40 minutes of EV charging, and it reaches its
+maximum at the start of every surge, when charging jumps from nothing to thousands of kW. Read back on both lab days at
+6:15-6:35 AM CT: 1.0, a reserve of 30%, a discharge gate at 33%. A battery under a third full therefore sits out every
+surge's first half hour, which is when a boot surge sets the day's billed peak. On the first day the battery started 71%
+full and the reserve never bound; on the second it started 25% full and sat out the whole morning surge.

@@ -188,11 +188,20 @@ which on `57188f55` above is when CP-SAT's proposals started to be enacted.
    perfect foresight of the day's load it would be $1,085 (`lab/research/p2_perfect_day/bound_energy.py`). Plans that see
    the next 1-4 hours perfectly and assume the load holds after that do worse than the day plan ($1,515-$1,583): the prize
    is in knowing the day's shape. (The older fixed-target rule, `energy_reserve_shave` 0, cost $2,225 on the same day: it
-   charged the battery into the peak. G370.) So the build is a forecast
-   of the depot's own charging load across the day, from what the engine already learns (the dispatch curve, the return
-   model, the charge clock, the line), in place of the plan's persistence floor (0435 §4.1 names it as the next step), measured
-   against the bound in the lab. The language model's part is around the plan: an energy brief for the operators, and the
-   exception desk when a demand-response call or a battery fault arrives (both already wake it).
+   charged the battery into the peak. G370.) A second lab day (seed 424242) tested a rough shape: each day planned on the
+   other day's load as its forecast (off by 217 kW on average), re-planned every five minutes, closes 77% and 67% of the gap
+   between the day plan and perfect foresight ($1,152 against $1,382 and $1,085; $1,243 against $1,543 and $1,098). On that
+   second day the day plan did not lower the peak at all: the battery started 25% full and its reserve, which rises at every
+   surge, held it out of the morning surge (G517). So the build is, in order: (a) a reserve that hedges the plan's own
+   forecast error rather than the surge it plans for (G517, sized in the lab first); (b) a forecast of the depot's own
+   charging load across the day, from what the engine already learns (the dispatch curve, the return model, the charge
+   clock, the line) and refit overnight from each day's real load (rule 10 allows production to update its estimates
+   overnight), in place of the plan's persistence floor (0435 §4.1 names it as the next step), measured against the bound in
+   the lab. The language model's part is around the plan: each evening it reads tomorrow's known inputs (the fleet's
+   schedule, the weather, a demand-response notice, a charger out of service) and proposes an adjustment to the day's
+   shape, which the plan takes only as a forecast and disposes of like any other (it keeps the battery's limits and never
+   touches a car's charge); an energy brief for the operators; and the exception desk when a demand-response call or a
+   battery fault arrives (both already wake it), or when the day departs from its shape by more than the plan can absorb.
 2. **Exceptions** (E8.1): it is now woken for them; the next build has it draft a plan into `ottoq_external_proposals` for the
    kernel to dispose of.
 3. **Explanations** (E8.2): every verdict and promise in plain words, through OTTO-Command (rule 11).

@@ -14,6 +14,7 @@ them wait. "Comfortably" is therefore a waiting question, read against what the 
 | `capacity_day.py` | one lab depot-day at fleet n, run as the engine's own throughput sweep arm runs a day (0568/0572), scored by its scorecard (0567) plus each owner's contract waits and, every half hour, the constraint board's wall (0783) |
 | `sweep.sh` | the matrix (scenarios x fleets x seeds), four days at a time, each replica kept for E5 |
 | `report.py` | the capacity curve from `results.jsonl` |
+| `whatif_reserve_no_surge_jump.sql` | a what-if for one lab day (`capacity_day.py --lab-sql FILE`, recorded with its md5): the battery's reserve does not rise at a surge (G517) |
 
 Each day: the twin depot as built today (30 robotic DCFC posts, 3 wash bays, 2 service bays, 113 staging spaces, one
 3,000 kWh battery), 12 hours from 6 AM CT at 5 sim-minutes a tick (the sweeps' own window), the deterministic core alone
