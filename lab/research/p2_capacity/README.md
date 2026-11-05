@@ -22,4 +22,25 @@ Each day: the twin depot as built today (30 robotic DCFC posts, 3 wash bays, 2 s
 
 ## What it found
 
-(results follow)
+### A 12-hour lab day measures the start-up wave, not steady operations (2026-11-05)
+
+The first days ran the sweep arms' own window: 12 hours from 6 AM CT. Read hour by hour (seed 171717), that window is a
+transient. The day starts with the whole fleet at the depot and most of it needing a charge at once: 91 visits "arrive"
+in the 6 AM hour at 116 cars and 106 at 150, and about half of each wait past the contract's 30 minutes (43 of 89 and 52
+of 105 charged; on seed 424242, 42 of 94). After that, most cars come back only once inside the window, as the morning
+wave returns. The work side asks for 97-104 cars out in the afternoon at 116 cars and gets 73-86, and 125-135 at 150
+and gets 98-109; and afternoon arrivals barely move with the fleet (28.7 an hour at 116 cars, 29.2 at 150, 1 PM to 6 PM).
+So the 12-hour days are kept as a stress test of the start-up wave, and the capacity curve proper is read on whole days
+(288 ticks, `jobs_2026-11-05c.txt`).
+
+Arrivals from 9 AM to 5 PM, past the start-up and early enough to finish (`steady_state.py`):
+
+| 12-hour normal day | arrivals an hour | charged within the contract's 30 minutes | wait p50 / p95 (min) | gate to leaving p50 / p95 (min) |
+|---|---:|---:|---:|---:|
+| 116 cars, seed 171717 | 20.4 | 134 of 144 (93%) | 5 / 35 | 70 / 150 |
+| 116 cars, seed 424242 | 18.1 | 110 of 137 (80%) | 10 / 57 | 90 / 181 |
+| 150 cars, seed 171717 | 21.8 | 141 of 167 (84%) | 10 / 55 | 85 / 165 |
+| 116 cars with a third service bay, seed 171717 | 19.4 | 131 of 139 (94%) | 5 / 35 | 75 / 144 |
+
+The two seeds at 116 cars differ by as much as 116 and 150 cars do on one seed: one day per point is a reading, not a
+curve. More seeds and whole days are running.
