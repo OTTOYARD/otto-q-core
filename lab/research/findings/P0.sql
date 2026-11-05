@@ -109,3 +109,29 @@ ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
   run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
+
+-- P0.2, per owner (2026-11-04 CT; Chase: "keep going"). Evidence: db/checks/0478, lab/research/p0_referee_per_owner/.
+INSERT INTO public.ottoq_research_findings
+  (slug, phase, item, kind, status, title, summary, metrics, evidence, run_ids, measured_at)
+VALUES
+  ('p0-referee-per-owner', 'P0', 'P0.2', 'measurement', 'measured',
+   'Counted owner by owner, most of the AI orders the referee accepted helped one owner at another''s expense',
+   'The lab re-checked all 370 of the referee''s past calls and got exactly production''s answers. Looked at one owner '
+   'at a time, of the 32 AI charging orders the referee accepted, only 5 were good for every owner. 22 helped one '
+   'owner''s cars at another''s expense, and 5 hurt all three. The AI''s orders leaned toward Waymo''s cars and away from '
+   'Tesla''s and Zoox''s. The referee cannot yet tell which owner an order will help (it is right about half the time), '
+   'so the owner safeguard switched on on 25 October works by refusing almost every AI order. The next build makes the '
+   'referee judge each owner on its own, with honest estimates.',
+   '{"decisions": 370, "regraded_exactly": 370, "taken": 32, "taken_good_for_every_owner": 5,
+     "taken_trade_owners": 22, "taken_bad_for_every_owner": 5, "missed_wins": 143,
+     "missed_wins_good_for_every_owner": 30,
+     "by_owner": {"Waymo Nashville": {"better": 182, "worse": 146}, "Tesla Robotaxi TN": {"better": 145, "worse": 180},
+                  "Zoox Southeast": {"better": 153, "worse": 171}},
+     "expected_vs_hindsight_same_direction": 0.543, "guard_would_refuse": 322, "guard_passes": 48,
+     "guard_passes_hurting_an_owner": 39, "median_contract_wait_min_lost_by_a_hurt_owner": 23.1, "runs": 25, "keys": 18,
+     "finding": "G511"}',
+   'otto-q-core db/checks/0478', '{}', '2026-11-05 01:18:01+00')
+ON CONFLICT (depot_id, slug) DO UPDATE SET
+  phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
+  title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
+  run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
