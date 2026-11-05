@@ -100,22 +100,52 @@ per five minutes, so the shape is a rough forecast, not a copy.
 
 - **The shape of the day is the money, and a rough one is enough.** Planned on another day's shape, the battery's bill
   closes 77% of the gap between the day plan and perfect foresight on the first day ($230 of $298) and 67% on the second
-  ($300 of $445). Seeing the next hours exactly and nothing beyond does far worse, on both days.
+  ($300 of $445). Seeing the next hours exactly and nothing beyond does far worse, on both days. The day plan as it runs
+  also holds the two reserves of G517 below and these plans hold neither, so part of each gap is the reserves, not the
+  forecast: the lab's what-if days split the two.
 - **On the second day the day plan did not lower the peak at all** (1,475 kW with and without the battery). The battery
   started the day 25% full, and the day's highest draw came in its first ten minutes (2,226 kW at 6:10 AM CT, as the boot
   cars plugged in). The battery never discharged that day: its $44 over no battery is the energy it bought to fill itself
-  from 25% to 50% (some of it the panels' midday surplus), not money lost. Why it did not discharge is G517 below.
+  from 25% to 50% (some of it the panels' midday surplus), not money lost. Why it did not discharge is G517 below: it
+  was holding a reserve for a demand-response call that never came.
 - Every plan above ends the day at least as full as the real battery did (2,702 kWh on the first day, 1,508 on the
   second); the no-battery bill does not pay for the energy the real battery stored, so it is slightly flattered.
 - Two days, one forecast each way: a reading, not a range. The build it points to is a learned forecast of the depot's own
   charging load across the day, in the day plan's hands (0435 §4.1 names its persistence floor as the next step).
 
-### G517: the battery's reserve rises at the surge it exists for
+### G517: two reserves keep a battery under about half full out of the morning surge
 
-The battery may discharge only above a reserve: its own floor (10%) plus 20 points times a "forecast uncertainty", plus 3
-points of margin (`ottoq_energy_orchestrate`; `ottoq_bess_day_plan` and `ottoq_bess_reserve_target` use the same reserve).
-That uncertainty (`ottoq_forecast_uncertainty`) is the spread of the last 40 minutes of EV charging, and it reaches its
-maximum at the start of every surge, when charging jumps from nothing to thousands of kW. Read back on both lab days at
-6:15-6:35 AM CT: 1.0, a reserve of 30%, a discharge gate at 33%. A battery under a third full therefore sits out every
-surge's first half hour, which is when a boot surge sets the day's billed peak. On the first day the battery started 71%
-full and the reserve never bound; on the second it started 25% full and sat out the whole morning surge.
+Two reserves stand between the battery and a discharge, and the plan records both every tick (`ottoq_energy_commands`,
+`bess_setpoint_kw`: the plan's mode, the energy it may use, the reserve it holds):
+
+1. **The demand-response reserve, held from the first minute of the day.** In summer the day plan holds 600 kWh
+   (`bess_plan_dr_reserve_kwh`) for a possible demand-response call between 2 and 8 PM, at every step before the window,
+   and while the battery holds less than that above its floor the plan is `reserve_protected` and does not discharge at
+   all. The reserve has a vehicle purpose: during a call the cars may charge on what the battery can sustain
+   (`ottoq_ev_charge_allowance_kw`), so a full reserve keeps a call from slowing them.
+2. **A floor that rises at every surge.** The plan's floor is the battery's own (10%) plus 20 points times
+   `ottoq_forecast_uncertainty`, the spread of the last 40 minutes of EV charging, which reads 1.0 from the first tick after
+   a surge begins (read back on both lab days at 6:15, 6:25 and 6:35 AM CT), plus 3 points: 33% through every surge's
+   first half hour.
+
+So before 2 PM a battery needs about 33% to discharge at all, and about 53% during a surge. On the second day it started
+24.5% full. At 6:10 AM CT, when the day's highest draw began (2,226 kW at the meter), the plan read 340 kWh it could use
+against the 600 kWh reserve and held; from 6:15 the rising floor made it 0. It held for 30 ticks and never discharged that
+day. On the first day it started 71% full and shaved, but at 6:15, holding about 1,660 kWh above its floor, the two
+reserves left it 388. No demand-response call came on either day (`ottoq_dr_calls`).
+
+Needed only from 2 PM, the same reserve costs nothing in hindsight on either day: with `--dr-reserve-kwh 600`, perfect
+foresight is $1,085 and $1,098 exactly as without it, and the typical-day plans pay $0 and $3 more ($1,152 and $1,246).
+The battery refills well before the window anyway (on the second day from 25% to 52% between 8 AM and 1 PM, without trying).
+
+| what the reserves cost on the second day (seed 424242) | half-hour peak | bill |
+|---|---:|---:|
+| the day plan as it runs (both reserves) | 1,475 kW | $1,543 |
+| the demand-response reserve off (`dr0`) | running | |
+| the rising floor off (`res0`) | running | |
+| both off (`dr0res0`) | running | |
+| perfect foresight, the reserve needed from 2 PM | 850 kW | $1,098 |
+
+The proposed fix keeps the reserve and needs it by the window: the plan may spend it before 2 PM when it can refill it by
+then, and the floor hedges the plan's own forecast error, not the surge it is planning for. It is built behind a dial and
+tested in the lab on a day with a demand-response call before anyone switches it on, so a call never slows a car.

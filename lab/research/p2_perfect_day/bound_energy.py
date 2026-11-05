@@ -26,6 +26,7 @@ import argparse
 import json
 import math
 import os
+from zoneinfo import ZoneInfo
 
 import psycopg
 from ortools.linear_solver import pywraplp
@@ -55,6 +56,14 @@ def main() -> None:
     ap.add_argument("--forecast-db", action="append", default=[],
                     help="another finished lab day whose load before the battery, step by step, is the forecast of this "
                          "day's (several: their mean): a plan made from a typical day's shape")
+    ap.add_argument("--dr-reserve-kwh", type=float, default=0.0,
+                    help="deliverable kWh every plan must hold in summer through the demand-response window, declining "
+                         "across it as the day plan's does (bess_plan_dr_reserve_kwh, 600 at the twin depot, so a call "
+                         "does not slow the cars' charging), but needed only from the window's start: a plan may spend "
+                         "it earlier and must refill it by then. The day plan holds it from the start of the day; that "
+                         "form is a ratchet a linear program cannot hold exactly, and is measured by the lab's what-if "
+                         "days instead. 0: none (the earlier results)")
+    ap.add_argument("--dr-window", default="14,20", help="the call window in local hours (the plan's defaults)")
     a = ap.parse_args()
     conn = psycopg.connect(host=HOST, port=PORT, user="postgres", dbname=a.db)
     run = a.run or conn.execute("SELECT sim_run_id::text FROM ottoq_sim_runs WHERE run_by = 'ab_harness' "
@@ -68,9 +77,9 @@ def main() -> None:
     soc = conn.execute("""SELECT timestamp, soc_percent FROM bess_snapshots WHERE depot_id = %s
                            AND timestamp BETWEEN %s AND %s ORDER BY timestamp""", (TWIN, t0, t1)).fetchall()
     month = t0.month
-    d_rate = conn.execute("""SELECT demand_first_block_usd_kw FROM ottoq_depot_tariffs
+    d_rate, d_season = conn.execute("""SELECT demand_first_block_usd_kw, season FROM ottoq_depot_tariffs
                               WHERE depot_id = %s AND active AND %s = ANY(season_months)
-                              ORDER BY effective_from DESC LIMIT 1""", (TWIN, month)).fetchone()[0]
+                              ORDER BY effective_from DESC LIMIT 1""", (TWIN, month)).fetchone()
     d_rate = float(d_rate)
     amort = 30.0
     wear = 0.02
@@ -96,6 +105,17 @@ def main() -> None:
     billed_before = float(a.billed_before)
     n = len(rows)
     win = max(1, int(round(0.5 / (sum(dts) / n))))                                  # steps in 30 minutes
+    # the demand-response reserve (0435's v_res, summer only), needed from the window's start: deliverable kWh as a lower
+    # bound on the battery's stored energy at the start of each step in the window, declining to nothing at its end.
+    dr_ws, dr_we = (float(x) for x in a.dr_window.split(","))
+
+    def dr_res(i: int) -> float:
+        if a.dr_reserve_kwh <= 0 or d_season != "summer":
+            return 0.0
+        lt = ts[i].astimezone(ZoneInfo("America/Chicago"))
+        h = lt.hour + lt.minute / 60.0
+        return a.dr_reserve_kwh * (dr_we - h) / (dr_we - dr_ws) if dr_ws <= h < dr_we else 0.0
+    e_min = [min(hi_e, lo_e + dr_res(i) / eff) for i in range(n)]
 
     def bill(grid: list[float], discharge_kwh: float) -> dict:
         energy = sum(max(g, 0) * rate[i] * dts[i] for i, g in enumerate(grid))
@@ -116,6 +136,8 @@ def main() -> None:
     p30 = s.NumVar(0, s.infinity(), "p30")
     s.Add(e[0] == min(max(e0, lo_e), hi_e))
     for i in range(n):
+        if e_min[i] > lo_e:
+            s.Add(e[i] >= e_min[i])
         s.Add(e[i + 1] == e[i] + (eff * c[i] - d[i] / eff) * dts[i])
         s.Add(g[i] == pre[i] + c[i] - d[i] + spill[i])
     s.Add(e[n] >= min(max(e_end, lo_e), hi_e))
@@ -150,6 +172,8 @@ def main() -> None:
             pp = r.NumVar(0, r.infinity(), "")
             r.Add(ee[0] == e_t)
             for k in range(m):
+                if k > 0 and e_min[t + k] > lo_e:
+                    r.Add(ee[k] >= e_min[t + k])
                 r.Add(ee[k + 1] == ee[k] + (eff * cc[k] - dd[k] / eff) * dts[t + k])
                 r.Add(gg[k] == fc[k] + cc[k] - dd[k] + xx[k])
             r.Add(ee[m] >= min(max(e_end, lo_e), hi_e))
@@ -201,7 +225,9 @@ def main() -> None:
     out = {"db": a.db, "run": run, "steps": n, "step_h": round(sum(dts) / n, 4), "status": int(st),
            "battery": {"capacity_kwh": cap, "max_kw": pd, "rte": rte, "soc_start_kwh": round(e0, 1),
                        "soc_end_kwh": round(e_end, 1)},
-           "billed_before_kw": billed_before, "demand_usd_kw_month": float(d_rate),
+           "billed_before_kw": billed_before, "demand_usd_kw_month": float(d_rate), "demand_season": d_season,
+           "dr_reserve": {"kwh": a.dr_reserve_kwh, "needed_from": "window_start", "window": a.dr_window}
+                         if a.dr_reserve_kwh > 0 else None,
            "load_kwh": round(sum(max(p, 0) * dts[i] for i, p in enumerate(pre)), 1),
            "no_battery": none, "real_plan": real, "perfect_foresight": best,
            "battery_earned_usd": round(none["total_usd"] - real["total_usd"], 2),

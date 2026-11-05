@@ -190,10 +190,13 @@ which on `57188f55` above is when CP-SAT's proposals started to be enacted.
    is in knowing the day's shape. (The older fixed-target rule, `energy_reserve_shave` 0, cost $2,225 on the same day: it
    charged the battery into the peak. G370.) A second lab day (seed 424242) tested a rough shape: each day planned on the
    other day's load as its forecast (off by 217 kW on average), re-planned every five minutes, closes 77% and 67% of the gap
-   between the day plan and perfect foresight ($1,152 against $1,382 and $1,085; $1,243 against $1,543 and $1,098). On that
-   second day the day plan did not lower the peak at all: the battery started 25% full and its reserve, which rises at every
-   surge, held it out of the morning surge (G517). So the build is, in order: (a) a reserve that hedges the plan's own
-   forecast error rather than the surge it plans for (G517, sized in the lab first); (b) a forecast of the depot's own
+   between the day plan and perfect foresight ($1,152 against $1,382 and $1,085; $1,243 against $1,543 and $1,098), though
+   part of each gap is two reserves the day plan holds and those plans do not. On that second day the day plan did not
+   lower the peak at all: the battery started 25% full, and before 2 PM the plan holds 600 kWh for a demand-response call
+   from the first minute of the day (no call came), while its floor rises at every surge (G517). Needed only from 2 PM, that
+   reserve costs nothing in hindsight on either day. So the build is, in order: (a) the demand-response reserve needed by
+   its window, and a floor that hedges the plan's own forecast error rather than the surge it plans for (G517, sized in the
+   lab first, and tested on a day with a call so a call never slows a car); (b) a forecast of the depot's own
    charging load across the day, from what the engine already learns (the dispatch curve, the return model, the charge
    clock, the line) and refit overnight from each day's real load (rule 10 allows production to update its estimates
    overnight), in place of the plan's persistence floor (0435 §4.1 names it as the next step), measured against the bound in

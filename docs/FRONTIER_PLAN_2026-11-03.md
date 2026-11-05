@@ -649,8 +649,9 @@ more days and fleet sizes are running (`lab/research/p2_capacity/`).*
 
 *Status 2026-11-05 (5:29 PM CT), the battery on a second day (seed 424242): planning on a typical day's shape (the other
 lab day's load) closes 67-77% of the gap to perfect foresight on both days, and on the second day the day plan did not
-lower the peak at all, because the battery's reserve rises at every surge and the battery started 25% full (G517). The
-battery's build order is in `docs/AGENT_ARCHITECTURE.md` (where the agent earns its place, item 1).*
+lower the peak at all: the battery started 25% full, the plan holds a 600 kWh demand-response reserve from the first
+minute of the day (no call came; needed only from 2 PM it costs nothing in hindsight), and its floor rises at every surge
+(G517). The battery's build order is in `docs/AGENT_ARCHITECTURE.md` (where the agent earns its place, item 1).*
 
 ### Phase 4: the inventor. Needs D3.
 
