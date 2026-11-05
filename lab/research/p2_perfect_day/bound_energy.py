@@ -50,6 +50,8 @@ def main() -> None:
     ap.add_argument("--db", required=True)
     ap.add_argument("--run")
     ap.add_argument("--out", default=os.path.join(HERE, "bound_energy.jsonl"))
+    ap.add_argument("--billed-before", type=float, default=0.0,
+                    help="kW of the month's peak already billed before this day (0: the day pays for its own peak)")
     ap.add_argument("--forecast-db", action="append", default=[],
                     help="another finished lab day whose load before the battery, step by step, is the forecast of this "
                          "day's (several: their mean): a plan made from a typical day's shape")
@@ -87,7 +89,11 @@ def main() -> None:
     real_grid = [float(r[6]) - float(r[7]) for r in rows]
     real_out = [float(r[5]) for r in rows]                                          # + discharge, - charge
     rate = [float(r[9] if r[9] is not None else 0.07) for r in rows]
-    billed_before = float(rows[0][8] or 0)
+    # the peak already billed this month before the day began: a lab day starts a fresh run, whose billed peak (0600's
+    # completed 30-minute windows of this run's own draw) is nothing at its start, so every policy on every day is
+    # charged for its own highest half hour. (An earlier cut read the first snapshot's billing_period_peak_kw, which
+    # already holds the first tick's draw: a policy that drew hard in that tick had its own peak hidden.)
+    billed_before = float(a.billed_before)
     n = len(rows)
     win = max(1, int(round(0.5 / (sum(dts) / n))))                                  # steps in 30 minutes
 

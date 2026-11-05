@@ -34,24 +34,31 @@ ON CONFLICT (depot_id, slug) DO UPDATE SET
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
   run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
 
--- E5, the battery's half (2026-11-05 CT). Evidence: lab/research/p2_perfect_day/bound_energy.py.
+-- E5, the battery's half (2026-11-05 CT), with the G370 comparison. Evidence: lab/research/p2_perfect_day/bound_energy.py.
+-- Every policy pays for its own highest half hour at the daily share of the monthly demand charge (the lab day starts a
+-- fresh run, so nothing was billed before it). A first publication read the month's billed peak from the day's first
+-- snapshot (330.6 kW), which shifted every bill by $224 and left the differences unchanged; it is replaced here.
 INSERT INTO public.ottoq_research_findings
   (slug, phase, item, kind, status, title, summary, metrics, evidence, run_ids, measured_at)
 VALUES
   ('p2-battery-foresight-prize', 'P2', 'E5', 'measurement', 'measured',
-   'The battery earns $317 on a 12-hour day; knowing the day''s shape would be worth about $298 more',
-   'On the same lab day, the depot''s energy bill with no battery would have been $1,463. The battery''s current day plan '
-   'brought it to $1,147, mostly by cutting the half-hour peak from 1,679 kW to 1,160 kW. With perfect foresight of the '
-   'day''s load the bill would have been $849 (peak 735 kW). Plans that see the next 1 to 4 hours perfectly but assume '
-   'the load then holds steady do worse than the current plan ($1,300 to $1,387): the money is in knowing the shape of '
-   'the whole day, so the AI build is a forecast of the depot''s own charging demand across the day. Priced the way the '
-   'battery''s own plan prices demand (the monthly charge spread over 30 days). One day, one seed.',
+   'The battery''s day plan saves $317 on a 12-hour day, and $843 against the old rule; foresight would add about $298',
+   'On the lab''s first full day (a normal day, 116 cars, 12 hours), the depot''s energy bill with no battery would have '
+   'been $1,699 (half-hour peak 1,679 kW). The battery''s day plan, the setting the twin depot runs (energy_reserve_shave '
+   'on), brought it to $1,382 (peak 1,160 kW). The same day with that setting off, the older fixed-target rule, cost '
+   '$2,225: that rule charged the battery into the peak (2,336 kW), worse than no battery at all. With perfect foresight '
+   'of the day''s load the bill would have been $1,085 (peak 735 kW). Plans that see the next 1 to 4 hours perfectly but '
+   'assume the load then holds steady do worse than the day plan ($1,515 to $1,583): the money is in knowing the shape of '
+   'the whole day, so the AI build is a forecast of the depot''s own charging demand across the day. One day, one seed.',
    '{"scenario": "normal_day", "fleet": 116, "seed": 171717, "hours": 12, "load_kwh": 6803.3,
-     "no_battery": {"total_usd": 1463.03, "peak30_kw": 1679.0}, "day_plan": {"total_usd": 1146.51, "peak30_kw": 1159.6},
-     "perfect_foresight": {"total_usd": 848.78, "peak30_kw": 735.3},
-     "rolling_lookahead_usd": {"persistence": 1387.46, "1h": 1338.82, "2h": 1313.73, "4h": 1299.64},
-     "battery": {"capacity_kwh": 3000, "max_kw": 1500}, "demand_usd_kw_month": 20.34}',
-   'otto-q-core lab/research/p2_perfect_day/bound_energy.jsonl', '{}', '2026-11-05 22:03:00+00')
+     "billing": "each policy pays its own highest 30-minute average at 20.34 USD/kW-month over 30 days",
+     "no_battery": {"total_usd": 1698.86, "peak30_kw": 1679.0},
+     "day_plan_energy_reserve_shave_1": {"total_usd": 1382.34, "peak30_kw": 1159.6},
+     "old_rule_energy_reserve_shave_0": {"total_usd": 2224.84, "peak30_kw": 2335.7},
+     "perfect_foresight": {"total_usd": 1084.61, "peak30_kw": 735.3},
+     "rolling_lookahead_usd": {"persistence": 1583.27, "1h": 1514.99, "2h": 1549.56, "4h": 1535.47},
+     "battery": {"capacity_kwh": 3000, "max_kw": 1500}, "finding": "G370"}',
+   'otto-q-core lab/research/p2_perfect_day/bound_energy.jsonl', '{}', '2026-11-05 23:04:40+00')
 ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,

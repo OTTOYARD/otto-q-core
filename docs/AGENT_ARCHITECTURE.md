@@ -183,10 +183,12 @@ which on `57188f55` above is when CP-SAT's proposals started to be enacted.
 
 **Where the agent earns its place, ranked by what the lab has measured:**
 
-1. **The battery's forward plan.** On the lab's first full day (normal_day, 116 cars, 12 hours): with no battery the bill is
-   $1,463; the battery's day plan (0435) brings it to $1,147; with perfect foresight of the day's load it would be $849
-   (`lab/research/p2_perfect_day/bound_energy.py`). Plans that see the next 1-4 hours perfectly and assume the load holds
-   after that do worse than the day plan ($1,300-$1,387): the prize is in knowing the day's shape. So the build is a forecast
+1. **The battery's forward plan.** On the lab's first full day (normal_day, 116 cars, 12 hours, each policy paying for its
+   own highest half hour): with no battery the bill is $1,699; the battery's day plan (0435) brings it to $1,382; with
+   perfect foresight of the day's load it would be $1,085 (`lab/research/p2_perfect_day/bound_energy.py`). Plans that see
+   the next 1-4 hours perfectly and assume the load holds after that do worse than the day plan ($1,515-$1,583): the prize
+   is in knowing the day's shape. (The older fixed-target rule, `energy_reserve_shave` 0, cost $2,225 on the same day: it
+   charged the battery into the peak. G370.) So the build is a forecast
    of the depot's own charging load across the day, from what the engine already learns (the dispatch curve, the return
    model, the charge clock, the line), in place of the plan's persistence floor (0435 §4.1 names it as the next step), measured
    against the bound in the lab. The language model's part is around the plan: an energy brief for the operators, and the

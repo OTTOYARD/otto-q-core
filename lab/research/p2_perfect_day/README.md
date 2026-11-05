@@ -56,5 +56,19 @@ machine (so "best found" can still improve; the bound cannot be beaten).
 - A car that finished its work waited a total of 1,318 minutes for the work side to send it (24,332 to ready against
   25,650 to dispatch): small, and not the depot's to schedule.
 
-The battery on the same day: no battery $1,463, the day plan $1,147, perfect foresight $849 (`bound_energy.jsonl`); plans
-that see 1-4 hours ahead perfectly and hold the load flat beyond do worse than the day plan ($1,300-$1,387).
+The battery on the same day (`bound_energy.jsonl`; each policy pays for its own highest half hour at the daily share of
+the monthly demand charge):
+
+| 12-hour normal day, 116 cars | half-hour peak | bill |
+|---|---:|---:|
+| no battery | 1,679 kW | $1,699 |
+| the battery's day plan (`energy_reserve_shave` 1, what the twin depot runs; G370) | 1,160 kW | $1,382 |
+| the same day with `energy_reserve_shave` 0 (the older fixed-target rule) | 2,336 kW | $2,225 |
+| perfect foresight of the day's load | 735 kW | $1,085 |
+| rolling plans seeing the next 1 / 2 / 4 hours exactly, the load held flat beyond | | $1,515 / $1,550 / $1,535 |
+
+The older rule charges the battery into the peak and does worse than no battery; the day plan saves $843 against it on
+this day. The car side of the two days is identical (every visit, every seat): the setting changes only the energy. A
+first cut of this tool read the month's billed peak from the day's first snapshot, which already holds the first tick's
+draw; under the older rule that hid most of its own peak (it charges hard at 6 AM). Every bill above is computed with
+nothing billed before the day.
