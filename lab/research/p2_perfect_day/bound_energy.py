@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+"""E5, the battery's half: the cheapest energy bill the depot could have had on a finished lab day, with perfect foresight.
+
+On a day the lab ran to its end, the depot's load before the battery is known minute by minute (site_energy_snapshots:
+the cars' charging, the building, the lights, less the solar). Given that load, a linear program (OR-Tools GLOP, 9.15)
+chooses the battery's charge and discharge at every step to minimise the day's bill, priced exactly as the battery's
+own day plan prices it (0435: the TOU rate of the step from twin.ottoq_sim_current_tariff, the demand charge on the
+highest 30-minute average spread over 30 days, $0.02 per kWh of wear), within the battery's limits (power, its SoC
+floor and ceiling, round-trip efficiency), ending the day no emptier than the real battery did. It is a bound: no
+battery policy, however clever, beats it on this day's load. Beside it, the bill the battery's real plan ran up and the
+bill with no battery at all. The gap between the real plan and the bound is what perfect forward planning is worth on
+this day; the gap between no battery and the real plan is what the battery earned.
+
+WHAT IT IS NOT. The load is held as it happened: the cars' charging is not moved (the vehicles' needs set the load,
+CLAUDE.md rule 13), so this measures the battery's planning only. Demand is read on 30-minute averages of the step
+samples, and the day's demand charge counts only the part of the peak above what the month had already billed.
+
+Usage: /var/tmp/ottoq_lab_venv/bin/python -I lab/research/p2_perfect_day/bound_energy.py --db ottoq_cap_normal_day_116_171717
+Nothing here touches production.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import os
+
+import psycopg
+from ortools.linear_solver import pywraplp
+
+HOST, PORT = os.environ.get("LAB_HOST", "/var/tmp"), int(os.environ.get("LAB_PORT", "55433"))
+TWIN = "11111111-1111-1111-1111-111111111111"
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+SNAP_SQL = """
+SELECT s.timestamp, COALESCE(s.total_ev_charging_kw, 0), COALESCE(s.building_load_kw, 0), COALESCE(s.lighting_load_kw, 0),
+       COALESCE(s.solar_generation_kw, 0), COALESCE(s.bess_output_kw, 0), COALESCE(s.grid_import_kw, 0),
+       COALESCE(s.grid_export_kw, 0), s.billing_period_peak_kw,
+       (SELECT t.out_rate_usd_kwh FROM twin.ottoq_sim_current_tariff(%(depot)s, s.timestamp) t)
+  FROM site_energy_snapshots s
+ WHERE s.sim_run_id = %(run)s AND s.depot_id = %(depot)s
+ ORDER BY s.timestamp
+"""
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--db", required=True)
+    ap.add_argument("--run")
+    ap.add_argument("--out", default=os.path.join(HERE, "bound_energy.jsonl"))
+    a = ap.parse_args()
+    conn = psycopg.connect(host=HOST, port=PORT, user="postgres", dbname=a.db)
+    run = a.run or conn.execute("SELECT sim_run_id::text FROM ottoq_sim_runs WHERE run_by = 'ab_harness' "
+                                "ORDER BY started_at DESC LIMIT 1").fetchone()[0]
+    t0, t1 = conn.execute("SELECT sim_clock_start, sim_clock_current FROM ottoq_sim_runs WHERE sim_run_id = %s",
+                          (run,)).fetchone()
+    rows = conn.execute(SNAP_SQL, {"run": run, "depot": TWIN}).fetchall()
+    b = conn.execute("""SELECT capacity_kwh, max_charge_kw, max_discharge_kw, roundtrip_efficiency_pct,
+                               soc_min_floor_pct, soc_max_ceiling_pct FROM ottoq_bess_units WHERE depot_id = %s""",
+                     (TWIN,)).fetchone()
+    soc = conn.execute("""SELECT timestamp, soc_percent FROM bess_snapshots WHERE depot_id = %s
+                           AND timestamp BETWEEN %s AND %s ORDER BY timestamp""", (TWIN, t0, t1)).fetchall()
+    month = t0.month
+    d_rate = conn.execute("""SELECT demand_first_block_usd_kw FROM ottoq_depot_tariffs
+                              WHERE depot_id = %s AND active AND %s = ANY(season_months)
+                              ORDER BY effective_from DESC LIMIT 1""", (TWIN, month)).fetchone()[0]
+    amort = 30.0
+    wear = 0.02
+    conn.close()
+    if len(rows) < 12:
+        raise SystemExit(f"only {len(rows)} energy snapshots for run {run}")
+    cap, pc, pd, rte, floor_pct, ceil_pct = (float(x) for x in b)
+    eff = math.sqrt(rte if rte <= 1 else rte / 100.0)         # per direction (0435 §1(d): the column is a fraction)
+    lo_e, hi_e = cap * floor_pct / 100.0, cap * ceil_pct / 100.0
+    e0 = cap * float(soc[0][1]) / 100.0 if soc else cap * 0.5
+    e_end = cap * float(soc[-1][1]) / 100.0 if soc else e0
+    ts = [r[0] for r in rows]
+    dts = [max((ts[i + 1] - ts[i]).total_seconds() / 3600.0, 1e-6) for i in range(len(ts) - 1)]
+    dts.append(dts[-1])
+    pre = [float(r[1]) + float(r[2]) + float(r[3]) - float(r[4]) for r in rows]   # load before the battery
+    real_grid = [float(r[6]) - float(r[7]) for r in rows]
+    real_out = [float(r[5]) for r in rows]                                          # + discharge, - charge
+    rate = [float(r[9] if r[9] is not None else 0.07) for r in rows]
+    billed_before = float(rows[0][8] or 0)
+    n = len(rows)
+    win = max(1, int(round(0.5 / (sum(dts) / n))))                                  # steps in 30 minutes
+
+    def bill(grid: list[float], discharge_kwh: float) -> dict:
+        energy = sum(max(g, 0) * rate[i] * dts[i] for i, g in enumerate(grid))
+        peak30 = max(sum(grid[i:i + win]) / len(grid[i:i + win]) for i in range(0, n - win + 1)) if n >= win else max(grid)
+        demand = d_rate / amort * max(peak30 - billed_before, 0)
+        return {"energy_usd": round(energy, 2), "peak30_kw": round(peak30, 1), "demand_usd": round(demand, 2),
+                "wear_usd": round(wear * discharge_kwh, 2), "total_usd": round(energy + demand + wear * discharge_kwh, 2)}
+
+    real = bill(real_grid, sum(max(o, 0) * dts[i] for i, o in enumerate(real_out)))
+    none = bill([max(p, 0) for p in pre], 0.0)
+
+    s = pywraplp.Solver.CreateSolver("GLOP")
+    c = [s.NumVar(0, pc, f"c{i}") for i in range(n)]
+    d = [s.NumVar(0, pd, f"d{i}") for i in range(n)]
+    e = [s.NumVar(lo_e, hi_e, f"e{i}") for i in range(n + 1)]
+    g = [s.NumVar(0, s.infinity(), f"g{i}") for i in range(n)]
+    spill = [s.NumVar(0, s.infinity(), f"x{i}") for i in range(n)]   # solar the site cannot use (no export credit)
+    p30 = s.NumVar(0, s.infinity(), "p30")
+    s.Add(e[0] == min(max(e0, lo_e), hi_e))
+    for i in range(n):
+        s.Add(e[i + 1] == e[i] + (eff * c[i] - d[i] / eff) * dts[i])
+        s.Add(g[i] == pre[i] + c[i] - d[i] + spill[i])
+    s.Add(e[n] >= min(max(e_end, lo_e), hi_e))
+    for i in range(0, n - win + 1):
+        s.Add(p30 >= sum(g[i:i + win]) * (1.0 / win))
+    over = s.NumVar(0, s.infinity(), "over")
+    s.Add(over >= p30 - billed_before)
+    s.Minimize(sum(rate[i] * g[i] * dts[i] for i in range(n)) + (d_rate / amort) * over
+               + wear * sum(d[i] * dts[i] for i in range(n)))
+    st = s.Solve()
+    best_grid = [g[i].solution_value() for i in range(n)]
+    best = bill(best_grid, sum(d[i].solution_value() * dts[i] for i in range(n)))
+    out = {"db": a.db, "run": run, "steps": n, "step_h": round(sum(dts) / n, 4), "status": int(st),
+           "battery": {"capacity_kwh": cap, "max_kw": pd, "rte": rte, "soc_start_kwh": round(e0, 1),
+                       "soc_end_kwh": round(e_end, 1)},
+           "billed_before_kw": billed_before, "demand_usd_kw_month": float(d_rate),
+           "load_kwh": round(sum(max(p, 0) * dts[i] for i, p in enumerate(pre)), 1),
+           "no_battery": none, "real_plan": real, "perfect_foresight": best,
+           "battery_earned_usd": round(none["total_usd"] - real["total_usd"], 2),
+           "foresight_prize_usd": round(real["total_usd"] - best["total_usd"], 2)}
+    with open(a.out, "a") as f:
+        f.write(json.dumps(out, default=str) + "\n")
+    print(json.dumps({k: out[k] for k in ("db", "load_kwh", "no_battery", "real_plan", "perfect_foresight",
+                                          "battery_earned_usd", "foresight_prize_usd")}, indent=1))
+
+
+if __name__ == "__main__":
+    main()
