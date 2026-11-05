@@ -170,6 +170,8 @@ def main() -> None:
             conn.execute("ROLLBACK TO SAVEPOINT t")
             err = {"tick": st[1] + 1, "error": str(e)[:400]}
             break
+        if (k + 1) % 12 == 0:
+            print(f"tick {k + 1}/{a.ticks} at {time.time() - t0:.0f} s", flush=True)
         if (k + 1) % a.sample_every == 0:
             clock = one("SELECT sim_clock_current FROM ottoq_sim_runs WHERE sim_run_id = %s", (run,))
             try:
