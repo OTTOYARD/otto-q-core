@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # lab/research/p2_capacity/run_queue.sh JOBS_FILE [PARALLEL] -- lab days from a list, PARALLEL at a time (default 4, one
-# per core), skipping every day the results file already holds whole (all its ticks, no error). LAB ONLY.
+# per core, counting every lab day running on the machine), skipping every day the results file already holds whole
+# (all its ticks, no error). LAB ONLY.
 #
 # A lab day runs in one transaction, so a container restart that kills it rolls it back and leaves nothing half-written;
 # running the same list again picks up where it stopped (the lab server must be up: it needs crash recovery after a
@@ -60,7 +61,9 @@ while IFS= read -r line <&3; do
     echo "$(date -u +%T) skip $label (in $(basename "$OUT") already)"
     continue
   fi
-  while [ "$(jobs -rp | wc -l)" -ge "$PAR" ]; do sleep 10; done
+  # every lab day on this machine counts, not only this runner's, so two lists can share the four cores
+  # (matched from the start of the command line, so no shell that merely mentions the script is counted)
+  while [ "$(pgrep -fc "^$PY -I .*capacity_day[.]py")" -ge "$PAR" ]; do sleep 10; done
   echo "$(date -u +%T) start $label"
   # shellcheck disable=SC2086
   "$PY" -I "$HERE/capacity_day.py" $args --keep --out "$OUT" < /dev/null > "$LOGDIR/$label.log" 2>&1 &
