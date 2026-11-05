@@ -512,6 +512,8 @@ can show each customer, for example: *"Waymo's cars were not made worse by this 
 
 ### E8. Agents at the edges
 
+*Status 2026-11-05 (3:34 PM CT): D5 decided by Chase ("Okay I agree with you on all fronts. Begin building"). `0795` makes the per-tick order a background challenger (checked, kept and graded, never standing) and the wake gate is on at the twin depot, so the agent is consulted on exceptions plus a 30-sim-minute check-in (`db/checks/0480`). Items 1-4 below are the build list.*
+
 **What.** Move the LLM agent from per-tick charge orders, where 2.6% are taken, to four jobs that need a language model:
 
 1. **Exceptions.** On a fault, an owner request or an E3 monitor alarm, it reads the situation and drafts a plan into

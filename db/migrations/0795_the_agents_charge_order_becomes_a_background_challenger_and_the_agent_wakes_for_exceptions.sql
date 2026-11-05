@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261105213348
 -- migration-name:    the_agents_charge_order_becomes_a_background_challenger_and_the_agent_wakes_for_exceptions
 --
 -- 0795  **The agent's charge order becomes a background challenger: checked and graded as before, never standing; and
@@ -300,3 +300,16 @@ VALUES ('0795_the_agents_charge_order_becomes_a_background_challenger_and_the_ag
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-05 at 21:33:48 UTC (3:33 PM CT), ledger 20261105213348, through apply_migration, on Chase's decision of
+--   the same day (§0). Nothing in flight and no run live or paused (read 21:32:33 UTC: the five bodies at the md5s P1
+--   names, 0784 in the lineage, 0795 not, the dial uncatalogued, the status check as read). The text sent was this file
+--   before its version line and this footer were set: 23,263 bytes, md5 f14f2b71ba134053ae5b9e0ef108120e, equal to the
+--   ledger's statements[1] read back. Read back at 21:34:04 UTC: record f0facbb7, usage 8e889892, board fabe3829, wake
+--   cc9adc8d, grader 1dbe17c9 (md5 of prosrc), the status check admits 'shadow', five '0795_pre' snapshots, the lineage
+--   row FALSE/FALSE. The research lab, given the same file and ledger row, holds the same five bodies and production's
+--   engine hash (4eb75105).
+--   SWITCHED ON at the twin depot at 21:34:09 UTC (3:34 PM CT), under Chase's name, in one statement:
+--   ottoq_policy_set('depot', twin, 'agent_charge_order_shadow', 1, 'Chase') and
+--   ottoq_policy_set('depot', twin, 'agent_wake_enabled', 1, 'Chase'), both receipts ok, unclamped. No run was live; the
+--   next demo run at the twin depot is the first under them (db/checks/0480 (2) reads it).
