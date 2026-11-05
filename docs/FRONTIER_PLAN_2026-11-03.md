@@ -590,7 +590,7 @@ These run in parallel. None touches production. Building the Lab runs a few simu
    arm). Throughput: one depot-day in 173 s on one stream (20.8 depot-days an hour), 54.6 an hour on four
    replicas; a pair costs more than its two arms, because both share one transaction. Forks reproduce. The fidelity
    test found an engine defect instead of a lab one: on today's engine a pair fails the end-state atom on a minted id,
-   over 12 ticks and over a full depot-day (G510; `0794` PENDING passes both). A production run's digests could not
+   over 12 ticks and over a full depot-day (G510; `0794` passes both, and is in production since 2026-11-05 3:09 PM CT, Chase's approval). A production run's digests could not
    be compared: no pair has run on this engine. Report: `lab/engine/reports/e1_acceptance_2026-11-04.md`.*
 2. **E2 replay harness.**
    - Re-price the depot-level hindsight under a grid of prices, for the 323 graded decisions whose hindsight stores all

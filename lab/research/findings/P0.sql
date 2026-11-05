@@ -96,15 +96,16 @@ VALUES
      "minted_ids_48_ticks": 154, "dial": "stall_cabin_robot", "dial_value": 2, "dial_set_at": "2026-10-23 14:19:53+00",
      "last_production_pair": "2026-10-14 15:09:32+00", "finding": "G510"}',
    'otto-q-core db/checks/0477', '{}', '2026-11-04 23:33:00+00'),
-  ('p0-end-state-fix', 'P0', 'E1', 'recommendation', 'recommended',
-   'Recommended: leave the made-up ID out of the repeatability check (0794)',
+  ('p0-end-state-fix', 'P0', 'E1', 'recommendation', 'shipped',
+   'Shipped: the repeatability check leaves the made-up ID out (0794)',
    'A small change to the check''s end-of-day snapshot sets the made-up ID aside, as the check already does for every '
-   'other ID the engine makes up. Tried in the lab only: the check then passes on all 14 of its parts, over a six-hour '
-   'and a 24-hour day. It changes what the check measures, not what the depot does, and it waits for a person to ship '
-   'it.',
-   '{"migration": "0794", "migration_status": "PENDING", "pair_12_ticks": "passed 14 of 14",
-     "pair_48_ticks": "passed 14 of 14", "forces_recert": true, "finding": "G510"}',
-   'otto-q-core db/migrations/0794', '{}', '2026-11-04 23:33:00+00')
+   'other ID the engine makes up. Tried in the lab first: the check then passes on all 14 of its parts, over a six-hour '
+   'and a 24-hour day. Chase approved it and it went into production on 2026-11-05 at 3:09 PM CT. It changes what the '
+   'check measures, not what the depot does; the lab now runs the identical engine.',
+   '{"migration": "0794", "migration_status": "applied", "ledger_version": "20261105210912",
+     "applied_at": "2026-11-05 21:09:12+00", "pair_12_ticks": "passed 14 of 14", "pair_48_ticks": "passed 14 of 14",
+     "forces_recert": true, "engine_hash_prod_and_lab": "7af6fcca", "finding": "G510"}',
+   'otto-q-core db/migrations/0794', '{}', '2026-11-05 21:09:18+00')
 ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,

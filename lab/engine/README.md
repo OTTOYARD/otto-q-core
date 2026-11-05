@@ -100,6 +100,6 @@ A fork is a `SAVEPOINT` in an arm's transaction (`lib/lab_run.py`): run to tick 
 branch, digest it, `ROLLBACK TO SAVEPOINT`, run the next. Two things do not roll back: sequences (ids minted
 in a later branch are higher) and `gen_random_uuid()`. Thirteen atoms are blind to both; the end state is not,
 because it hashes the `robot_leg_id` 0764 mints into each cleaned visit's atoms (G510; `0794` is the fix,
-PENDING). Each branch sets `ottoq.sim_run_id` itself (the GUC hazard of `0329`/`0421`). A replica is
+in production and in this lab since 2026-11-05). Each branch sets `ottoq.sim_run_id` itself (the GUC hazard of `0329`/`0421`). A replica is
 `CREATE DATABASE … TEMPLATE ottoq_lab`, for running arms in parallel or forks longer than one transaction
 should hold.
