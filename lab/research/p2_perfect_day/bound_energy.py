@@ -50,6 +50,9 @@ def main() -> None:
     ap.add_argument("--db", required=True)
     ap.add_argument("--run")
     ap.add_argument("--out", default=os.path.join(HERE, "bound_energy.jsonl"))
+    ap.add_argument("--forecast-db", action="append", default=[],
+                    help="another finished lab day whose load before the battery, step by step, is the forecast of this "
+                         "day's (several: their mean): a plan made from a typical day's shape")
     a = ap.parse_args()
     conn = psycopg.connect(host=HOST, port=PORT, user="postgres", dbname=a.db)
     run = a.run or conn.execute("SELECT sim_run_id::text FROM ottoq_sim_runs WHERE run_by = 'ab_harness' "
@@ -122,12 +125,15 @@ def main() -> None:
     # ── how much of the prize a forecast of the next H hours would capture: a rolling plan that re-solves every step
     #    seeing the true load H hours ahead and holding the current load flat beyond it (persistence, as the real plan's
     #    floor does), applying only its first step. H = the whole day reproduces the bound (a check on the method).
-    def rolling(h_hours: float | None) -> dict:
+    def rolling(h_hours: float | None, shape: list[float] | None = None) -> dict:
+        """A rolling plan: the true load for h hours ahead; beyond it, the shape if one is given (another day's load,
+        step by step), else the load now held flat."""
         hs = n if h_hours is None else max(1, int(round(h_hours * win * 2)))     # win steps = 30 min
         e_t = min(max(e0, lo_e), hi_e)
         grid_hist, dis_kwh = [], 0.0
         for t in range(n):
-            fc = [pre[i] if i < t + hs else pre[t] for i in range(t, n)]
+            fc = [pre[i] if i < t + hs else (shape[i] if shape is not None and i < len(shape) else pre[t])
+                  for i in range(t, n)]
             m = len(fc)
             r = pywraplp.Solver.CreateSolver("GLOP")
             cc = [r.NumVar(0, pc, "") for _ in range(m)]
@@ -169,6 +175,23 @@ def main() -> None:
     ladder = {}
     for label, h in (("persistence_only", 0.0), ("next_1h", 1.0), ("next_2h", 2.0), ("next_4h", 4.0), ("whole_day", None)):
         ladder[label] = rolling(h if h else 1.0 / (2 * win)) if h is not None else rolling(None)
+    # a typical day's shape as the forecast: another lab day's load before the battery, step by step
+    if a.forecast_db:
+        shapes = []
+        for fdb in a.forecast_db:
+            fc = psycopg.connect(host=HOST, port=PORT, user="postgres", dbname=fdb)
+            frun = fc.execute("SELECT sim_run_id::text FROM ottoq_sim_runs WHERE run_by = 'ab_harness' "
+                              "ORDER BY started_at DESC LIMIT 1").fetchone()[0]
+            fr = fc.execute(SNAP_SQL, {"run": frun, "depot": TWIN}).fetchall()
+            fc.close()
+            shapes.append([float(r[1]) + float(r[2]) + float(r[3]) - float(r[4]) for r in fr])
+        m_ = min(len(x) for x in shapes)
+        shape = [sum(x[i] for x in shapes) / len(shapes) for i in range(m_)]
+        err = [abs(shape[i] - pre[i]) for i in range(min(m_, n))]
+        ladder["typical_day_shape"] = rolling(1.0 / (2 * win), shape)
+        ladder["typical_day_shape"]["forecast_mae_kw"] = round(sum(err) / len(err), 1)
+        ladder["typical_day_shape"]["forecast_from"] = a.forecast_db
+        ladder["next_1h_then_shape"] = rolling(1.0, shape)
     out = {"db": a.db, "run": run, "steps": n, "step_h": round(sum(dts) / n, 4), "status": int(st),
            "battery": {"capacity_kwh": cap, "max_kw": pd, "rte": rte, "soc_start_kwh": round(e0, 1),
                        "soc_end_kwh": round(e_end, 1)},

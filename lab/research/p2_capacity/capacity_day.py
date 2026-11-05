@@ -92,11 +92,17 @@ def main() -> None:
     ap.add_argument("--step", type=float, default=5.0, help="sim minutes per tick")
     ap.add_argument("--sim-start", default="2026-09-01 11:00:00+00")
     ap.add_argument("--sample-every", type=int, default=6, help="ticks between constraint-board samples")
+    ap.add_argument("--dial", action="append", default=[],
+                    help="key=value, a run-scoped dial for this day (a lab arm's own variation, e.g. energy_reserve_shave=0)")
+    ap.add_argument("--tag", default="", help="appended to the replica's name, to keep variations apart")
+    ap.add_argument("--add-stall", action="append", default=[],
+                    help="type=n: n more stalls of that type (a copy of the depot's last one of it), for this lab day "
+                         "only, e.g. service_bay=1")
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--out", default=os.path.join(HERE, "results.jsonl"))
     a = ap.parse_args()
 
-    db = f"ottoq_cap_{a.scenario}_{a.fleet}_{a.seed}"
+    db = f"ottoq_cap_{a.scenario}_{a.fleet}_{a.seed}" + (f"_{a.tag}" if a.tag else "")
     admin = psycopg.connect(host=HOST, port=PORT, user="postgres", dbname="postgres", autocommit=True)
     if admin.execute("SELECT count(*) FROM pg_database WHERE datname = %s", (db,)).fetchone()[0]:
         admin.execute(f"DROP DATABASE {db}")
@@ -109,6 +115,22 @@ def main() -> None:
 
     conn.execute(open(os.path.join(HERE, "grow_fleet.sql")).read())
     grown = one("SELECT lab.grow_fleet(%s, %s)", (TWIN, a.fleet))
+    added = {}
+    for kv in a.add_stall:   # a what-if site: more of one kind of stall, copied from the depot's own
+        kind, _, nstr = kv.partition("=")
+        for i in range(int(nstr)):
+            conn.execute("""INSERT INTO stalls
+                            SELECT (jsonb_populate_record(NULL::stalls, to_jsonb(s)
+                                    || jsonb_build_object('id', md5('lab-stall:' || s.id || ':' || %(i)s)::uuid,
+                                                          'stall_code', s.stall_code || '-LAB' || (%(i)s + 1),
+                                                          'display_name', COALESCE(s.display_name, s.stall_code) || ' (lab)',
+                                                          'relative_x', COALESCE(s.relative_x, 0) + 12 * (%(i)s + 1),
+                                                          'current_vehicle_id', NULL, 'reserved_by', NULL,
+                                                          'reserved_at', NULL, 'reservation_expires_at', NULL,
+                                                          'status', 'available'))).*
+                              FROM stalls s WHERE s.depot_id = %(d)s AND s.stall_type::text = %(k)s
+                             ORDER BY s.stall_code DESC LIMIT 1""", {"i": i, "d": TWIN, "k": kind})
+        added[kind] = int(nstr)
     one("SELECT set_config('ottoq.sim_run_id', 'none', true)")
     conn.execute("SELECT public.ottoq_tick_invariance_reset_fleet(%s, %s, %s)", (TWIN, a.seed, a.sim_start))
     one("SELECT set_config('ottoq.sim_run_id', '', true)")
@@ -124,6 +146,14 @@ def main() -> None:
                            ('run', %(r)s, 'proposer_seat', 0, 'lab_capacity')
                     ON CONFLICT (scope_type, scope_id, param_key) DO UPDATE
                       SET param_value = EXCLUDED.param_value, updated_by = EXCLUDED.updated_by""", {"r": run})
+    dials = {}
+    for kv in a.dial:
+        k, _, v = kv.partition("=")
+        dials[k] = float(v)
+        conn.execute("""INSERT INTO ottoq_policy_params (scope_type, scope_id, param_key, param_value, updated_by)
+                        VALUES ('run', %s, %s, %s, 'lab_capacity_variation')
+                        ON CONFLICT (scope_type, scope_id, param_key) DO UPDATE
+                          SET param_value = EXCLUDED.param_value, updated_by = EXCLUDED.updated_by""", (run, k, float(v)))
     t0 = time.time()
     walls, err, ticks = [], None, 0
     for k in range(a.ticks):
@@ -166,6 +196,7 @@ def main() -> None:
     conn.commit()
     conn.close()
     out = {"db": db, "run": run, "scenario": a.scenario, "seed": a.seed, "fleet": a.fleet, "grown": grown,
+           "dials": dials, "tag": a.tag, "added_stalls": added,
            "ticks": ticks, "step_min": a.step, "sim_start": a.sim_start, "wall_s": wall_s, "clone_s": round(clone_s, 1),
            "error": err, "scorecard": score, "owners": owners, "resources": resources, "walls": walls}
     with open(a.out, "a") as f:

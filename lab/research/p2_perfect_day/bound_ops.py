@@ -55,6 +55,12 @@ SELECT o.visit_id::text, o.vehicle_id::text, fo.name AS owner,
        extract(epoch FROM (o.due_at - r.sim_clock_start)) / 60.0 AS due,
        extract(epoch FROM (o.departed_at - r.sim_clock_start)) / 60.0 AS dep,
        o.in_depot_at_horizon, o.on_time,
+       -- when the car was READY: its last done atom (the readiness check is the last by construction); a car that
+       -- finished its work may wait for the work side to send it, which no scheduling of the depot can shorten
+       extract(epoch FROM ((SELECT max(COALESCE((e ->> 'done_at')::timestamptz, (e ->> 'closed_at')::timestamptz,
+                                                  (e ->> 'ends_at')::timestamptz))
+                              FROM ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) e
+                             WHERE vn.visit_id = o.visit_id AND e ->> 'status' = 'done') - r.sim_clock_start)) / 60.0 AS ready,
        COALESCE((SELECT s.max_queue_wait_minutes FROM ottoq_fleet_operator_slas s
                   WHERE s.fleet_operator_id = v.fleet_operator_id AND s.status = 'active'
                   ORDER BY s.version DESC LIMIT 1), 30) AS contract_wait
@@ -189,6 +195,8 @@ def realized(day: dict) -> dict:
     for v in day["visits"]:
         arr = float(v["arr"])
         dep = float(v["dep"]) if v["dep"] is not None else H
+        # ready: the last done atom of a car that left (never after it left); a car still in at the horizon, the horizon
+        ready = min(float(v["ready"]) if v["ready"] is not None else dep, dep) if v["dep"] is not None else H
         posts = [j for j in day["jobs"].get(v["visit_id"], []) if j["lane"] == "post"]
         first_plug = min((j["start"] for j in posts if j["start"] is not None), default=None)
         # a car that owed a charge and never plugged in waited to the horizon: its wait is counted to there
@@ -196,6 +204,9 @@ def realized(day: dict) -> dict:
         for k in ("all", v["owner"]):
             out[k]["visits"] += 1
             out[k]["door_min"] += max(min(dep, H) - arr, 0)
+            out[k]["door_ready_min"] += max(min(ready, H) - arr, 0)
+            if v["due"] is not None:
+                out[k]["ready_by_due"] += 1 if (v["dep"] is not None and ready <= float(v["due"])) else 0
             out[k]["past_contract_min"] += max(min(plug, H) - arr - float(v["contract_wait"]), 0) if plug is not None else 0
             if v["due"] is not None:
                 out[k]["with_due"] += 1
@@ -258,7 +269,7 @@ def solve(day: dict, objective: str, seconds: float, owner: str | None = None, f
             m.Add(past >= first_c - arr - int(v["contract_wait"]))
         else:
             m.Add(past == 0)
-        visit_vars.append((v, door, on_time, past))
+        visit_vars.append((v, door, on_time, past, out_at))
     for lane, ivs in lanes.items():
         cap = int(day["units"].get(lane, 0))
         if cap <= 0:
@@ -273,11 +284,11 @@ def solve(day: dict, objective: str, seconds: float, owner: str | None = None, f
         m.AddCumulative(ivs, demands, cap)
     sel = [x for x in visit_vars if owner is None or x[0]["owner"] == owner]
     if objective == "door":
-        m.Minimize(sum(d for _, d, _, _ in sel))
+        m.Minimize(sum(x[1] for x in sel))
     elif objective == "on_time":
-        m.Maximize(sum(o for _, _, o, _ in sel if o is not None))
+        m.Maximize(sum(x[2] for x in sel if x[2] is not None))
     elif objective == "wait":
-        m.Minimize(sum(p for _, _, _, p in sel))
+        m.Minimize(sum(x[3] for x in sel))
     else:
         raise ValueError(objective)
     s = cp_model.CpSolver()
@@ -292,10 +303,12 @@ def solve(day: dict, objective: str, seconds: float, owner: str | None = None, f
         res["best"] = s.ObjectiveValue()
         res["bound"] = s.BestObjectiveBound()
         per = defaultdict(lambda: defaultdict(float))
-        for v, door, ot, past in visit_vars:
+        for v, door, ot, past, out_at in visit_vars:
             for k in ("all", v["owner"]):
                 per[k]["door_min"] += s.Value(door)
                 per[k]["past_contract_min"] += s.Value(past)
+                if v["due"] is not None:
+                    per[k]["ready_by_due"] += 1 if s.Value(out_at) <= math.floor(float(v["due"])) else 0
                 if ot is not None:
                     per[k]["on_time"] += s.Value(ot)
         res["schedule"] = {k: dict(x) for k, x in per.items()}
@@ -331,8 +344,9 @@ def main() -> None:
     for sv in out["solves"]:
         tag = sv["objective"] + (f"[{sv['owner']}]" if sv["owner"] else "") + (f"[fix {sv['fix']}]" if sv["fix"] else "")
         print(f"{tag:28s} {sv['status']:9s} best {sv.get('best')}  bound {sv.get('bound')}  ({sv['seconds']} s)")
-    print(f"realized: door {r.get('door_min'):.0f} min over {r.get('visits'):.0f} visits; on time "
-          f"{r.get('on_time', 0):.0f}/{r.get('with_due', 0):.0f}; past contract {r.get('past_contract_min', 0):.0f} min")
+    print(f"realized: door {r.get('door_min'):.0f} min (to ready {r.get('door_ready_min'):.0f}) over "
+          f"{r.get('visits'):.0f} visits; on time {r.get('on_time', 0):.0f}/{r.get('with_due', 0):.0f} "
+          f"(ready by due {r.get('ready_by_due', 0):.0f}); past contract {r.get('past_contract_min', 0):.0f} min")
 
 
 if __name__ == "__main__":
