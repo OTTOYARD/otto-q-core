@@ -144,6 +144,8 @@ request, a technician's note. None of the twin's event types is unstructured tod
 
 - **Turning the wake gate on** (`agent_wake_enabled`) for demos and production. On `57188f55` it cut consults from every
   pass to 21 of 288 and model tokens by 71%. The orders it skips are ones whose value the check cannot establish (0708).
+  **Decided 2026-11-05 for the twin depot: on, under Chase's name, with 0795 (see the section below).** A production
+  depot needs the same switch when it is configured.
 - **The NVIDIA endpoint.** The primary model failed a third of its attempts on `176b2912`. A dedicated deployment, or a
   batch-invariant self-hosted one, is a cost decision.
 - **The security items.** Rotating the signing secret and closing open sign-up are Chase's calls. Three reviewed changes
@@ -156,3 +158,42 @@ request, a technician's note. None of the twin's event types is unstructured tod
 - **Rule 9: cars leave with maintenance or calibration due (G430).** 0715 is written and tested but not applied. On busy_day
   the intervals are compressed about a hundredfold, so applying it makes the two service bays the depot's wall. The
   decision is whether to apply it with realistic intervals or with the compression kept.
+
+## 2026-11-05: the agent leaves the charge line, and where it earns its place
+
+*Written 2026-11-05 (CT), after Chase's decision that day: "let's make sure that AI + Agentic assistance is still a huge tool
+for us in the OTTO-Q tech stack. Even if it isn't in every loop, maybe it is in the background or knows when to be called for
+exceptions or input." Frontier plan D5 and E8.*
+
+**The per-tick charge order is retired to a background challenger.** Three measurements, each on the 370 graded decisions
+at the twin depot (25 runs, 18 keys), all re-graded byte for byte in the research lab:
+
+| | what it found | evidence |
+|---|---|---|
+| G511 | of the 32 orders the check took before the owner guard, 27 made some owner's cars worse off in hindsight | `db/checks/0478` |
+| G512 | a referee that lets no owner lose takes none of them; only 35 of 370 were good for every owner, and no decision showed it in more than 8 of 12 futures | `db/checks/0479` |
+| G515 | re-ranked only within each owner's own places in the line, they still traded one owner for another 188 times in 370 (25 good for every owner): the posts are shared, so which car takes a seat moves every car after it | `lab/research/p1_owner_projection/` |
+
+`0795` keeps the order as a challenger: checked, kept and graded exactly as before, never standing (`shadow`). With the wake
+gate on, the agent is consulted on exceptions (a charger fault or repair, contention onset or relief, an emergency, a car newly
+past its contract wait, a demand-response call, a scout's finding) and on a 30-sim-minute heartbeat; 0795 stops waking it for
+the two routine moments an order could change the line. Replayed on the twin depot's 1,691 passes since 2026-10-20: about 143
+consults, about 20 in a 9-hour busy day (`db/checks/0480`). Every pass still hands CP-SAT its work on the standing objective,
+which on `57188f55` above is when CP-SAT's proposals started to be enacted.
+
+**Where the agent earns its place, ranked by what the lab has measured:**
+
+1. **The battery's forward plan.** On the lab's first full day (normal_day, 116 cars, 12 hours): with no battery the bill is
+   $1,463; the battery's day plan (0435) brings it to $1,147; with perfect foresight of the day's load it would be $849
+   (`lab/research/p2_perfect_day/bound_energy.py`). Plans that see the next 1-4 hours perfectly and assume the load holds
+   after that do worse than the day plan ($1,300-$1,387): the prize is in knowing the day's shape. So the build is a forecast
+   of the depot's own charging load across the day, from what the engine already learns (the dispatch curve, the return
+   model, the charge clock, the line), in place of the plan's persistence floor (0435 §4.1 names it as the next step), measured
+   against the bound in the lab. The language model's part is around the plan: an energy brief for the operators, and the
+   exception desk when a demand-response call or a battery fault arrives (both already wake it).
+2. **Exceptions** (E8.1): it is now woken for them; the next build has it draft a plan into `ottoq_external_proposals` for the
+   kernel to dispose of.
+3. **Explanations** (E8.2): every verdict and promise in plain words, through OTTO-Command (rule 11).
+4. **Contracts to terms** (E8.3): an owner's SLA and price terms drafted from contract text, for a person to confirm.
+5. **Rule invention in the lab** (E6): the model proposes kernel priority rules, the lab proves them owner by owner against
+   E5's bound before a person ships one. It needs the D3 budget for model calls.

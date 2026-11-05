@@ -50,7 +50,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GATE_MIN = 3
 
 VISITS_SQL = """
-SELECT o.visit_id::text, o.vehicle_id::text, fo.name AS owner,
+SELECT o.visit_id::text, o.vehicle_id::text, fo.name AS owner, o.archetype,
        extract(epoch FROM (o.arrived_at - r.sim_clock_start)) / 60.0 AS arr,
        extract(epoch FROM (o.due_at - r.sim_clock_start)) / 60.0 AS due,
        extract(epoch FROM (o.departed_at - r.sim_clock_start)) / 60.0 AS dep,
@@ -215,7 +215,8 @@ def realized(day: dict) -> dict:
     return {k: dict(x) for k, x in out.items()}
 
 
-def solve(day: dict, objective: str, seconds: float, owner: str | None = None, fix: str | None = None) -> dict:
+def solve(day: dict, objective: str, seconds: float, owner: str | None = None, fix: str | None = None,
+          caps: dict | None = None, engine_order: bool = False) -> dict:
     """One clairvoyant solve. fix = 'post' or 'bay' holds that lane's jobs at their realized start (the regret split)."""
     Hd = int(math.ceil(day["horizon"]))      # the day's own end: both sides count minutes only up to it
     H = Hd + 24 * 60                          # the schedule may run past it, as the real day's cars did
@@ -242,6 +243,18 @@ def solve(day: dict, objective: str, seconds: float, owner: str | None = None, f
                 plug_starts.append(s)
         if len(ivs) > 1:
             m.AddNoOverlap(ivs)
+        if engine_order and len(ivs) > 1:
+            # the engine's own order of a car's work: a car with an open fault is repaired before it charges (0557);
+            # any other car charges before its bays (0780: a car that owes a charge is not ready for a bay)
+            posts = [(iv, e) for (iv, e, j) in zip(ivs, ends, jobs) if j["lane"] == "post"]
+            bays = [(iv, e, j) for (iv, e, j) in zip(ivs, ends, jobs) if j["lane"] != "post"]
+            fault = v.get("archetype") == "E_tech_hold_fault"
+            for piv, pe in posts:
+                for biv, be, bj in bays:
+                    if fault and bj["lane"] == "service_bay":
+                        m.Add(be <= piv.StartExpr())
+                    else:
+                        m.Add(pe <= biv.StartExpr())
         dep = m.NewIntVar(arr, H, "dep")
         if ends:
             m.AddMaxEquality(dep, [e for e in ends])
@@ -283,6 +296,9 @@ def solve(day: dict, objective: str, seconds: float, owner: str | None = None, f
                     demands = demands + [1]
         m.AddCumulative(ivs, demands, cap)
     sel = [x for x in visit_vars if owner is None or x[0]["owner"] == owner]
+    if caps:   # rule 14's form of the perfect day: no owner's cars spend more minutes to ready than the kernel's day gave them
+        for o, cap in caps.items():
+            m.Add(sum(x[1] for x in visit_vars if x[0]["owner"] == o) <= int(math.floor(cap)))
     if objective == "door":
         m.Minimize(sum(x[1] for x in sel))
     elif objective == "on_time":
@@ -322,22 +338,30 @@ def main() -> None:
     ap.add_argument("--seconds", type=float, default=60)
     ap.add_argument("--split", action="store_true", help="also solve with each lane held at the kernel's starts")
     ap.add_argument("--owners", action="store_true", help="also each owner's own best (door), the others free")
+    ap.add_argument("--engine-order", action="store_true",
+                    help="hold each car's work in the engine's own order (repair first on a fault, else charge before bays)")
     ap.add_argument("--out", default=os.path.join(HERE, "bound_ops.jsonl"))
     a = ap.parse_args()
     day = load(a.db, a.run)
     real = realized(day)
     out = {"db": day["db"], "run": day["run"], "scenario": day["scenario"], "seed": day["seed"], "lab": day["lab"],
+           "engine_order": a.engine_order,
            "horizon_min": day["horizon"], "units": day["units"], "faults": len(day["faults"]),
            "visits": len(day["visits"]), "jobs": sum(len(j) for j in day["jobs"].values()),
            "realized": real, "solves": []}
     for obj in ("door", "on_time", "wait"):
-        out["solves"].append(solve(day, obj, a.seconds))
+        out["solves"].append(solve(day, obj, a.seconds, engine_order=a.engine_order))
     if a.split:
         for fix in ("bay", "post"):
-            out["solves"].append(solve(day, "door", a.seconds, fix=fix))
+            out["solves"].append(solve(day, "door", a.seconds, fix=fix, engine_order=a.engine_order))
     if a.owners:
         for owner in sorted({v["owner"] for v in day["visits"]}):
-            out["solves"].append(solve(day, "door", a.seconds, owner=owner))
+            out["solves"].append(solve(day, "door", a.seconds, owner=owner, engine_order=a.engine_order))
+        # the fair perfect day: the least total, no owner above what the kernel's day gave it (minutes to ready)
+        caps = {o: x["door_ready_min"] for o, x in real.items() if o != "all"}
+        fair = solve(day, "door", a.seconds, caps=caps, engine_order=a.engine_order)
+        fair["objective"] = "door_no_owner_worse"
+        out["solves"].append(fair)
     with open(a.out, "a") as f:
         f.write(json.dumps(out, default=str) + "\n")
     r = real.get("all", {})
