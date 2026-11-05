@@ -109,6 +109,8 @@ BAY_LANE = {"detail": "wash_bay", "wash": "wash_bay", "wash_bay": "wash_bay", "s
             "service_bay": "service_bay"}
 
 
+NUM_WORKERS = 4   # CP-SAT workers; --workers sets it
+
 def jobs_of(atoms: list, sessions: list, bookings: list) -> list:
     """One visit's place-holding jobs: realized where done (sessions, bookings), else the atom's estimate."""
     out = []
@@ -309,7 +311,7 @@ def solve(day: dict, objective: str, seconds: float, owner: str | None = None, f
         raise ValueError(objective)
     s = cp_model.CpSolver()
     s.parameters.max_time_in_seconds = seconds
-    s.parameters.num_workers = 4
+    s.parameters.num_workers = NUM_WORKERS
     s.parameters.random_seed = 0
     t0 = time.time()
     st = s.Solve(m)
@@ -336,12 +338,16 @@ def main() -> None:
     ap.add_argument("--db", required=True)
     ap.add_argument("--run")
     ap.add_argument("--seconds", type=float, default=60)
+    ap.add_argument("--workers", type=int, default=4,
+                    help="CP-SAT workers (fewer beside running lab days; the bound stays a bound, only weaker in the time)")
     ap.add_argument("--split", action="store_true", help="also solve with each lane held at the kernel's starts")
     ap.add_argument("--owners", action="store_true", help="also each owner's own best (door), the others free")
     ap.add_argument("--engine-order", action="store_true",
                     help="hold each car's work in the engine's own order (repair first on a fault, else charge before bays)")
     ap.add_argument("--out", default=os.path.join(HERE, "bound_ops.jsonl"))
     a = ap.parse_args()
+    global NUM_WORKERS
+    NUM_WORKERS = a.workers
     day = load(a.db, a.run)
     real = realized(day)
     out = {"db": day["db"], "run": day["run"], "scenario": day["scenario"], "seed": day["seed"], "lab": day["lab"],
