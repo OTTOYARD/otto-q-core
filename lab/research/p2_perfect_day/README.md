@@ -25,4 +25,36 @@ replicas keep every row of the run.
 
 ## What it found
 
-(results follow)
+### The first lab day (solved 2026-11-05 22:05-22:21 UTC = 4:05-4:21 PM CT)
+
+normal_day at the twin depot as built today, 116 cars, seed 171717, 12 hours from 6 AM CT at 5-minute ticks, production's
+engine (`ottoq_cap_normal_day_116_171717`, run `d6955d8e`); 292 visits. CP-SAT 120 s per solve, 4 workers, on a loaded
+machine (so "best found" can still improve; the bound cannot be beaten).
+
+| minutes from arrival to ready, all cars | real day | best found | proven bound |
+|---|---:|---:|---:|
+| any job order (relaxation) | 24,332 | 16,687 | 15,079 |
+| the engine's own job order (a fault repaired first, else charge before bays) | 24,332 | 17,154 | 15,307 |
+| the engine's order, and **no owner worse than the real day** | 24,332 | 17,057 | 15,354 |
+
+| owner, minutes to ready | real day | the fair perfect day (no owner worse) | that owner's own best (others free) |
+|---|---:|---:|---:|
+| Tesla Robotaxi TN | 6,710 | 4,463 (-33%) | 4,053 |
+| Waymo Nashville | 11,890 | 8,941 (-25%) | 7,946 |
+| Zoox Southeast | 5,732 | 3,653 (-36%) | 3,063 |
+
+- **The gap is not a trade between owners.** Holding every owner to no worse than the real day costs the perfect day
+  almost nothing (17,057 against 17,154 found unconstrained): every owner can be a quarter to a third better at once. The
+  agent's per-tick reorders, judged in hindsight, mostly traded owners (G511, G512, G515); a whole-day schedule made with
+  foresight does not have to.
+- **Contract waits:** minutes past the 30-minute queue wait, 3,365 on the real day, 1,116 on the fair perfect day, 839 at
+  best on that measure alone (engine order; bound 231).
+- **Due times:** at most 48 of the 93 cars with a due time can be ready by it (38 were). The other 45 were due sooner than
+  their own work takes, which no schedule fixes: that is the work side's demand, read against the depot's real durations.
+- **Where the gap sits** (any order): holding the bays where the kernel put them and rescheduling only the charging posts
+  reaches 18,614; holding the posts and rescheduling only the bays reaches 20,796. The charge line carries the larger share.
+- A car that finished its work waited a total of 1,318 minutes for the work side to send it (24,332 to ready against
+  25,650 to dispatch): small, and not the depot's to schedule.
+
+The battery on the same day: no battery $1,463, the day plan $1,147, perfect foresight $849 (`bound_energy.jsonl`); plans
+that see 1-4 hours ahead perfectly and hold the load flat beyond do worse than the day plan ($1,300-$1,387).

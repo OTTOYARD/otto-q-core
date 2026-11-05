@@ -8,21 +8,27 @@ INSERT INTO public.ottoq_research_findings
   (slug, phase, item, kind, status, title, summary, metrics, evidence, run_ids, measured_at)
 VALUES
   ('p2-perfect-day-first', 'P2', 'E5', 'measurement', 'measured',
-   'The best possible day, measured: the depot''s cars spent about half again as long as they needed to',
+   'The best possible day, measured: every owner''s cars could have spent a quarter to a third less time in the depot',
    'On the lab''s first full day at the twin depot (a normal day, today''s 116 cars, 12 hours from 6 AM), a solver with '
    'perfect hindsight scheduled the same cars, arriving when they did, owing the same work, on the same chargers and '
-   'bays. The real day used 24,332 car-minutes from arrival to ready; the best day found needs 16,687, and no schedule '
-   'can go below 15,079. Minutes past the 30-minute contract wait fell from 3,365 to 660. At most 48 of the 93 cars with '
-   'a due time could have been ready by it (38 were): the rest were due sooner than their work allows. Rescheduling the '
-   'chargers alone recovers about three quarters of the gap, the bays alone under half. The solver may do a car''s jobs '
-   'in any order, so this is an optimistic bound; a stricter one keeps the engine''s order.',
+   'bays, in the engine''s own job order. The real day used 24,332 car-minutes from arrival to ready; the best day found '
+   'needs about 17,100, and no schedule can go below 15,307. That gain does not have to come from one owner at another''s '
+   'expense: holding every owner to no worse than the real day, the best day found still gives Tesla 33%, Waymo 25% and '
+   'Zoox 36% less time in the depot, cuts minutes past the 30-minute contract wait from 3,365 to 1,116, and gets 48 of the '
+   '93 cars with a due time ready by it (38 were; the rest were due sooner than their own work takes). Rescheduling the '
+   'chargers carries the larger share of the gap.',
    '{"scenario": "normal_day", "fleet": 116, "seed": 171717, "visits": 292, "hours": 12,
-     "minutes_to_ready": {"real": 24332, "best_found": 16687, "bound": 15079},
-     "past_contract_wait_min": {"real": 3365, "best_found": 660, "bound": 72},
+     "minutes_to_ready": {"real": 24332, "any_order": {"best_found": 16687, "bound": 15079},
+                          "engine_order": {"best_found": 17154, "bound": 15307},
+                          "engine_order_no_owner_worse": {"best_found": 17057, "bound": 15354}},
+     "by_owner_minutes_to_ready": {"Tesla Robotaxi TN": {"real": 6710, "fair_best": 4463},
+                                   "Waymo Nashville": {"real": 11890, "fair_best": 8941},
+                                   "Zoox Southeast": {"real": 5732, "fair_best": 3653}},
+     "past_contract_wait_min": {"real": 3365, "fair_best": 1116, "best_on_its_own": 839, "bound": 231},
      "due_cars_on_time": {"real": 38, "best": 48, "of": 93},
      "regret_split": {"posts_free_bays_held": 18614, "bays_free_posts_held": 20796},
      "solver": "CP-SAT, OR-Tools 9.15.6755, 120 s per solve"}',
-   'otto-q-core lab/research/p2_perfect_day/', '{}', '2026-11-05 22:12:00+00')
+   'otto-q-core lab/research/p2_perfect_day/', '{}', '2026-11-05 22:21:00+00')
 ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
