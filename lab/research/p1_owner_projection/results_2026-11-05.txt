@@ -1,0 +1,62 @@
+== (1) the projection: how many places it moved, per order
+ orders | line_cars | agent_ranked | projection_is_kernels_own | places_moved 
+--------+-----------+--------------+---------------------------+--------------
+    370 |      29.5 |          9.2 |                        22 |         11.5
+
+== (2) per decision, in hindsight (s = -1): the projected order owner by owner against the kernel's own
+    projected_in_hindsight    | count 
+------------------------------+-------
+ trades_one_owner_for_another |   188
+ no_owner_changes             |   111
+ bad_for_every_owner          |    46
+ good_for_every_owner         |    25
+
+== (3) the same decisions, the agent's order as given (0478's hindsight classes)
+    as_given_in_hindsight     | count 
+------------------------------+-------
+ trades_one_owner_for_another |   250
+ bad_for_every_owner          |    45
+ no_owner_changes             |    40
+ good_for_every_owner         |    35
+
+== (4) side by side, per decision: as given -> projected (hindsight)
+ as_given | projected | count 
+----------+-----------+-------
+ bad      | bad       |    18
+ bad      | good      |     2
+ bad      | none      |     8
+ bad      | trades    |    17
+ good     | bad       |     2
+ good     | good      |    12
+ good     | none      |     7
+ good     | trades    |    14
+ none     | none      |    36
+ none     | trades    |     4
+ trades   | bad       |    26
+ trades   | good      |    11
+ trades   | none      |    60
+ trades   | trades    |   153
+
+== (5) the futures the check would roll (s = 0..11): futures in which the projected order is good for every owner
+ decisions | good_in_10_of_12 | no_owner_worse_in_any_future | most_good_futures | mean_good_futures | mean_futures_some_owner_worse 
+-----------+------------------+------------------------------+-------------------+-------------------+-------------------------------
+       370 |                0 |                           84 |                 7 |              1.03 |                          7.50
+
+== (6) a fair referee on projected orders: take when no owner is worse in the expected future and in 10 of 12, some better in the expected one; judged in hindsight
+ bar | takes | good_for_every_owner | some_owner_worse | no_change 
+-----+-------+----------------------+------------------+-----------
+   6 |     4 |                    1 |                2 |         1
+   8 |     0 |                    0 |                0 |         0
+  10 |     0 |                    0 |                0 |         0
+  12 |     0 |                    0 |                0 |         0
+
+== (7) owner by owner in hindsight: better / worse / no different for that owner's cars
+       owner       | better | worse | no_different 
+-------------------+--------+-------+--------------
+ Tesla Robotaxi TN |    109 |   143 |          118
+ Waymo Nashville   |    133 |   123 |          114
+ Zoox Southeast    |    111 |   144 |          115
+
+f | f | 259
+f | t | 89
+t | t | 22

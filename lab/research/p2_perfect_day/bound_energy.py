@@ -9,7 +9,9 @@ highest 30-minute average spread over 30 days, $0.02 per kWh of wear), within th
 floor and ceiling, round-trip efficiency), ending the day no emptier than the real battery did. It is a bound: no
 battery policy, however clever, beats it on this day's load. Beside it, the bill the battery's real plan ran up and the
 bill with no battery at all. The gap between the real plan and the bound is what perfect forward planning is worth on
-this day; the gap between no battery and the real plan is what the battery earned.
+this day; the gap between no battery and the real plan is what the battery earned. And a ladder: rolling plans that
+see the true load 1, 2 or 4 hours ahead (persistence beyond), so the prize can be read as what a forecast of each
+horizon would capture.
 
 WHAT IT IS NOT. The load is held as it happened: the cars' charging is not moved (the vehicles' needs set the load,
 CLAUDE.md rule 13), so this measures the battery's planning only. Demand is read on 30-minute averages of the step
@@ -64,6 +66,7 @@ def main() -> None:
     d_rate = conn.execute("""SELECT demand_first_block_usd_kw FROM ottoq_depot_tariffs
                               WHERE depot_id = %s AND active AND %s = ANY(season_months)
                               ORDER BY effective_from DESC LIMIT 1""", (TWIN, month)).fetchone()[0]
+    d_rate = float(d_rate)
     amort = 30.0
     wear = 0.02
     conn.close()
@@ -116,6 +119,56 @@ def main() -> None:
     st = s.Solve()
     best_grid = [g[i].solution_value() for i in range(n)]
     best = bill(best_grid, sum(d[i].solution_value() * dts[i] for i in range(n)))
+    # ── how much of the prize a forecast of the next H hours would capture: a rolling plan that re-solves every step
+    #    seeing the true load H hours ahead and holding the current load flat beyond it (persistence, as the real plan's
+    #    floor does), applying only its first step. H = the whole day reproduces the bound (a check on the method).
+    def rolling(h_hours: float | None) -> dict:
+        hs = n if h_hours is None else max(1, int(round(h_hours * win * 2)))     # win steps = 30 min
+        e_t = min(max(e0, lo_e), hi_e)
+        grid_hist, dis_kwh = [], 0.0
+        for t in range(n):
+            fc = [pre[i] if i < t + hs else pre[t] for i in range(t, n)]
+            m = len(fc)
+            r = pywraplp.Solver.CreateSolver("GLOP")
+            cc = [r.NumVar(0, pc, "") for _ in range(m)]
+            dd = [r.NumVar(0, pd, "") for _ in range(m)]
+            ee = [r.NumVar(lo_e, hi_e, "") for _ in range(m + 1)]
+            gg = [r.NumVar(0, r.infinity(), "") for _ in range(m)]
+            xx = [r.NumVar(0, r.infinity(), "") for _ in range(m)]
+            pp = r.NumVar(0, r.infinity(), "")
+            r.Add(ee[0] == e_t)
+            for k in range(m):
+                r.Add(ee[k + 1] == ee[k] + (eff * cc[k] - dd[k] / eff) * dts[t + k])
+                r.Add(gg[k] == fc[k] + cc[k] - dd[k] + xx[k])
+            r.Add(ee[m] >= min(max(e_end, lo_e), hi_e))
+            for i0 in range(max(0, t - win + 1), n - win + 1):       # every 30-minute window that is not all past
+                past = sum(grid_hist[i] for i in range(i0, min(t, i0 + win)))
+                fut = [gg[i - t] for i in range(max(i0, t), i0 + win)]
+                r.Add(pp >= (past + sum(fut)) * (1.0 / win))
+            sunk = max((sum(grid_hist[i:i + win]) / win for i in range(0, t - win + 1)), default=0.0)
+            r.Add(pp >= sunk)
+            ov = r.NumVar(0, r.infinity(), "")
+            r.Add(ov >= pp - billed_before)
+            r.Minimize(sum(rate[t + k] * gg[k] * dts[t + k] for k in range(m)) + (d_rate / amort) * ov
+                       + wear * sum(dd[k] * dts[t + k] for k in range(m)))
+            if r.Solve() not in (pywraplp.Solver.OPTIMAL, pywraplp.Solver.FEASIBLE):
+                c0, d0 = 0.0, 0.0
+            else:
+                c0, d0 = cc[0].solution_value(), dd[0].solution_value()
+            # the step as it really happens: the true load, the battery's chosen power, within its energy limits
+            e_next = min(max(e_t + (eff * c0 - d0 / eff) * dts[t], lo_e), hi_e)
+            net = (e_next - e_t) / dts[t]
+            c_eff, d_eff = (net / eff, 0.0) if net >= 0 else (0.0, -net * eff)
+            grid_hist.append(max(pre[t] + c_eff - d_eff, 0.0))
+            dis_kwh += d_eff * dts[t]
+            e_t = e_next
+        b_ = bill(grid_hist, dis_kwh)
+        b_["end_soc_kwh"] = round(e_t, 1)
+        return b_
+
+    ladder = {}
+    for label, h in (("persistence_only", 0.0), ("next_1h", 1.0), ("next_2h", 2.0), ("next_4h", 4.0), ("whole_day", None)):
+        ladder[label] = rolling(h if h else 1.0 / (2 * win)) if h is not None else rolling(None)
     out = {"db": a.db, "run": run, "steps": n, "step_h": round(sum(dts) / n, 4), "status": int(st),
            "battery": {"capacity_kwh": cap, "max_kw": pd, "rte": rte, "soc_start_kwh": round(e0, 1),
                        "soc_end_kwh": round(e_end, 1)},
@@ -123,11 +176,12 @@ def main() -> None:
            "load_kwh": round(sum(max(p, 0) * dts[i] for i, p in enumerate(pre)), 1),
            "no_battery": none, "real_plan": real, "perfect_foresight": best,
            "battery_earned_usd": round(none["total_usd"] - real["total_usd"], 2),
-           "foresight_prize_usd": round(real["total_usd"] - best["total_usd"], 2)}
+           "foresight_prize_usd": round(real["total_usd"] - best["total_usd"], 2),
+           "forecast_ladder": ladder}
     with open(a.out, "a") as f:
         f.write(json.dumps(out, default=str) + "\n")
     print(json.dumps({k: out[k] for k in ("db", "load_kwh", "no_battery", "real_plan", "perfect_foresight",
-                                          "battery_earned_usd", "foresight_prize_usd")}, indent=1))
+                                          "battery_earned_usd", "foresight_prize_usd", "forecast_ladder")}, indent=1))
 
 
 if __name__ == "__main__":

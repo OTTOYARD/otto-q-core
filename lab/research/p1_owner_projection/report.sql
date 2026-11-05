@@ -8,12 +8,12 @@
 SELECT count(*) AS orders, round(avg(n_line), 1) AS line_cars, round(avg(n_ranked), 1) AS agent_ranked,
        count(*) FILTER (WHERE moved = 0) AS projection_is_kernels_own,
        round(avg(moved), 1) AS places_moved
-  FROM research.owner_projection_orders;
+  FROM research.owner_projection2_orders;
 
 \echo '== (2) per decision, in hindsight (s = -1): the projected order owner by owner against the kernel''s own'
 WITH h AS (
   SELECT order_id, count(*) FILTER (WHERE cmp > 0) AS better, count(*) FILTER (WHERE cmp < 0) AS worse
-    FROM research.owner_projection WHERE s = -1 GROUP BY 1),
+    FROM research.owner_projection2 WHERE s = -1 GROUP BY 1),
 c AS (
   SELECT h.*, CASE WHEN better > 0 AND worse = 0 THEN 'good_for_every_owner'
                    WHEN worse > 0 AND better = 0 THEN 'bad_for_every_owner'
@@ -27,7 +27,7 @@ SELECT hindsight_class AS as_given_in_hindsight, count(*) FROM research.referee_
 \echo '== (4) side by side, per decision: as given -> projected (hindsight)'
 WITH h AS (
   SELECT order_id, count(*) FILTER (WHERE cmp > 0) AS better, count(*) FILTER (WHERE cmp < 0) AS worse
-    FROM research.owner_projection WHERE s = -1 GROUP BY 1),
+    FROM research.owner_projection2 WHERE s = -1 GROUP BY 1),
 p AS (SELECT order_id, CASE WHEN better > 0 AND worse = 0 THEN 'good' WHEN worse > 0 AND better = 0 THEN 'bad'
                             WHEN better > 0 AND worse > 0 THEN 'trades' ELSE 'none' END AS projected FROM h)
 SELECT CASE v.hindsight_class WHEN 'good_for_every_owner' THEN 'good' WHEN 'bad_for_every_owner' THEN 'bad'
@@ -38,7 +38,7 @@ SELECT CASE v.hindsight_class WHEN 'good_for_every_owner' THEN 'good' WHEN 'bad_
 \echo '== (5) the futures the check would roll (s = 0..11): futures in which the projected order is good for every owner'
 WITH f AS (
   SELECT order_id, s, count(*) FILTER (WHERE cmp > 0) AS better, count(*) FILTER (WHERE cmp < 0) AS worse
-    FROM research.owner_projection WHERE s >= 0 GROUP BY 1, 2),
+    FROM research.owner_projection2 WHERE s >= 0 GROUP BY 1, 2),
 d AS (SELECT order_id, count(*) FILTER (WHERE better > 0 AND worse = 0) AS good_futures,
              count(*) FILTER (WHERE worse > 0) AS futures_some_owner_worse, count(*) AS futures FROM f GROUP BY 1)
 SELECT count(*) AS decisions,
@@ -52,7 +52,7 @@ SELECT count(*) AS decisions,
 \echo '== (6) a fair referee on projected orders: take when no owner is worse in the expected future and in 10 of 12, some better in the expected one; judged in hindsight'
 WITH f AS (
   SELECT order_id, s, count(*) FILTER (WHERE cmp > 0) AS better, count(*) FILTER (WHERE cmp < 0) AS worse
-    FROM research.owner_projection WHERE s >= 0 GROUP BY 1, 2),
+    FROM research.owner_projection2 WHERE s >= 0 GROUP BY 1, 2),
 t AS (
   SELECT order_id,
          bool_or(s = 0 AND worse = 0 AND better > 0) AS expected_fair_win,
@@ -60,7 +60,7 @@ t AS (
     FROM f GROUP BY 1),
 h AS (
   SELECT order_id, count(*) FILTER (WHERE cmp > 0) AS better, count(*) FILTER (WHERE cmp < 0) AS worse
-    FROM research.owner_projection WHERE s = -1 GROUP BY 1)
+    FROM research.owner_projection2 WHERE s = -1 GROUP BY 1)
 SELECT bar, count(*) FILTER (WHERE take) AS takes,
        count(*) FILTER (WHERE take AND h.better > 0 AND h.worse = 0) AS good_for_every_owner,
        count(*) FILTER (WHERE take AND h.worse > 0) AS some_owner_worse,
@@ -73,5 +73,5 @@ SELECT bar, count(*) FILTER (WHERE take) AS takes,
 \echo '== (7) owner by owner in hindsight: better / worse / no different for that owner''s cars'
 SELECT COALESCE(fo.name, p.owner) AS owner, count(*) FILTER (WHERE cmp > 0) AS better,
        count(*) FILTER (WHERE cmp < 0) AS worse, count(*) FILTER (WHERE cmp = 0) AS no_different
-  FROM research.owner_projection p LEFT JOIN public.fleet_operators fo ON fo.id::text = p.owner
+  FROM research.owner_projection2 p LEFT JOIN public.fleet_operators fo ON fo.id::text = p.owner
  WHERE s = -1 GROUP BY 1 ORDER BY 1;
