@@ -21,3 +21,16 @@ for w in 0 1 2 3; do psql -h /var/tmp -p 55433 -U postgres ottoq_lab -v worker=$
   -f lab/research/p1_referee_owner_futures/futures.sql & done; wait
 psql -h /var/tmp -p 55433 -U postgres ottoq_lab -f lab/research/p1_referee_owner_futures/rules.sql
 ```
+
+## What it found (2026-11-05 01:38 UTC = 7:38 PM CT 2026-11-04; `db/checks/0479`, G512)
+
+| rule | takes | good for every owner | trades one owner for another | bad for every owner |
+|---|---:|---:|---:|---:|
+| the referee before 0784 | 32 | 5 | 22 | 5 |
+| with 0784's owner guard (on since 10-25) | 5 | 1 | 3 | 1 |
+| no owner worse (depot better) in 10 of 12 futures | 0 | 0 | 0 | 0 |
+| no owner worse, some better, in 10 of 12 | 0 | 0 | 0 | 0 |
+
+Only 35 of the 370 orders were good for every owner in hindsight, and no decision had more than 8 of its 12 futures
+good for every owner. With three owners sharing one charge line, an order that moves one car up moves another
+owner's car down.

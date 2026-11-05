@@ -63,3 +63,20 @@ SELECT pareto AS futures_good_for_every_owner, count(*) AS decisions,
        count(*) FILTER (WHERE hindsight_class = 'good_for_every_owner') AS good_for_every_owner_in_hindsight,
        count(*) FILTER (WHERE hindsight_class IN ('trades_one_owner_for_another', 'bad_for_every_owner')) AS some_owner_worse_in_hindsight
   FROM research.referee_rules GROUP BY 1 ORDER BY 1;
+
+\echo '== (4) a looser bar: no owner worse and some owner better in the expected future, and in at least t of 12 futures'
+SELECT t AS at_least_futures, count(*) FILTER (WHERE takes) AS takes,
+       count(*) FILTER (WHERE takes AND hindsight_class = 'good_for_every_owner') AS good_for_every_owner,
+       count(*) FILTER (WHERE takes AND hindsight_class = 'no_owner_changes') AS no_owner_changes,
+       count(*) FILTER (WHERE takes AND hindsight_class = 'trades_one_owner_for_another') AS trades_owners,
+       count(*) FILTER (WHERE takes AND hindsight_class = 'bad_for_every_owner') AS bad_for_every_owner
+  FROM generate_series(1, 9) t
+ CROSS JOIN research.referee_rules r
+ CROSS JOIN LATERAL (SELECT (r.worse0 = 0 AND r.better0 > 0 AND r.pareto >= t) AS takes) x
+ GROUP BY t ORDER BY t;
+
+\echo '== (5) how rare a fair improvement is: decisions good for every owner in hindsight, and the most futures any decision was'
+SELECT count(*) FILTER (WHERE hindsight_class = 'good_for_every_owner') AS good_for_every_owner_in_hindsight,
+       count(*) AS decisions, max(pareto) AS most_futures_good_for_every_owner,
+       count(*) FILTER (WHERE pareto = 0) AS no_future_good_for_every_owner
+  FROM research.referee_rules;

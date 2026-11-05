@@ -607,6 +607,12 @@ These run in parallel. None touches production. Building the Lab runs a few simu
 
 ### Phase 1: the judge and the promises
 
+*Status 2026-11-04: E2's first replay report is done (`db/checks/0479`, G512). Judged owner by owner, a referee that
+lets no owner lose takes nothing: reordering the shared charge line was good for every owner in 35 of 370 past
+decisions, and the referee's own futures never showed it in more than 8 of 12. Before E2 is built, its shape is a
+decision for Chase: project an agent order so each owner keeps its places (rule 14's own form, as 0781 does), or move
+the agent off per-tick orders (D5).*
+
 - **E2 build.** The constraint layer, the priced layer, the sequential e-process, and antithetic and stratified futures.
   Measure each on the snapshot replay before building the next.
 - **E7, inside E2.** The per-owner confidence sequences.
