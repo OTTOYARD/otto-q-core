@@ -41,6 +41,24 @@ Arrivals from 9 AM to 5 PM, past the start-up and early enough to finish (`stead
 | 116 cars, seed 424242 | 18.1 | 110 of 137 (80%) | 10 / 57 | 90 / 181 |
 | 150 cars, seed 171717 | 21.8 | 141 of 167 (84%) | 10 / 55 | 85 / 165 |
 | 116 cars with a third service bay, seed 171717 | 19.4 | 131 of 139 (94%) | 5 / 35 | 75 / 144 |
+| **200 cars, seed 171717** | 25.8 | 97 of 155 (63%) | 20 / 145 | 105 / 225 |
 
 The two seeds at 116 cars differ by as much as 116 and 150 cars do on one seed: one day per point is a reading, not a
 curve. More seeds and whole days are running.
+
+### The first wall is the two service bays, between 150 and 200 cars (12-hour days, seed 171717)
+
+| | 116 cars | 150 cars | 200 cars |
+|---|---:|---:|---:|
+| visits in the 12 hours / left ready by 6 PM | 292 / 253 | 324 / 272 | 379 / 282 |
+| still in the depot at 6 PM | 39 | 52 | 97 |
+| busy: service bays / charging posts / wash bays | 68% / 57% / 43% | 57% / 68% / 49% | **96%** / 77% / 56% |
+| the wall the constraint board named most often | service bays | posts | **service bays** |
+| 9 AM-5 PM arrivals charged within the contract's 30 minutes | 93% | 84% | **63%** |
+| 9 AM-5 PM gate to leaving, median / p95 (min) | 70 / 150 | 85 / 165 | 105 / 225 |
+| fleet out at work / asked for by the work side (9 AM-5 PM) | 75.6% / 85.8% | 76.4% / 85.7% | 71.6% / 85.8% |
+
+From 150 to 200 cars the depot let out 10 more cars in the day and held 45 more at 6 PM; the two service bays ran 96%
+busy, and a third of the cars arriving in the day waited past the contract for a charger, though the posts were 77% busy:
+cars wait on posts held by cars waiting for a bay. Whether a third service bay moves the wall is the next lab day
+(`normal_day_200_171717_svc3`); the whole-day runs read the same curve past the start-up wave.
