@@ -396,3 +396,47 @@ ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
   run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
+
+-- The battery planner on the forecast and through the chain production would run (2026-11-06, read by 16:24 UTC; published
+-- 16:25:48 UTC):
+-- 0803's learned forecast, 0804's request, landing and plan-follow, ottoq-intelligence #21's planner, end to end.
+INSERT INTO public.ottoq_research_findings
+  (slug, phase, item, kind, status, title, summary, metrics, evidence, run_ids, measured_at)
+VALUES
+  ('p2-battery-planner-production-chain', 'P2', 'E8', 'measurement', 'measured',
+   'Through the chain production would run, the battery planner saves $242 a day on the twin''s day plan, on all six lab seeds',
+   'Six 36-hour lab days billed 6 PM to 6 PM, 116 cars, every car''s day the same as on its base day. Every tick the engine '
+   'asked for the battery''s plan as 0804 would ask production: on the forecast 0803 learns in the database from the '
+   'orchestrator''s own per-tick log (each seed''s model fitted without it), the depot''s own learned day beyond its four '
+   'hours, the tariff, the billing period''s peak so far and the call reserve; the lab''s stand-in for the edge function '
+   'posted it to a local copy of the service and landed the answer, and the battery followed it under 0799 (99.1% of '
+   'ticks). It saved $242.18 a day on the day plan ($1,308 against $1,551; $119-315 by seed), 57% of the gap to perfect '
+   'foresight, and held the billed half hour to 559-765 kW against 975-1,160. With every answer landing two ticks late it '
+   'still saved $124 a day on all six. The same learned forecast inside the day plan saves $20: the gain is the planner''s. '
+   'Running the real chain found four defects every unit check had passed, two of them able to cost more than no battery '
+   '(the tick under way missing from the plan''s windows; the billed peak counting the billing period''s boundary snapshot; '
+   'late plans stacking charging bursts; an unreachable reserve floor crashing the answer), each fixed before filing. '
+   'Lab days, one scenario: a reading of the method on the twin, not a forecast of production''s bill.',
+   '{"scenario": "normal_day", "fleet": 116, "run_hours": 36, "billed_window": "6 PM day 1 to 6 PM day 2",
+     "lab_template": "ottoq_lab_0804m (0801 + 0799 + 0803 + 0804 as filed)", "service": "ottoq-intelligence #21 (step_cap on)",
+     "seeds": [171717, 424242, 616161, 818181, 919191, 373737], "cars_identical_in_every_plan": 6,
+     "mean_bill_usd": {"no_battery": 1624.11, "day_plan": 1550.64, "day_plan_on_learned_forecast": 1530.89,
+                       "lab_planner_learned_day_beyond": 1320.74, "production_chain": 1308.46,
+                       "production_chain_answers_two_ticks_late": 1426.71, "perfect_foresight_free_ends": 1128.94},
+     "saving_on_day_plan_usd": {"day_plan_on_learned_forecast": 19.75, "lab_planner_learned_day_beyond": 229.90,
+                                "production_chain": 242.18, "production_chain_answers_two_ticks_late": 123.93},
+     "production_chain_by_seed_usd": {"171717": 198.39, "424242": 240.19, "616161": 284.27, "818181": 315.28, "919191": 295.97, "373737": 118.96},
+     "seeds_beating_day_plan": {"day_plan_on_learned_forecast": 4, "lab_planner_learned_day_beyond": 6, "production_chain": 6, "production_chain_answers_two_ticks_late": 6},
+     "share_of_gap_to_perfect_foresight_closed": {"production_chain": 0.57, "production_chain_answers_two_ticks_late": 0.29},
+     "billed_peak_kw": {"day_plan": "975-1160", "production_chain": "559-765"},
+     "chain": {"plans_asked": 2556, "plans_landed": 2554, "failed": "2 (the local service restarted mid-run)", "ticks_on_a_plan": 0.991,
+               "round_trip_ms_mean": 40, "solve_ms_mean": 35},
+     "forecast_out_of_sample_kw_next_half_hour": {"learned": "101-107", "day_plan_rule": "1001-1020"},
+     "defects_found_and_fixed": ["the tick under way missing from the plan windows", "the billed peak counting the period''s boundary snapshot, the past counted in snapshots",
+                                 "late plans stacking charging bursts (step_cap)", "an unreachable reserve floor answered as NaN"]}',
+   'otto-q-core lab/research/p2_capacity/planner_e2e_lab_2026-11-06.md, results.jsonl (tags p36prof, p36profq, dp36learn, p36sqlshape, p36e2e, p36e2ef, p36e2eflag2, p36e2ec, p36e2eclag2, p36prod, p36prodlag2), lab/research/p2_perfect_day/bound_energy.jsonl; db/migrations/0803, 0804, 0805; ottoyard/ottoq-intelligence#21',
+   '{}', '2026-11-06 16:24:59+00')
+ON CONFLICT (depot_id, slug) DO UPDATE SET
+  phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
+  title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
+  run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();

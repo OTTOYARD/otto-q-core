@@ -86,6 +86,17 @@
 --   good answer for an older plan is superseded on arrival, and a bad one fails with its reason; each a ledger row.
 --   Skipped with a notice when the twin depot has no run. V3 the patched orchestrator is byte for byte the body the
 --   research lab ran.
+--   In the research lab (2026-11-06; lab/research/p2_capacity/planner_e2e_lab_2026-11-06.md): this file applied in order
+--   (0799, 0803, 0804) on the 0801 template; V2 passed on a live lab run. Six 36-hour lab days (seeds 171717, 424242,
+--   616161, 818181, 919191, 373737; 15:52-16:23 UTC) asked the planner every tick, its answer posted to a local
+--   ottoq-intelligence carrying #21 and landed by this file's landing, followed under 0799, on the forecast 0803 fits from
+--   the orchestrator's own in-tick log (each seed's model held out). Billed from 6 PM day 1, every car the base day's:
+--   $242.18 a day under the day plan on all six seeds ($118.96-315.28; 57% of the gap to perfect foresight; billed half
+--   hour 559-765 kW against 975-1,160); 2,554 of 2,556 plans landed; the battery on a plan on 99.1% of ticks. With every
+--   answer two ticks late, $123.93 a day, all six seeds. The runs before found four defects, each fixed here or in the
+--   service before this file was filed: the tick under way missing from the plan's windows (the battery idle through a
+--   1,200 kW wave), the billed peak taken from the day plan's ratchet with the period's boundary snapshot and the past
+--   counted in snapshots, late plans stacking charging bursts (step_cap), and an infeasible plan answered as a NaN.
 --
 -- ══ §4 LINEAGE ═════════════════════════════════════════════════════════════════════════════════════════════════════
 --

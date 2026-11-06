@@ -67,10 +67,11 @@ solvers run. So production needs the forecast in the database, the solver in the
 - **0803:** the SQL refit reproduces the lab's Python models to within 4e-11, and the reader gives the lab planner's
   forecast to within 0.05 kW. A 36-hour lab day with the log on wrote 432 rows and left every car and all 864 energy
   commands exactly as the base day.
-- **0804:** it applies in order on the lab template (0799, 0803, 0804). Its live check passes on a lab run. A 3-hour lab
-  day through the whole chain landed 35 of 35 plans; the battery followed the plan on every tick after the first.
+- **0804:** it applies in order on the lab template (0799, 0803, 0804), and its live check passes on a lab run. On six
+  36-hour lab days through the whole chain, 2,554 of 2,556 plans landed and the chain saved $242.18 a day on the day plan
+  (§5).
 - **The service:** on three lab ticks it returns the lab planner's objective to 1e-9 and its setpoints to 0.1 kW. Its
-  suite passes, 58 tests.
+  suite passes, 61 tests (`step_cap`, and an infeasible plan answering cleanly, included).
 
 ## 4. Switching it on (each step a person's)
 
@@ -90,10 +91,38 @@ solvers run. So production needs the forecast in the database, the solver in the
 Until a model is usable, the request is empty and the day plan decides. That is also true whenever the planner is late or
 fails, and whenever a demand-response call is live.
 
-## 5. The lab on production's own forecast (2026-11-06)
+**Run length matters.** The twin's operator demo runs have averaged 3.5 sim-hours (57 runs; the longest 9.4). Production
+sessions have averaged 20.9. The forecast needs runs longer than 4 hours to learn its last half hour ahead, and the planner
+earns its keep over a whole evening, so the value above is a steady-state value. Short demo runs will mostly show the day
+plan.
 
-PENDING: the six seeds through the production chain (`p36e2e`), and the comparison of what the planner reads beyond the
-forecast's four hours.
+## 5. The lab, on production's forecast and through production's chain (2026-11-06)
+
+Full record: `lab/research/p2_capacity/planner_e2e_lab_2026-11-06.md`. Six 36-hour twin days billed from 6 PM, every car
+the same as on its base day:
+
+| plan | mean bill a day | saving on the day plan | seeds better | share of the gap to perfect foresight |
+|---|---:|---:|---:|---:|
+| the day plan as it runs | $1,550.64 | | | 0% |
+| the day plan reading the learned forecast | $1,530.89 | $19.75 | 4 of 6 | 5% |
+| the lab planner, the depot's learned day beyond 4 hours | $1,320.74 | $229.90 | 6 of 6 | 55% |
+| **production's chain end to end (0804 as filed, #21)** | **$1,308.46** | **$242.18** | **6 of 6** | **57%** |
+| the same, every answer landing two ticks late | $1,426.71 | $123.93 | 6 of 6 | 29% |
+| perfect foresight (the bound) | $1,128.94 | | | |
+
+**Production's chain.** Every tick the orchestrator asked for a plan. The lab's stand-in for the edge function posted it to
+a local copy of the service and landed the answer. The battery followed it on 99.1% of ticks. The billed half hour held at
+559–765 kW, against the day plan's 975–1,160 kW.
+
+**Running the real chain found four defects, each fixed before filing:**
+
+1. **The tick under way was missing from the plan's windows.** The battery sat at 65% through a 1,200 kW wave.
+2. **The billed peak counted the billing period's boundary snapshot,** and the past was counted in snapshots rather than
+   minutes, which breaks at production's 2-minute tick.
+3. **Plans followed late stacked charging bursts.** The fix is the service's `step_cap`.
+4. **An unreachable reserve floor crashed the answer** (NaN) instead of failing it cleanly.
+
+Two of the four could cost more than no battery.
 
 ## 6. B2: the battery grades itself in hindsight (0805, pending)
 
