@@ -88,8 +88,8 @@
 --
 -- ROLLBACK: EXECUTE the `definition` in ottoq_schema_snapshots WHERE label = '0804_pre';
 --   DROP FUNCTION public.ottoq_bess_planner_land(uuid,jsonb,integer,integer),
---     public.ottoq_bess_planner_fire(uuid,uuid,timestamptz,bigint,jsonb),
---     public.ottoq_bess_planner_request(uuid,uuid,timestamptz,jsonb,bigint);
+--     public.ottoq_bess_planner_fire(uuid,uuid,timestamptz,bigint,jsonb,numeric,numeric),
+--     public.ottoq_bess_planner_request(uuid,uuid,timestamptz,jsonb,bigint,numeric,numeric);
 --   DELETE FROM public.ottoq_policy_params WHERE param_key LIKE 'bess_planner_%';
 --   DELETE FROM public.ottoq_policy_param_catalog WHERE param_key LIKE 'bess_planner_%';
 --   DELETE FROM public.ottoq_cert_lineage WHERE name = '0804_the_battery_plans_its_day_on_the_learned_forecast_and_the_planner_answers_from_outside'.
@@ -164,7 +164,8 @@ VALUES ('bess_planner_enabled',
 
 -- ══ (a) the request ═════════════════════════════════════════════════════════════════════════════════════════════════
 CREATE OR REPLACE FUNCTION public.ottoq_bess_planner_request(p_sim_run_id uuid, p_depot_id uuid,
-    p_sim_clock timestamp with time zone, p_day_plan jsonb DEFAULT NULL, p_model_id bigint DEFAULT NULL)
+    p_sim_clock timestamp with time zone, p_day_plan jsonb DEFAULT NULL, p_model_id bigint DEFAULT NULL,
+    p_net_now_kw numeric DEFAULT NULL, p_grid_now_kw numeric DEFAULT NULL)
  RETURNS jsonb
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
@@ -172,7 +173,12 @@ CREATE OR REPLACE FUNCTION public.ottoq_bess_planner_request(p_sim_run_id uuid, 
 AS $function$
 /* 0804: the battery planner's request at this moment, {request, model_id, beyond}: request is the body
    ottoq-intelligence's POST /optimize/battery-plan reads. NULL when the depot has no usable learned forecast (0803), no
-   battery, or less than half an hour of run left. Step j covers (clock + j steps, clock + j + 1 steps]. Design: 0804 §2(a). */
+   battery, or less than half an hour of run left. Step j covers (clock + j steps, clock + j + 1 steps]. Design: 0804 §2(a).
+   From inside a tick (the orchestrator), the tick's own site snapshot is not yet written: p_net_now_kw (the site before
+   the battery this tick) and p_grid_now_kw (what it draws this tick, the battery's setpoint applied) stand for it, as the
+   last step before the plan, in the windows that straddle now and in the guard. Without them the plan's windows skip the
+   tick under way, and a plan made blind to the half hour forming defers its discharge to steps it never runs (the
+   research lab's first end-to-end days, 2026-11-06: the battery idle at 65% through a 1,200 kW wave). */
 DECLARE
   c_tz CONSTANT text := 'America/Chicago';
   v_plan jsonb := p_day_plan; v_lf jsonb; b record;
@@ -213,19 +219,23 @@ BEGIN
   v_beyond := CASE WHEN COALESCE(ottoq_policy_get(p_sim_run_id, 'bess_planner_beyond', 0), 0) >= 0.5
                    THEN 'pre_upper_kw' ELSE 'pre_mean_kw' END;
 
-  -- what the site drew last (the guard) and the grid over the last half hour (the windows that straddle now)
+  -- what the site drew last (the guard) and the grid over the last half hour (the windows that straddle now): the tick
+  -- under way, when the caller is inside it, then the snapshots before it
   SELECT COALESCE(e.total_ev_charging_kw, 0) + COALESCE(e.building_load_kw, 0) + COALESCE(e.lighting_load_kw, 0)
          - COALESCE(e.solar_generation_kw, 0)
     INTO v_last_pre
     FROM site_energy_snapshots e
    WHERE e.depot_id = p_depot_id AND e.sim_run_id = p_sim_run_id AND e.timestamp <= p_sim_clock
    ORDER BY e.timestamp DESC LIMIT 1;
-  v_last_pre := COALESCE(v_last_pre, 0);
+  v_last_pre := COALESCE(p_net_now_kw, v_last_pre, 0);
   SELECT COALESCE(array_agg(g ORDER BY t), ARRAY[]::numeric[]) INTO v_past
     FROM (SELECT e.timestamp AS t, round(GREATEST(COALESCE(e.grid_import_kw, 0), 0), 1) AS g
             FROM site_energy_snapshots e
            WHERE e.depot_id = p_depot_id AND e.sim_run_id = p_sim_run_id AND e.timestamp <= p_sim_clock
-           ORDER BY e.timestamp DESC LIMIT v_win - 1) z;
+           ORDER BY e.timestamp DESC LIMIT v_win - 1 - CASE WHEN p_grid_now_kw IS NULL THEN 0 ELSE 1 END) z;
+  IF p_grid_now_kw IS NOT NULL THEN
+    v_past := v_past || round(GREATEST(p_grid_now_kw, 0), 1);
+  END IF;
 
   -- the demand-response reserve as the depot holds it (0435, 0797)
   v_dr_kwh := GREATEST(0, COALESCE(ottoq_policy_get(p_sim_run_id, 'bess_plan_dr_reserve_kwh', 600), 600));
@@ -297,7 +307,8 @@ $function$;
 
 -- ══ (b) the fire ════════════════════════════════════════════════════════════════════════════════════════════════════
 CREATE OR REPLACE FUNCTION public.ottoq_bess_planner_fire(p_sim_run_id uuid, p_depot_id uuid,
-    p_sim_clock timestamp with time zone, p_tick_seq bigint DEFAULT NULL, p_day_plan jsonb DEFAULT NULL)
+    p_sim_clock timestamp with time zone, p_tick_seq bigint DEFAULT NULL, p_day_plan jsonb DEFAULT NULL,
+    p_net_now_kw numeric DEFAULT NULL, p_grid_now_kw numeric DEFAULT NULL)
  RETURNS uuid
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -308,7 +319,7 @@ AS $function$
    function reads the request from the row, never from the caller; without the vault's anon key the row waits. */
 DECLARE v_q jsonb; v_req jsonb; v_id uuid; v_step numeric; v_m int; v_k text; v_rid bigint;
 BEGIN
-  v_q := public.ottoq_bess_planner_request(p_sim_run_id, p_depot_id, p_sim_clock, p_day_plan, NULL);
+  v_q := public.ottoq_bess_planner_request(p_sim_run_id, p_depot_id, p_sim_clock, p_day_plan, NULL, p_net_now_kw, p_grid_now_kw);
   IF v_q IS NULL THEN RETURN NULL; END IF;
   v_req := v_q->'request';
   v_step := (v_req->>'step_min')::numeric;
@@ -415,11 +426,11 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.ottoq_bess_planner_fire(uuid,uuid,timestamptz,bigint,jsonb),
+REVOKE ALL ON FUNCTION public.ottoq_bess_planner_fire(uuid,uuid,timestamptz,bigint,jsonb,numeric,numeric),
                        public.ottoq_bess_planner_land(uuid,jsonb,integer,integer)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ottoq_bess_planner_land(uuid,jsonb,integer,integer) TO service_role;
-GRANT EXECUTE ON FUNCTION public.ottoq_bess_planner_request(uuid,uuid,timestamptz,jsonb,bigint) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.ottoq_bess_planner_request(uuid,uuid,timestamptz,jsonb,bigint,numeric,numeric) TO anon, authenticated, service_role;
 
 -- ══ (d) the orchestrator's one insertion ════════════════════════════════════════════════════════════════════════════
 CREATE TEMP TABLE _0804_patch (seq int, c_old text, c_new text) ON COMMIT DROP;
@@ -434,7 +445,8 @@ $n$  /* 0804 (B1): ask the battery planner for the next plan, on the learned for
   IF ottoq_policy_get(p_sim_run_id, 'bess_planner_enabled', 0) >= 0.5
      AND COALESCE(p_tick_seq, 0) % GREATEST(1, COALESCE(ottoq_policy_get(p_sim_run_id, 'bess_planner_every_ticks', 1), 1))::int = 0 THEN
     BEGIN
-      PERFORM public.ottoq_bess_planner_fire(p_sim_run_id, p_depot_id, p_sim_clock, p_tick_seq, v_day_plan);
+      PERFORM public.ottoq_bess_planner_fire(p_sim_run_id, p_depot_id, p_sim_clock, p_tick_seq, v_day_plan,
+                                             v_net_load, GREATEST(0, v_net_load - v_bess_dispatch));
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING '0804: the battery planner was not asked at tick %: %', p_tick_seq, SQLERRM;
     END;
@@ -562,7 +574,7 @@ END $v2$;
 DO $v3$
 BEGIN
   IF (SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.ottoq_energy_orchestrate(uuid,uuid,timestamp with time zone,bigint)'::regprocedure)
-     IS DISTINCT FROM '3b94f1c73b4a4903ec94adc9e628bba3' THEN
+     IS DISTINCT FROM 'fa0a97ad294a06d350a02266881e5a97' THEN
     RAISE EXCEPTION '0804 V3: the patched orchestrator is not the body the lab ran (md5 %)',
       (SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.ottoq_energy_orchestrate(uuid,uuid,timestamp with time zone,bigint)'::regprocedure);
   END IF;

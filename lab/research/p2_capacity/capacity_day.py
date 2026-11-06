@@ -141,6 +141,10 @@ def main() -> None:
                          "asked for (ottoq_energy_plan pending, source bess_planner) is posted to URL/optimize/battery-plan "
                          "(a local ottoq-intelligence) and landed with ottoq_bess_planner_land, as the edge function "
                          "ottoq-battery-planner does in production")
+    ap.add_argument("--planner-lag-ticks", type=int, default=0, metavar="K",
+                    help="with --planner-service: land each plan only once K ticks have passed since it was asked for, as an "
+                         "answer that comes back late would (0799 follows a plan from the step its clock is in, while it is "
+                         "fresh: under energy_mpc_max_plan_age_steps steps old)")
     ap.add_argument("--bess-forecast-model", type=int, metavar="MODEL_ID",
                     help="before the first tick, copy this ottoq_bess_forecast_models row as the depot's newest (the learned "
                          "forecast the day reads: a model fitted without the day's own seed)")
@@ -286,9 +290,12 @@ def main() -> None:
         """The edge function's part (0804), in the lab: each pending plan's request to the service, its answer landed."""
         import urllib.error
         import urllib.request
-        for pid, req in conn.execute("""SELECT id, detail->'request' FROM ottoq_energy_plan WHERE sim_run_id = %s
-                                         AND source = 'bess_planner' AND plan_state = 'pending' ORDER BY plan_start_clock""",
-                                      (run,)).fetchall():
+        for pid, req in conn.execute("""SELECT p.id, p.detail->'request' FROM ottoq_energy_plan p JOIN ottoq_sim_runs r
+                                           ON r.sim_run_id = p.sim_run_id
+                                         WHERE p.sim_run_id = %s AND p.source = 'bess_planner' AND p.plan_state = 'pending'
+                                           AND COALESCE((p.detail->>'tick_seq')::int, 0) <= r.tick_count - %s
+                                         ORDER BY p.plan_start_clock""",
+                                      (run, a.planner_lag_ticks)).fetchall():
             t1 = time.time()
             try:
                 r = urllib.request.urlopen(urllib.request.Request(
@@ -426,7 +433,7 @@ def main() -> None:
                            "learned_sql": a.battery_lp_learned_sql, "beyond": a.battery_lp_beyond,
                            "guard": lp.guard}
                           if lp is not None else None),
-           "planner_service": ({"url": a.planner_service, "model_copied": a.bess_forecast_model,
+           "planner_service": ({"url": a.planner_service, "model_copied": a.bess_forecast_model, "lag_ticks": a.planner_lag_ticks,
                                 **{k2: v for k2, v in planner.items() if k2 not in ("latency_ms", "solve_ms")},
                                 "latency_ms_mean": round(sum(planner["latency_ms"]) / len(planner["latency_ms"]), 1) if planner["latency_ms"] else None,
                                 "solve_ms_mean": round(sum(planner["solve_ms"]) / len(planner["solve_ms"]), 1) if planner["solve_ms"] else None}
