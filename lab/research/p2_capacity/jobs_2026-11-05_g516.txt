@@ -1,0 +1,3 @@
+# G516's candidate fix on the day that found it (150 cars, seed 171717): the arm's routine of a car that left its post is
+# cancelled before the starter runs, so a short second charge can be cleaned. Compare with normal_day_150_171717.
+normal_day_150_171717_g516|--fleet 150 --scenario normal_day --seed 171717 --lab-sql lab/research/p2_capacity/whatif_g516_cancel_before_start.sql --tag g516
