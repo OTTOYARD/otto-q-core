@@ -111,3 +111,12 @@ Running many lab days at once (`lab/research/p2_capacity/`): count a day's ticks
 each statement ends, not at commit), since nothing the day writes is visible until it commits. To queue work behind a
 running process, wait on its pid (`kill -0`), never on `pgrep -f <pattern>`: a waiter's own command line contains the
 pattern, so it waits on itself forever (2026-11-05).
+
+### The template's twin-depot dials follow production's (2026-11-06)
+
+`ottoq_lab` carries production's engine through 0797 (applied to the template at 03:01:10 UTC with its ledger row) and,
+from 05:52:46 UTC, production's two 0797 dials at the twin depot: `bess_plan_dr_reserve_lead_h` 3 and
+`bess_reserve_uncertainty_weight` 0, under the name production carries ("Chase (delegated to Claude Code: 0797)"), set
+once the overnight list that ran at 0797's defaults had finished. `energy_reserve_shave` (1) and `stall_cabin_robot` (2)
+match production's values. A lab day cloned from the template after 05:52 UTC runs the battery as the twin depot does.
+`ottoq_lab_0798` and `ottoq_lab_0799` are copies taken before that, each with one PENDING migration applied for its tests.
