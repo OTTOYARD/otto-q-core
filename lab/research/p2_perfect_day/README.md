@@ -226,6 +226,29 @@ a forecast of the day's shape inside that planner, where it is worth something (
 from $1,583 with the load held flat to $1,152 with the shape). The first day's reserves are being measured the same way
 (`dr0res0` on seed 171717).
 
+### The battery planned as a linear program inside the engine's loop (2026-11-06, `battery_lp.py`)
+
+Every tick, before the engine runs it, GLOP plans the rest of the day on the other day's load shape (the plan is made
+before the tick, as an outside service's would be, so it cannot see the step's own load), holds the 600 kWh reserve from
+2 PM, and the engine follows its first step through the MPC bridge it already has (`energy_mpc_follow` = 1); the rising
+floor is fixed (`res0`). Every car-facing line identical on both days.
+
+| at the base day's end state | first day (71% full at 6 AM) | second day (25% full) |
+|---|---:|---:|
+| the day plan as it runs | $1,382 (1,160 kW) | $1,543 (1,475 kW) |
+| the day plan, both reserves off (`dr0res0`) | $1,295 (1,032 kW) | $1,301 (1,132 kW) |
+| the LP in the loop, first cut (`lp`) | **$1,611 (1,457 kW)** | $1,319 (1,148 kW) |
+| perfect foresight | $1,085 (735 kW) | $1,098 (850 kW) |
+
+**The first cut ratcheted its own peak on the first day.** It handled the 6 AM surge, then planned to the edge of the peak
+already billed (1,128 kW): charging is free of demand charge under it, so it charged at up to 1,500 kW wherever its
+forecast saw room. At midday that forecast was 250-400 kW under the real load (the other day's shape), each half hour came
+in over the billed peak, and each new peak became the next tick's headroom: 1,128, 1,164, 1,276, 1,321, 1,342, 1,359 and,
+by 12:30, 1,457 kW. The day plan does not do this because it recharges only under its level less a margin (0435) and never
+lifts a half hour above the billed peak (0600). So `battery_lp.py` now keeps the same two guards: the next 30 minutes are
+never forecast under what the depot drew last, and a half hour wholly in the future is planned to stay
+max(100 kW, 10% of the billed peak) under the plan's peak. The guarded runs are tag `lp2`.
+
 The proposed fix keeps the reserve and needs it by the window: the plan may spend it before 2 PM when it can refill it by
 then, and the floor hedges the plan's own forecast error, not the surge it is planning for. It is built behind a dial and
 tested in the lab on a day with a demand-response call before anyone switches it on, so a call never slows a car.
