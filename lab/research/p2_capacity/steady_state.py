@@ -8,6 +8,13 @@ in the last hour cannot finish before the day ends at 6 PM. So the comfortable-c
 visits that arrive from 9 AM to 5 PM CT (by default): how many an hour, how many charged within the contract's queue
 wait (each owner's own `max_queue_wait_minutes`), and how long a car spent from the gate to leaving ready.
 
+CORRECTED 2026-11-06: a visit opens when its car is CALLED HOME, not when it reaches the gate (on the 116-car day 228 of
+292 visits open while the car drives, 10 minutes on average and up to 60). The first readings measured the queue wait
+from the call and so counted the drive home as queueing; the contract's wait is the wait in the depot's charge queue,
+which the engine's own clock (ottoq_charge_wait_min) starts at the gate. The wait is now read from the gate, with the
+first readings' measure kept beside it (`*_from_call`), and the door is read from the gate (`gate_door_*`) beside the
+scorecard's own door (`door_*`, from the call).
+
 A whole day (288 ticks) is read the same way on a window measured from the run's own start and end instead
 (--skip-h 3 --tail-h 1: everything after the start-up and before the last hour), and with each hour's uptime beside it:
 the share of the fleet out at work, against the share the work side asked for (`ottoq_deploy_target_now`).
@@ -42,7 +49,22 @@ sla AS (SELECT DISTINCT ON (s.fleet_operator_id) s.fleet_operator_id, s.max_queu
 w AS (SELECT o.*, fo.name AS owner, sla.max_queue_wait_minutes AS contract_wait,
              (SELECT min(s.started_at) FROM ocpp_sessions s, r
                WHERE s.sim_run_id = r.run AND s.vehicle_id = o.vehicle_id AND s.started_at >= o.arrived_at
-                 AND (o.departed_at IS NULL OR s.started_at <= o.departed_at)) AS plugged_at
+                 AND (o.departed_at IS NULL OR s.started_at <= o.departed_at)) AS plugged_at,
+             -- 2026-11-06: the car reaches the gate. A visit opens when the car is CALLED HOME (228 of 292 on the
+             -- 116-car day open while it drives, 10 minutes on average, up to 60), and the contract's queue wait is
+             -- the wait in the depot's charge queue (ottoq_contract_queue_wait_min against the engine's own wait clock,
+             -- ottoq_charge_wait_min, which starts at the gate). The first arrival at the gate after the call and not
+             -- after the car left; a car already in the depot when its visit opened is at the gate from the start.
+             COALESCE((SELECT min(e.sim_clock_at) FROM ottoq_events e
+                        WHERE e.entity_id = o.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                          AND COALESCE(e.payload->>'to', e.payload->'diff'->'current_state'->>'to') = 'arrived_at_gate'
+                          AND e.sim_clock_at >= o.arrived_at AND (o.departed_at IS NULL OR e.sim_clock_at <= o.departed_at)),
+                      CASE WHEN (SELECT COALESCE(e.payload->>'to', e.payload->'diff'->'current_state'->>'to')
+                                   FROM ottoq_events e WHERE e.entity_id = o.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                                    AND e.sim_clock_at <= o.arrived_at AND (e.payload ? 'to' OR e.payload->'diff' ? 'current_state')
+                                  ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1)
+                                NOT IN ('deployed', 'en_route_to_depot', 'en_route_to_deployment', 'offline', 'tow_requested')
+                           THEN o.arrived_at END) AS gate_at
         FROM o JOIN vehicles v ON v.id = o.vehicle_id
         JOIN fleet_operators fo ON fo.id = v.fleet_operator_id
         LEFT JOIN sla ON sla.fleet_operator_id = v.fleet_operator_id
@@ -56,12 +78,24 @@ w AS (SELECT o.*, fo.name AS owner, sla.max_queue_wait_minutes AS contract_wait,
 SELECT COALESCE(owner, 'all') AS owner, count(*) AS visits,
        count(*) FILTER (WHERE departed_at IS NOT NULL) AS left_ready,
        count(plugged_at) AS charged,
+       -- the contract's queue wait, gate to plug-in (2026-11-06; the first readings counted the drive home in it)
        count(*) FILTER (WHERE plugged_at IS NOT NULL
-                          AND extract(epoch FROM (plugged_at - arrived_at)) / 60.0 <= contract_wait) AS within_contract,
-       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (plugged_at - arrived_at)) / 60.0)::numeric, 1) AS wait_p50,
-       round(percentile_cont(0.95) WITHIN GROUP (ORDER BY extract(epoch FROM (plugged_at - arrived_at)) / 60.0)::numeric, 1) AS wait_p95,
+                          AND extract(epoch FROM (plugged_at - COALESCE(gate_at, arrived_at))) / 60.0 <= contract_wait) AS within_contract,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (plugged_at - COALESCE(gate_at, arrived_at))) / 60.0)::numeric, 1) AS wait_p50,
+       round(percentile_cont(0.95) WITHIN GROUP (ORDER BY extract(epoch FROM (plugged_at - COALESCE(gate_at, arrived_at))) / 60.0)::numeric, 1) AS wait_p95,
+       -- the first readings' measure, from the call home, kept beside it
+       count(*) FILTER (WHERE plugged_at IS NOT NULL
+                          AND extract(epoch FROM (plugged_at - arrived_at)) / 60.0 <= contract_wait) AS within_contract_from_call,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (plugged_at - arrived_at)) / 60.0)::numeric, 1) AS wait_p50_from_call,
+       round(percentile_cont(0.95) WITHIN GROUP (ORDER BY extract(epoch FROM (plugged_at - arrived_at)) / 60.0)::numeric, 1) AS wait_p95_from_call,
+       round(avg(extract(epoch FROM (gate_at - arrived_at)) / 60.0) FILTER (WHERE gate_at IS NOT NULL)::numeric, 1) AS drive_home_mean,
+       count(*) FILTER (WHERE gate_at IS NULL) AS never_at_gate,
        round(percentile_cont(0.5) WITHIN GROUP (ORDER BY door_min) FILTER (WHERE departed_at IS NOT NULL)::numeric, 1) AS door_p50,
-       round(percentile_cont(0.95) WITHIN GROUP (ORDER BY door_min) FILTER (WHERE departed_at IS NOT NULL)::numeric, 1) AS door_p95
+       round(percentile_cont(0.95) WITHIN GROUP (ORDER BY door_min) FILTER (WHERE departed_at IS NOT NULL)::numeric, 1) AS door_p95,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (departed_at - gate_at)) / 60.0)
+             FILTER (WHERE departed_at IS NOT NULL AND gate_at IS NOT NULL)::numeric, 1) AS gate_door_p50,
+       round(percentile_cont(0.95) WITHIN GROUP (ORDER BY extract(epoch FROM (departed_at - gate_at)) / 60.0)
+             FILTER (WHERE departed_at IS NOT NULL AND gate_at IS NOT NULL)::numeric, 1) AS gate_door_p95
   FROM w GROUP BY GROUPING SETS ((owner), ()) ORDER BY owner NULLS FIRST
 """
 
@@ -106,8 +140,9 @@ def main() -> None:
     params = {"h0": a.h0, "h1": a.h1, "rel": rel, "skip": a.skip_h or 0.0, "tail": a.tail_h}
     head = (f"arrivals {a.skip_h:g} h after the start to {a.tail_h:g} h before the end" if rel
             else f"arrivals {a.h0}:00-{a.h1}:00 CT")
-    print(f"{head} | visits | per hour | charged within contract | wait p50/p95 min | "
-          f"gate to leaving p50/p95 min | left ready | fleet out / asked (%)")
+    print(f"{head} | visits | per hour | charged within contract, gate to plug-in (from the call home) | "
+          f"wait p50/p95 min, from the gate | drive home mean min | gate to leaving p50/p95 min | left ready | "
+          f"fleet out / asked (%)")
     for db in dbs:
         try:
             with psycopg.connect(host=HOST, port=PORT, user="postgres", dbname=db) as c:
@@ -135,9 +170,11 @@ def main() -> None:
             f.write(json.dumps(rec, default=str) + "\n")
         t = rec["by_owner"]["all"]
         pct = 100.0 * t["within_contract"] / t["charged"] if t["charged"] else float("nan")
+        pct_call = 100.0 * t["within_contract_from_call"] / t["charged"] if t["charged"] else float("nan")
         print(f"{db.removeprefix('ottoq_cap_')} | {t['visits']:.0f} | {t['visits'] / hours:.1f} | "
-              f"{t['within_contract']:.0f}/{t['charged']:.0f} ({pct:.0f}%) | {t['wait_p50']}/{t['wait_p95']} | "
-              f"{t['door_p50']}/{t['door_p95']} | {t['left_ready']:.0f} | "
+              f"{t['within_contract']:.0f}/{t['charged']:.0f} ({pct:.0f}%; {pct_call:.0f}% from the call) | "
+              f"{t['wait_p50']}/{t['wait_p95']} | {t['drive_home_mean']} | "
+              f"{t['gate_door_p50']}/{t['gate_door_p95']} | {t['left_ready']:.0f} | "
               f"{rec['uptime']['out_pct']}/{rec['uptime']['asked_pct']}")
 
 

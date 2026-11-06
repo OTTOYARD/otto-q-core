@@ -41,11 +41,25 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 OWNER_SQL = """
 WITH o AS (SELECT * FROM public.ottoq_visit_outcomes(%(run)s)),
-     w AS (  -- each visit's first charge after it arrived: the contract's queue wait is arrival to plug-in
+     w AS (  -- each visit's first charge after it arrived, and when its car reached the gate
        SELECT o.visit_id, o.vehicle_id, o.arrived_at,
               (SELECT min(s.started_at) FROM ocpp_sessions s
                 WHERE s.sim_run_id = %(run)s AND s.vehicle_id = o.vehicle_id AND s.started_at >= o.arrived_at
-                  AND (o.departed_at IS NULL OR s.started_at <= o.departed_at)) AS plugged_at
+                  AND (o.departed_at IS NULL OR s.started_at <= o.departed_at)) AS plugged_at,
+              -- 2026-11-06: a visit opens when its car is CALLED HOME, most of them while it drives; the contract's
+              -- queue wait is the wait in the depot's charge queue, from the gate (the engine's own clock,
+              -- ottoq_charge_wait_min, starts there). wait_* below keep the first measure, from the call; wait_gate_*
+              -- and over_contract_wait_gate are the contract's. A car in the depot when its visit opened is at the gate.
+              COALESCE((SELECT min(e.sim_clock_at) FROM ottoq_events e
+                         WHERE e.entity_id = o.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                           AND COALESCE(e.payload->>'to', e.payload->'diff'->'current_state'->>'to') = 'arrived_at_gate'
+                           AND e.sim_clock_at >= o.arrived_at AND (o.departed_at IS NULL OR e.sim_clock_at <= o.departed_at)),
+                       CASE WHEN (SELECT COALESCE(e.payload->>'to', e.payload->'diff'->'current_state'->>'to')
+                                    FROM ottoq_events e WHERE e.entity_id = o.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                                     AND e.sim_clock_at <= o.arrived_at AND (e.payload ? 'to' OR e.payload->'diff' ? 'current_state')
+                                   ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1)
+                                 NOT IN ('deployed', 'en_route_to_depot', 'en_route_to_deployment', 'offline', 'tow_requested')
+                            THEN o.arrived_at END) AS gate_at
          FROM o),
      sla AS (
        SELECT DISTINCT ON (s.fleet_operator_id) s.fleet_operator_id, s.max_queue_wait_minutes
@@ -61,6 +75,9 @@ SELECT fo.name AS owner, count(*) AS visits,
        round(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (w.plugged_at - w.arrived_at)) / 60.0)::numeric, 1) AS wait_p50_min,
        round(percentile_cont(0.95) WITHIN GROUP (ORDER BY extract(epoch FROM (w.plugged_at - w.arrived_at)) / 60.0)::numeric, 1) AS wait_p95_min,
        count(*) FILTER (WHERE extract(epoch FROM (w.plugged_at - w.arrived_at)) / 60.0 > sla.max_queue_wait_minutes) AS over_contract_wait,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (w.plugged_at - COALESCE(w.gate_at, w.arrived_at))) / 60.0)::numeric, 1) AS wait_gate_p50_min,
+       round(percentile_cont(0.95) WITHIN GROUP (ORDER BY extract(epoch FROM (w.plugged_at - COALESCE(w.gate_at, w.arrived_at))) / 60.0)::numeric, 1) AS wait_gate_p95_min,
+       count(*) FILTER (WHERE extract(epoch FROM (w.plugged_at - COALESCE(w.gate_at, w.arrived_at))) / 60.0 > sla.max_queue_wait_minutes) AS over_contract_wait_gate,
        max(sla.max_queue_wait_minutes) AS contract_wait_min,
        sum(o.needed_open_at_departure) AS needed_open_at_departure,
        count(*) FILTER (WHERE o.departed_at IS NOT NULL AND o.soc_out < o.target_soc - 1) AS left_below_target

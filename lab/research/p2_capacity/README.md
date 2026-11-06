@@ -33,15 +33,17 @@ and gets 98-109; and afternoon arrivals barely move with the fleet (28.7 an hour
 So the 12-hour days are kept as a stress test of the start-up wave, and the capacity curve proper is read on whole days
 (288 ticks, `jobs_2026-11-05c.txt`).
 
-Arrivals from 9 AM to 5 PM, past the start-up and early enough to finish (`steady_state.py`):
+Arrivals from 9 AM to 5 PM, past the start-up and early enough to finish (`steady_state.py`; **corrected 2026-11-06
+06:12 UTC to wait from the gate**, the first reading, from the call home, in brackets: see "The queue wait runs from the
+gate" below):
 
-| 12-hour normal day | arrivals an hour | charged within the contract's 30 minutes | wait p50 / p95 (min) | gate to leaving p50 / p95 (min) |
+| 12-hour normal day | arrivals an hour | charged within the contract's 30 minutes, from the gate (from the call) | wait p50 / p95 from the gate (min) | gate to leaving p50 / p95 (min) |
 |---|---:|---:|---:|---:|
-| 116 cars, seed 171717 | 20.4 | 134 of 144 (93%) | 5 / 35 | 70 / 150 |
-| 116 cars, seed 424242 | 18.1 | 110 of 137 (80%) | 10 / 57 | 90 / 181 |
-| 150 cars, seed 171717 | 21.8 | 141 of 167 (84%) | 10 / 55 | 85 / 165 |
-| 116 cars with a third service bay, seed 171717 | 19.4 | 131 of 139 (94%) | 5 / 35 | 75 / 144 |
-| **200 cars, seed 171717** | 25.8 | 97 of 155 (63%) | 20 / 145 | 105 / 225 |
+| 116 cars, seed 171717 | 20.4 | 143 of 144, 99% (93%) | 0 / 20 | 65 / 145 |
+| 116 cars, seed 424242 | 18.1 | 123 of 137, 90% (80%) | 0 / 50 | 85 / 165 |
+| 150 cars, seed 171717 | 21.8 | 154 of 167, 92% (84%) | 0 / 39 | 80 / 160 |
+| 116 cars with a third service bay, seed 171717 | 19.4 | 137 of 139, 99% (94%) | 0 / 16 | 70 / 139 |
+| **200 cars, seed 171717** | 25.8 | 111 of 155, 72% (63%) | 10 / 140 | 100 / 220 |
 
 The two seeds at 116 cars differ by as much as 116 and 150 cars do on one seed: one day per point is a reading, not a
 curve. More seeds and whole days are running.
@@ -54,8 +56,8 @@ curve. More seeds and whole days are running.
 | still in the depot at 6 PM | 39 | 52 | 97 | 114 |
 | busy: service bays / charging posts / wash bays | 68% / 57% / 43% | 57% / 68% / 49% | **96%** / 77% / 56% | 89% / 75% / 71% |
 | the wall the constraint board named most often | service bays | posts | **service bays** | **service bays** |
-| 9 AM-5 PM arrivals charged within the contract's 30 minutes | 93% | 84% | **63%** | **58%** |
-| 9 AM-5 PM gate to leaving, median / p95 (min) | 70 / 150 | 85 / 165 | 105 / 225 | 100 / 316 |
+| 9 AM-5 PM arrivals charged within the contract's 30 minutes, from the gate (first reading, from the call) | 99% (93%) | 92% (84%) | **72%** (63%) | **60%** (58%) |
+| 9 AM-5 PM gate to leaving, median / p95 (min; corrected, the first reading was from the call) | 65 / 145 | 80 / 160 | 100 / 220 | 90 / 310 |
 | fleet out at work / asked for by the work side (9 AM-5 PM) | 75.6% / 85.8% | 76.4% / 85.7% | 71.6% / 85.8% | 67.6% / 85.9% |
 
 From 200 to 250 cars the depot let out 14 more cars in the 12 hours and held 17 more at 6 PM; under six in ten of the
@@ -139,19 +141,22 @@ seeds a fleet size. Arrivals from 9 AM to 5 AM next day (`steady_state.py --skip
 left out); afternoon fleet out read hour by hour (`uptime_by_hour.sql`, distinct cars); resources over the whole day from
 the lab day's own record.
 
-| fleet, seed | visits an hour | charged within the 30-minute contract wait | wait p50 / p95 | gate to leaving p50 / p95 | 1-7 PM out at work (asked 87%) | cars inside, 1-7 PM | service bays busy | posts busy |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 116, 171717 | 19.8 | 91% | 5 / 35 min | 85 / 490 min | 68% | 38 | 74% | 48% |
-| 116, 424242 | 18.3 | 78% | 15 / 60 min | 105 / 485 min | 65% | 41 | 60% | 48% |
-| 150, 171717 | 22.3 | 62% | 20 / 95 min | 100 / 495 min | 69% | 47 | 74% | 58% |
-| 150, 424242 | 19.8 | 64% | 20 / 151 min | 140 / 585 min | 61% | 58 | 80% | 55% |
-| 200, 171717 | 22.7 | 39% | 98 / 310 min | 140 / 718 min | 59% | 82 | 93% | 72% |
-| 200, 424242 | 22.4 | 37% | 110 / 330 min | 165 / 720 min | 56% | 89 | 93% | 67% |
+Corrected 2026-11-06 06:12 UTC: the wait and the door from the gate (the first reading, from the call home, in brackets).
 
-- **The depot handles about 19 to 23 visits an hour, and comfortably up to about 116 cars.** At 116 cars 78-91% of the
-  cars that charge do so within the 30-minute contract wait, the median wait 5-15 minutes. At 150 cars the same depot
-  takes 20-22 visits an hour and 62-64% are within the wait (the 95th-percentile wait 1.5-2.5 hours); at 200 cars 22-23
-  an hour, 37-39% within it, a median wait over 1.5 hours and a 95th-percentile over 5.
+| fleet, seed | visits an hour | charged within the 30-minute contract wait, from the gate (from the call) | wait p50 / p95 from the gate | gate to leaving p50 / p95 | 1-7 PM out at work (asked 87%) | cars inside, 1-7 PM | service bays busy | posts busy |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 116, 171717 | 19.8 | 99% (91%) | 0 / 20 min | 80 / 481 min | 68% | 38 | 74% | 48% |
+| 116, 424242 | 18.3 | 91% (78%) | 3 / 45 min | 95 / 475 min | 65% | 41 | 60% | 48% |
+| 150, 171717 | 22.3 | 72% (62%) | 10 / 90 min | 90 / 488 min | 69% | 47 | 74% | 58% |
+| 150, 424242 | 19.8 | 70% (64%) | 10 / 140 min | 135 / 580 min | 61% | 58 | 80% | 55% |
+| 200, 171717 | 22.7 | 43% (39%) | 93 / 295 min | 135 / 690 min | 59% | 82 | 93% | 72% |
+| 200, 424242 | 22.4 | 40% (37%) | 103 / 318 min | 160 / 713 min | 56% | 89 | 93% | 67% |
+
+- **The depot handles about 19 to 23 visits an hour, and comfortably up to about 116 cars.** At 116 cars 91-99% of the
+  cars that charge do so within the 30-minute contract wait from the gate, the median wait under 3 minutes and the
+  95th percentile 20-45. At 150 cars the same depot takes 20-22 visits an hour and 70-72% are within the wait (the
+  95th-percentile wait 1.5-2.3 hours); at 200 cars 22-23 an hour, 40-43% within it, a median wait of 1.5-1.7 hours and
+  a 95th percentile about 5. (First reading, from the call home: 78-91%, 62-64% and 37-39%.)
 - **More cars still put more cars to work, by less each time.** Out at work in the afternoon: about 77 cars at 116,
   98 at 150 and 115 at 200, against the work side's ask of 87% of the fleet (101, 131, 174). The mornings keep up at 116
   and 150 (80-84% out against 85%); at 200 they fall to 74-78%.
@@ -174,11 +179,40 @@ posts, above), fewer charger faults, and the order in which cars get a post (the
 |---|---:|---:|---:|---:|
 | cars that left in the day | 466 | 488 | 464 | 474 |
 | visits an hour, 9 AM-5 AM arrivals | 22.3 | 23.1 | 22.7 | 23.1 |
-| charged within the contract wait | 62% | 56% | 39% | 40% |
+| charged within the contract wait, from the gate (from the call) | 72% (62%) | 62% (56%) | 43% (39%) | 43% (40%) |
 | 1-7 PM out at work | 69% | 67% | 59% | 63% |
 | service bays busy | 74% | 65% | 93% | 85% |
 | the wall named most (of 48) | service bays 27 | posts 21 | service bays 37 | posts 24 |
 
 A third bay lets 22 more cars out of the day at 150 cars (+4.7%) and 10 at 200 (+2.2%), and moves the wall to the posts at
-both sizes; at 150 the cars it lets through then wait a little longer for a post (56% within the contract wait against
-62%). So the depot's next 50 cars need the posts as well as the bays: a third bay alone buys a few percent. One seed each.
+both sizes; at 150 the cars it lets through then wait longer for a post (62% within the contract wait from the gate
+against 72%; 56% against 62% from the call). So the depot's next 50 cars need the posts as well as the bays: a third bay alone buys a few percent. One seed each.
+
+### The queue wait runs from the gate, not from the call home (corrected 2026-11-06, read 06:12 UTC)
+
+Every wait in this file before 2026-11-06 06:12 UTC was measured from the moment the visit opened to the car's plug-in.
+**A visit opens when the car is called home, not when it reaches the gate.** On the 116-car 12-hour day (seed 171717,
+`ottoq_cap_normal_day_116_171717`, run `d6955d8e`) 228 of 292 visits open while the car is driving home, 38 at the gate
+and 26 on a charger (the boot); the 225 that reach the gate before leaving take 10.1 minutes to get there on average, 5
+at the median and up to 60. The only way into the depot from the road is the gate (`en_route_to_depot` ->
+`arrived_at_gate`, 498 of 505 such transitions on the 150-car whole day; the other 7 go offline). The contract's limit is
+the wait in the depot's charge queue: the engine holds a car against it with its own wait clock
+(`ottoq_contract_queue_wait_min` against `ottoq_charge_wait_min`), which starts at the gate. So the first readings
+counted the drive home as queueing, which understated how many cars charge within the contract wait.
+
+`steady_state.py` and `capacity_day.py` now read the wait from the car's first arrival at the gate after the call and
+not after it left (a car already in the depot when its visit opened is at the gate from the start); both keep the first
+measure beside it (`*_from_call`, `wait_*`), and `steady_state.py` reads the door from the gate (`gate_door_*`) beside
+the scorecard's own door, which runs from the call. The tables above are corrected in place, the first readings in
+brackets. What moved:
+
+- **116 cars: 91-99% charge within the contract wait from the gate** (78-91% from the call), the median wait under 3
+  minutes. The depot serves 116 cars comfortably.
+- **150 cars: 70-72%** (62-64%); **200 cars: 40-43%** (37-39%). The curve still bends between 116 and 150 cars; the
+  drive home is 7-10 minutes a visit, so the correction matters most where the waits are short.
+- The "gate to leaving" columns were the scorecard's door from the call; they are now from the gate (5-15 minutes
+  shorter at the median).
+
+Nothing in the engine reads these figures: the error was the research wing's, in two readers, and it was found tracing
+why short charges seemed to wait as long as long ones (they did not; much of their "wait" was the drive). The same
+error was in the perfect-day model (`lab/research/p2_perfect_day/`), which let work start at the call.
