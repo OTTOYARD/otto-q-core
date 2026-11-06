@@ -16,7 +16,13 @@ THE MODEL (one minute per unit, from the day's start):
     order (a fault first, a charge before a bay), so the bound can only be better than the true best day;
   - each lane is a pool of identical units (cumulative), its capacity the units installed (rule 13), less a unit for
     every minute a post was faulted;
-  - a visit leaves when its last job ends, plus its readiness check (3 minutes, the gate atom).
+  - a visit leaves when its last job ends, plus its readiness check (5 minutes, one tick of the lab days; the gate atom's
+    estimate is 3, and the first versions took it), and never before its car reached the gate;
+  - (2026-11-06) every bay booking the visit held is a job, whether or not an atom names it (a fault repair for an
+    open trouble code is service-bay work the visit's atoms do not list);
+  - (2026-11-06) no job starts before the car is AT THE GATE: a visit opens when its car is called home, most of them
+    while it is still driving, and the first versions let the solver start work at the call; the contract's queue wait
+    (the wait objective) runs from the gate. Every door still counts from the visit's start, real and solved alike.
 Objectives, each solved on its own (every one a valid bound on its own measure, and none can be beaten by any schedule):
   door     total minutes in the depot (arrival to departure), the measure every turnaround number reads;
   on_time  the most cars with a due time that are ready by it;
@@ -47,7 +53,9 @@ from ortools.sat.python import cp_model
 HOST, PORT = os.environ.get("LAB_HOST", "/var/tmp"), int(os.environ.get("LAB_PORT", "55433"))
 TWIN = "11111111-1111-1111-1111-111111111111"
 HERE = os.path.dirname(os.path.abspath(__file__))
-GATE_MIN = 3
+# the readiness check, the last of every visit (2026-11-06: 5, one lab tick; the first versions took its 3-minute estimate,
+# and on the 116-car day 199 of 234 departing visits were ready exactly 5 minutes after their last job ended). --ready-min
+READY_MIN = 5
 
 VISITS_SQL = """
 SELECT o.visit_id::text, o.vehicle_id::text, fo.name AS owner, o.archetype,
@@ -63,7 +71,22 @@ SELECT o.visit_id::text, o.vehicle_id::text, fo.name AS owner, o.archetype,
                              WHERE vn.visit_id = o.visit_id AND e ->> 'status' = 'done') - r.sim_clock_start)) / 60.0 AS ready,
        COALESCE((SELECT s.max_queue_wait_minutes FROM ottoq_fleet_operator_slas s
                   WHERE s.fleet_operator_id = v.fleet_operator_id AND s.status = 'active'
-                  ORDER BY s.version DESC LIMIT 1), 30) AS contract_wait
+                  ORDER BY s.version DESC LIMIT 1), 30) AS contract_wait,
+       -- 2026-11-06: when the car REACHES THE GATE. A visit opens when its car is called home, and on the 116-car day
+       -- 228 of 292 open while it drives (10 minutes on average, up to 60); no work starts before it is at the gate,
+       -- and the contract's queue wait runs from there. The first arrival at the gate after the call and not after the
+       -- car left; a car already in the depot when its visit opened is at the gate from the start; NULL if it never came
+       extract(epoch FROM (COALESCE(
+         (SELECT min(e.sim_clock_at) FROM ottoq_events e
+           WHERE e.entity_id = o.vehicle_id AND e.event_type = 'vehicle.state_changed'
+             AND COALESCE(e.payload->>'to', e.payload->'diff'->'current_state'->>'to') = 'arrived_at_gate'
+             AND e.sim_clock_at >= o.arrived_at AND (o.departed_at IS NULL OR e.sim_clock_at <= o.departed_at)),
+         CASE WHEN (SELECT COALESCE(e.payload->>'to', e.payload->'diff'->'current_state'->>'to')
+                      FROM ottoq_events e WHERE e.entity_id = o.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                       AND e.sim_clock_at <= o.arrived_at AND (e.payload ? 'to' OR e.payload->'diff' ? 'current_state')
+                     ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1)
+                   NOT IN ('deployed', 'en_route_to_depot', 'en_route_to_deployment', 'offline', 'tow_requested')
+              THEN o.arrived_at END) - r.sim_clock_start)) / 60.0 AS gate
   FROM public.ottoq_visit_outcomes(%(run)s) o
   JOIN ottoq_sim_runs r ON r.sim_run_id = %(run)s
   JOIN vehicles v ON v.id = o.vehicle_id
@@ -161,6 +184,14 @@ def jobs_of(atoms: list, sessions: list, bookings: list) -> list:
             out.append({"lane": lane, "start": b["start"], "dur": b["dur"], "censored": b["censored"], "real": True})
         else:
             out.append({"lane": lane, "start": None, "dur": float(a["est_min"] or 10), "censored": True, "real": False})
+    # 2026-11-06: every bay booking the visit really held is work the depot did, whether or not an atom names it. A
+    # service booking carries no need_atom, and the needs card sends a car with an open trouble code (severity 3 or
+    # worse) to a service bay for a fault repair its visit's atoms do not list; unmatched, the first versions dropped
+    # 184 of 980 booked service-bay minutes on the 116-car day and 344 of 824 at 150, a bay freer than the real one
+    for i, b in enumerate(bookings):
+        if i not in used:
+            out.append({"lane": b["lane"], "start": b["start"], "dur": b["dur"], "censored": b["censored"], "real": True,
+                        "unmatched": True})
     return out
 
 
@@ -207,6 +238,14 @@ def load(db: str, run: str | None, occupancy: bool = False) -> dict:
         bk[vid].append({"lane": lane, "need_atom": need, "start": float(start), "dur": float(dur), "censored": cen})
     jobs = {v["visit_id"]: jobs_of(atoms.get(v["visit_id"], []), sess.get(v["visit_id"], []), bk.get(v["visit_id"], []))
             for v in visits}
+    horizon_min = (meta[4] - meta[3]).total_seconds() / 60.0
+    for v in visits:   # the visit's release: the car at the gate (never before a job it really started), else the day's end
+        arr = float(v["arr"])
+        rel = float(v["gate"]) if v["gate"] is not None else horizon_min
+        real_starts = [j["start"] for j in jobs[v["visit_id"]] if j["start"] is not None]
+        if real_starts:
+            rel = min(rel, min(real_starts))
+        v["rel"] = max(rel, arr)
     units = dict(conn.execute(UNITS_SQL, {"depot": TWIN}).fetchall())
     faults = [(float(a), float(b)) for a, b in conn.execute(FAULTS_SQL, {"run": run}).fetchall()]
     conn.close()
@@ -234,7 +273,8 @@ def realized(day: dict) -> dict:
             out[k]["door_ready_min"] += max(min(ready, H) - arr, 0)
             if v["due"] is not None:
                 out[k]["ready_by_due"] += 1 if (v["dep"] is not None and ready <= float(v["due"])) else 0
-            out[k]["past_contract_min"] += max(min(plug, H) - arr - float(v["contract_wait"]), 0) if plug is not None else 0
+            out[k]["past_contract_min"] += max(min(plug, H) - v["rel"] - float(v["contract_wait"]), 0) if plug is not None else 0
+            out[k]["drive_home_min"] += max(min(v["rel"], H) - arr, 0)
             if v["due"] is not None:
                 out[k]["with_due"] += 1
                 out[k]["on_time"] += 1 if (v["dep"] is not None and float(v["dep"]) <= float(v["due"])) else 0
@@ -243,7 +283,8 @@ def realized(day: dict) -> dict:
 
 
 def solve(day: dict, objective: str, seconds: float, owner: str | None = None, fix: str | None = None,
-          caps: dict | None = None, engine_order: bool = False, dump: str | None = None) -> dict:
+          caps: dict | None = None, engine_order: bool = False, dump: str | None = None,
+          immediate_first: bool = False) -> dict:
     """One clairvoyant solve. fix = 'post' or 'bay' holds that lane's jobs at their realized start (the regret split)."""
     Hd = int(math.ceil(day["horizon"]))      # the day's own end: both sides count minutes only up to it
     H = Hd + 24 * 60                          # the schedule may run past it, as the real day's cars did
@@ -254,6 +295,7 @@ def solve(day: dict, objective: str, seconds: float, owner: str | None = None, f
     for v in day["visits"]:
         jobs = day["jobs"].get(v["visit_id"], [])
         arr = int(math.floor(float(v["arr"])))
+        rel = max(int(math.ceil(float(v["rel"]))), arr)    # no work before the car is at the gate (2026-11-06)
         ivs, ends, plug_starts = [], [], []
         for j in jobs:
             d = max(int(round(j["dur"])), 1)
@@ -261,7 +303,7 @@ def solve(day: dict, objective: str, seconds: float, owner: str | None = None, f
                                                    or (fix == "bay" and j["lane"] != "post")):
                 s = m.NewConstant(max(int(round(j["start"])), arr))
             else:
-                s = m.NewIntVar(arr, H - d, "s")
+                s = m.NewIntVar(min(rel, H - d), H - d, "s")
             e = m.NewIntVar(arr + d, H, "e")
             iv = m.NewIntervalVar(s, d, e, "iv")
             ivs.append(iv)
@@ -285,21 +327,20 @@ def solve(day: dict, objective: str, seconds: float, owner: str | None = None, f
                     else:
                         m.Add(pe <= biv.StartExpr())
         dep = m.NewIntVar(arr, H, "dep")
-        if ends:
-            m.AddMaxEquality(dep, [e for e in ends])
-        else:
-            m.Add(dep == arr)
-        out_at = m.NewIntVar(arr, H, "out")
-        m.AddMinEquality(out_at, [dep + (GATE_MIN if ends else 0), m.NewConstant(max(Hd, arr))])
+        # 2026-11-06: every visit reaches the gate and passes its readiness check, a visit with no place-holding work
+        # too (the first versions let such a visit leave at its call, a door of 0 against 12 minutes gate to ready)
+        m.AddMaxEquality(dep, [e for e in ends] + [m.NewConstant(min(rel, H))])
+        out_at = m.NewIntVar(arr, H + READY_MIN, "out")
+        m.AddMinEquality(out_at, [dep + READY_MIN, m.NewConstant(max(Hd, arr))])
         door = m.NewIntVar(0, H, "door")
         m.Add(door == out_at - arr)
         late = m.NewIntVar(0, H, "late")
         on_time = None
         if v["due"] is not None:
             due = int(math.floor(float(v["due"])))
-            m.Add(late >= dep + (GATE_MIN if ends else 0) - due)
+            m.Add(late >= dep + READY_MIN - due)
             on_time = m.NewBoolVar("ot")
-            m.Add(dep + (GATE_MIN if ends else 0) <= due).OnlyEnforceIf(on_time)
+            m.Add(dep + READY_MIN <= due).OnlyEnforceIf(on_time)
         else:
             m.Add(late == 0)
         past = m.NewIntVar(0, H, "past")
@@ -308,7 +349,13 @@ def solve(day: dict, objective: str, seconds: float, owner: str | None = None, f
             m.AddMinEquality(first, plug_starts)
             first_c = m.NewIntVar(arr, H, "first_c")
             m.AddMinEquality(first_c, [first, m.NewConstant(max(Hd, arr))])
-            m.Add(past >= first_c - arr - int(v["contract_wait"]))
+            m.Add(past >= first_c - rel - int(v["contract_wait"]))
+            if immediate_first and v["due"] is not None:
+                # rule 9: an owner's immediate turnaround is the owner's requirement and is honoured as asked; the
+                # kernel serves it first, so no schedule the depot may run plugs it in later than the kernel did
+                real_plug = min((j["start"] for j in jobs if j["lane"] == "post" and j["start"] is not None), default=None)
+                if real_plug is not None:
+                    m.Add(first <= max(int(math.floor(real_plug)), rel))
         else:
             m.Add(past == 0)
         visit_vars.append((v, door, on_time, past, out_at))
@@ -349,7 +396,7 @@ def solve(day: dict, objective: str, seconds: float, owner: str | None = None, f
         if dump:   # each job: the realized start and the solved one, minutes from the day's start
             with open(dump, "w") as f:
                 for v, j, sv in job_vars:
-                    f.write(json.dumps({"visit": v["visit_id"], "owner": v["owner"], "arr": float(v["arr"]),
+                    f.write(json.dumps({"visit": v["visit_id"], "owner": v["owner"], "arr": float(v["arr"]), "rel": v["rel"],
                                         "due": (float(v["due"]) if v["due"] is not None else None),
                                         "archetype": v.get("archetype"), "lane": j["lane"], "dur": j["dur"],
                                         "real_start": j["start"], "solved_start": s.Value(sv),
@@ -377,37 +424,50 @@ def main() -> None:
                     help="CP-SAT workers (fewer beside running lab days; the bound stays a bound, only weaker in the time)")
     ap.add_argument("--split", action="store_true", help="also solve with each lane held at the kernel's starts")
     ap.add_argument("--owners", action="store_true", help="also each owner's own best (door), the others free")
+    ap.add_argument("--fair", action="store_true",
+                    help="also the fair perfect day alone (door, no owner above what the kernel's day gave it), "
+                         "without --owners' per-owner solves")
     ap.add_argument("--engine-order", action="store_true",
                     help="hold each car's work in the engine's own order (repair first on a fault, else charge before bays)")
     ap.add_argument("--post-occupancy", action="store_true",
                     help="a charge holds its post from the car's arrival on it to its leaving it (SESSIONS_OCC_SQL), not the session only")
     ap.add_argument("--objectives", default="door,on_time,wait", help="comma-separated: door, on_time, wait")
     ap.add_argument("--dump-schedule", help="write the first door solve's job starts (real and solved), one JSON a line")
+    ap.add_argument("--ready-min", type=int, default=5,
+                    help="the readiness check's minutes after a visit's last job (5: one tick of the lab days)")
+    ap.add_argument("--immediate-first", action="store_true",
+                    help="rule 9's form: no immediate dispatch (a visit with a due time) plugs in later than the kernel "
+                         "plugged it in (the owner's immediate turnaround is honoured as asked, so it keeps its place)")
     ap.add_argument("--out", default=os.path.join(HERE, "bound_ops.jsonl"))
     a = ap.parse_args()
-    global NUM_WORKERS
+    global NUM_WORKERS, READY_MIN
     NUM_WORKERS = a.workers
+    READY_MIN = a.ready_min
     day = load(a.db, a.run, occupancy=a.post_occupancy)
     real = realized(day)
     out = {"db": day["db"], "run": day["run"], "scenario": day["scenario"], "seed": day["seed"], "lab": day["lab"],
-           "engine_order": a.engine_order, "post_occupancy": a.post_occupancy,
+           "engine_order": a.engine_order, "post_occupancy": a.post_occupancy, "immediate_first": a.immediate_first,
+           "release": "gate", "bay_bookings": "all", "ready_min": READY_MIN, "workers": NUM_WORKERS,
            "horizon_min": day["horizon"], "units": day["units"], "faults": len(day["faults"]),
            "visits": len(day["visits"]), "jobs": sum(len(j) for j in day["jobs"].values()),
            "realized": real, "solves": []}
     dumped = False
     for obj in [x.strip() for x in a.objectives.split(",") if x.strip()]:
         out["solves"].append(solve(day, obj, a.seconds, engine_order=a.engine_order,
-                                   dump=(a.dump_schedule if obj == "door" and not dumped else None)))
+                                   dump=(a.dump_schedule if obj == "door" and not dumped else None),
+                                   immediate_first=a.immediate_first))
         dumped = dumped or obj == "door"
     if a.split:
         for fix in ("bay", "post"):
-            out["solves"].append(solve(day, "door", a.seconds, fix=fix, engine_order=a.engine_order))
-    if a.owners:
-        for owner in sorted({v["owner"] for v in day["visits"]}):
-            out["solves"].append(solve(day, "door", a.seconds, owner=owner, engine_order=a.engine_order))
+            out["solves"].append(solve(day, "door", a.seconds, fix=fix, engine_order=a.engine_order,
+                                       immediate_first=a.immediate_first))
+    if a.owners or a.fair:
+        for owner in (sorted({v["owner"] for v in day["visits"]}) if a.owners else []):
+            out["solves"].append(solve(day, "door", a.seconds, owner=owner, engine_order=a.engine_order,
+                                       immediate_first=a.immediate_first))
         # the fair perfect day: the least total, no owner above what the kernel's day gave it (minutes to ready)
         caps = {o: x["door_ready_min"] for o, x in real.items() if o != "all"}
-        fair = solve(day, "door", a.seconds, caps=caps, engine_order=a.engine_order)
+        fair = solve(day, "door", a.seconds, caps=caps, engine_order=a.engine_order, immediate_first=a.immediate_first)
         fair["objective"] = "door_no_owner_worse"
         out["solves"].append(fair)
     with open(a.out, "a") as f:
