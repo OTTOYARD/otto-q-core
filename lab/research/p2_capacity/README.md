@@ -89,3 +89,24 @@ each faulted session to its repair), so what is left is the minutes between one 
 in. At midday (11 AM-2 PM arrivals, 26-34 an hour) the posts are full too, and that is when the waits come (a mean of 33-79
 minutes). Whether a third service bay moves the wall is the next lab day
 (`normal_day_200_171717_svc3`); the whole-day runs read the same curve past the start-up wave.
+
+### While cars wait for a charge, a working post is almost never free (three lab days)
+
+`post_idle_while_waiting.sql` rebuilds every post and every waiting car tick by tick (posts from `stall.state_changed`,
+cars from `vehicle.state_changed`): the cars parked or at the gate whose charge has not begun, against the posts with no
+car, no reservation and no session, split by whether the post's last session ended in a fault. Read 2026-11-06 between
+03:19 and 03:24 UTC.
+
+| day | car-minutes parked or at the gate before the first charge | post-minutes free after a fault while a car waited | post-minutes free, no fault, while a car waited (of them, the day's first tick) |
+|---|---:|---:|---:|
+| 116 cars, 12 h, seed 171717 | 3,395 | 985 | 265 (150) |
+| 150 cars, 12 h, seed 171717 | 5,855 | 1,135 | 395 (150) |
+| 116 cars, 24 h, seed 171717 | 3,965 | 1,155 | 330 (150) |
+
+Past the first tick (38 to 49 cars at the gate and all 30 posts free), a working post stood free while a car waited one or
+two posts at a time, 115 to 245 post-minutes a day: the engine seats a car on a working post almost as soon as it frees.
+The posts that stood free while cars waited were posts whose charger had faulted, until the repair (counted to the next
+car plugging in, so an upper bound). So at the posts the perfect day's gain (E5: rescheduling only the posts takes 24,332
+car-minutes to ready to 18,614 at 116 cars) is the order in which cars get a post, not posts left idle, and charger faults
+are the posts' loss. A first pass of this measure read 2,500 post-minutes "empty while cars waited" at 116 cars: it counted
+cars still driving home (a visit opens when the car is called, before it arrives) and posts in repair as free.
