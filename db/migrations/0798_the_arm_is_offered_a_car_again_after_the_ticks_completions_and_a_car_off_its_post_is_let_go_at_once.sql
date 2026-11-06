@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261106132144
 -- migration-name:    the_arm_is_offered_a_car_again_after_the_ticks_completions_and_a_car_off_its_post_is_let_go_at_once
 --
 -- 0798  **The post's arm is offered a charging car again after the tick's completions, and a routine whose car has left
@@ -252,3 +252,13 @@ VALUES ('0798_the_arm_is_offered_a_car_again_after_the_ticks_completions_and_a_c
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-06 at 13:21:44 UTC (7:21 AM CT), ledger 20261106132144, through apply_migration, on Chase's word ("Yes,
+--   just keep building", read 2026-11-06 by 13:20 UTC, in reply to the report that asked "approve 0798, 0799, 0800, 0801,
+--   0802"). Nothing live (no run running), 0798 not in the lineage, and the function at the md5 P1 names, 99f6aa09 (read
+--   13:20:36 UTC). The text sent was this file before its version line and this footer were set: 17,093 bytes, md5
+--   e97b18b7aded4bb0ab73fa3ff9a19311, equal to the ledger's statements[1] read back. P0, P1, P2, the anchors, V1 and V3
+--   passed inside the apply. Read back at 13:21:52 UTC: md5(prosrc) of twin.ottoq_sim_advance_visit_atoms d5400144, the
+--   body ottoq_lab_0798 ran; the lineage row FALSE/FALSE at 13:21:44. On at the twin depot from each run's next pass
+--   (stall_cabin_robot has been 2 since 0764). Not yet seen in a demo run (rule 12): none has started since. The lab
+--   template ottoq_lab took the same text and ledger row at 13:28 UTC and holds the same body (d5400144).
