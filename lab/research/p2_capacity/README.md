@@ -78,8 +78,8 @@ The third bay takes the service bays off the wall (96% to 80% busy) and the post
 chargers sooner (63% to 72% within the contract wait) and the fleet out at work rose 3 points, but the 12 hours let out
 the same number of cars, because what limits a 12-hour day is the 6 AM wave. And this day drew fewer charger faults (5.1%
 of post time against 9.4%), so part of the gain may be the faults' luck, not the bay: one day each, a reading.
-Charger faults are a capacity lever of their own: 5-13% of post time on these days, so a fault rate halved is worth about
-two posts at 30.
+Charger faults are a capacity lever of their own: 5-13% of post time on these days (1.5-3.9 of the 30 posts, on
+average), so a fault rate halved is worth about one to two posts.
 
 From 150 to 200 cars the depot let out 10 more cars in the day and held 45 more at 6 PM; the two service bays ran 96%
 busy, and a third of the cars arriving in the day waited past the contract for a charger. The posts' 77% is a day's
