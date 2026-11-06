@@ -29,7 +29,7 @@ case "$cmd" in
         s=${seeds[$i]}; o=${seeds[$(( (i + 1) % ${#seeds[@]} ))]}
         shape=$D/load_shape_normal_day_116_${o}_b36.json
         [ -f "$shape" ] || $PY -I $D/make_load_shape.py --from-db ottoq_cap_normal_day_116_${o}_b36 > /dev/null
-        base="--fleet 116 --scenario normal_day --seed $s --ticks 432 --dial bess_plan_bill_from_min=720 --battery-lp $shape --battery-lp-bill-from-min 720"
+        base="--fleet 116 --scenario normal_day --seed $s --ticks 432 --run-hours 36 --dial bess_plan_bill_from_min=720 --battery-lp $shape --battery-lp-bill-from-min 720"
         echo "normal_day_116_${s}_p36shape|$base --tag p36shape"
         echo "normal_day_116_${s}_p36q80|$base --battery-lp-learned $D/forecast_model_36h_q80cv_ex$s.json --tag p36q80"
       done

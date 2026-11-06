@@ -107,6 +107,9 @@ def main() -> None:
     ap.add_argument("--scenario", default="normal_day")
     ap.add_argument("--seed", type=int, default=171717)
     ap.add_argument("--ticks", type=int, default=144)
+    ap.add_argument("--run-hours", type=float,
+                    help="the run's end this many hours after its start (a scenario ends its run at its "
+                         "default_duration_hours, 24 for normal_day; a longer lab day needs a later end)")
     ap.add_argument("--step", type=float, default=5.0, help="sim minutes per tick")
     ap.add_argument("--sim-start", default="2026-09-01 11:00:00+00")
     ap.add_argument("--sample-every", type=int, default=6, help="ticks between constraint-board samples")
@@ -222,6 +225,9 @@ def main() -> None:
     conn.execute("SELECT public.ottoq_tick_invariance_reset_fleet(%s, %s, %s)", (TWIN, a.seed, a.sim_start))
     one("SELECT set_config('ottoq.sim_run_id', '', true)")
     run = str(one("SELECT public.ottoq_sim_run_scenario(%s, %s, 'ab_harness', %s)", (a.scenario, a.seed, a.sim_start)))
+    if a.run_hours:      # LAB ONLY: a run longer than its scenario's default (the tick ends a run at sim_clock_end)
+        conn.execute("UPDATE ottoq_sim_runs SET sim_clock_end = sim_clock_start + make_interval(secs => %s) "
+                     "WHERE sim_run_id = %s", (a.run_hours * 3600.0, run))
     one("SELECT set_config('ottoq.sim_run_id', %s, true)", (run,))
     conn.execute("UPDATE ottoq_sim_runs SET time_scale = %s, tick_interval_seconds = 30, "
                  "payload = COALESCE(payload, '{}'::jsonb) || jsonb_build_object('lab_capacity', %s::jsonb) "
@@ -366,7 +372,7 @@ def main() -> None:
                            "blend": a.battery_lp_blend, "learned": a.battery_lp_learned, "band_hh": a.battery_lp_band_hh, "bill_from_min": a.battery_lp_bill_from_min,
                            "guard": lp.guard}
                           if lp is not None else None),
-           "ticks": ticks, "commit_each_tick": commit_mode, "step_min": a.step, "sim_start": a.sim_start, "wall_s": wall_s, "clone_s": round(clone_s, 1),
+           "ticks": ticks, "run_hours": a.run_hours, "commit_each_tick": commit_mode, "step_min": a.step, "sim_start": a.sim_start, "wall_s": wall_s, "clone_s": round(clone_s, 1),
            "error": err, "scorecard": score, "owners": owners, "resources": resources, "walls": walls}
     with open(a.out, "a") as f:
         f.write(json.dumps(out, default=str) + "\n")
