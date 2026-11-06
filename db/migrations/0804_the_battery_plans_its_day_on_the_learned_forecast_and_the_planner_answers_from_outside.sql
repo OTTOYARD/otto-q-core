@@ -36,9 +36,11 @@
 --           guard);
 --         the energy price per step (the twin's own tariff lookup, as the day plan and the bill read it);
 --         the billing periods: from the later of the month's start and the run's start plus bess_plan_bill_from_min (the
---           day plan's window), with the peak already billed (the day plan's ratchet) and a margin of max(100 kW, 10% of
---           it) under which every half hour wholly in the future is planned; a new month, a new period;
---         the grid draws of the last half hour (for the windows that straddle now);
+--           day plan's window), with the peak already billed (the day plan's ratchet, of the intervals after the period's
+--           start) and a margin of max(100 kW, 10% of it) under which every half hour wholly in the future is planned; a new
+--           month, a new period;
+--         the grid over the last half hour, step by step in minutes (production ticks every 2 minutes, a step is 5), the
+--           tick under way included (for the windows that straddle now);
 --         the battery as it stands, its floor and ceiling, its power and its one-way efficiency (G172's fraction);
 --         a floor per step from the demand-response reserve as the depot's dials hold it (bess_plan_dr_reserve_kwh from
 --           bess_plan_dr_reserve_lead_h before the window, declining to nothing through it, summer only), read at each
@@ -228,14 +230,17 @@ BEGIN
    WHERE e.depot_id = p_depot_id AND e.sim_run_id = p_sim_run_id AND e.timestamp <= p_sim_clock
    ORDER BY e.timestamp DESC LIMIT 1;
   v_last_pre := COALESCE(p_net_now_kw, v_last_pre, 0);
-  SELECT COALESCE(array_agg(g ORDER BY t), ARRAY[]::numeric[]) INTO v_past
-    FROM (SELECT e.timestamp AS t, round(GREATEST(COALESCE(e.grid_import_kw, 0), 0), 1) AS g
-            FROM site_energy_snapshots e
-           WHERE e.depot_id = p_depot_id AND e.sim_run_id = p_sim_run_id AND e.timestamp <= p_sim_clock
-           ORDER BY e.timestamp DESC LIMIT v_win - 1 - CASE WHEN p_grid_now_kw IS NULL THEN 0 ELSE 1 END) z;
-  IF p_grid_now_kw IS NOT NULL THEN
-    v_past := v_past || round(GREATEST(p_grid_now_kw, 0), 1);
-  END IF;
+  -- in minutes, not snapshots (a tick need not be a step: production ticks every 2 minutes): past step k covers
+  -- (clock - k steps, clock - (k - 1) steps], the mean of the snapshots in it, none before the run; step 1 is the tick
+  -- under way when the caller is inside it (its snapshot not yet written)
+  SELECT array_agg(COALESCE(g, 0) ORDER BY k DESC) INTO v_past
+    FROM (SELECT k, CASE WHEN k = 1 AND p_grid_now_kw IS NOT NULL THEN round(GREATEST(p_grid_now_kw, 0), 1)
+                         ELSE (SELECT round(GREATEST(avg(COALESCE(e.grid_import_kw, 0)), 0), 1) FROM site_energy_snapshots e
+                                WHERE e.depot_id = p_depot_id AND e.sim_run_id = p_sim_run_id
+                                  AND e.timestamp >  p_sim_clock - make_interval(secs => v_step * 60 * k)
+                                  AND e.timestamp <= p_sim_clock - make_interval(secs => v_step * 60 * (k - 1))) END AS g
+            FROM generate_series(1, v_win - 1) k) z;
+  v_past := COALESCE(v_past, ARRAY[]::numeric[]);
 
   -- the demand-response reserve as the depot holds it (0435, 0797)
   v_dr_kwh := GREATEST(0, COALESCE(ottoq_policy_get(p_sim_run_id, 'bess_plan_dr_reserve_kwh', 600), 600));
@@ -280,10 +285,23 @@ BEGIN
   v_next_month := date_trunc('month', p_sim_clock) + interval '1 month';
   v_s1 := ceil(EXTRACT(EPOCH FROM (v_bill_from - p_sim_clock)) / (v_step * 60))::int;
   v_e1 := LEAST(v_m, ceil(EXTRACT(EPOCH FROM (v_next_month - p_sim_clock)) / (v_step * 60))::int);
-  v_sunk := CASE WHEN v_s1 <= 0 THEN COALESCE((v_plan->>'ratchet_kw')::numeric, 0) ELSE 0 END;
+  -- the peak the period has already billed: its highest completed 30-minute window (the day plan's ratchet, 0600), of the
+  -- intervals after the period's start only: a snapshot at the start closes the interval before it, which the period does
+  -- not bill and the plan charged freely in (the research lab's end-to-end days: an 815 kW half hour taken as paid)
+  v_sunk := 0;
+  IF v_s1 <= 0 THEN
+    SELECT COALESCE(max(w.g30), 0) INTO v_sunk
+      FROM (SELECT e.timestamp AS t,
+                   avg(GREATEST(COALESCE(e.grid_import_kw, 0), 0))
+                     OVER (ORDER BY e.timestamp RANGE BETWEEN CURRENT ROW AND interval '29 minutes 59 seconds' FOLLOWING) AS g30
+              FROM site_energy_snapshots e
+             WHERE e.depot_id = p_depot_id AND e.sim_run_id = p_sim_run_id
+               AND e.timestamp > v_bill_from AND e.timestamp < p_sim_clock) w
+     WHERE w.t + interval '30 minutes' <= p_sim_clock;
+  END IF;
   IF v_s1 < v_e1 THEN
-    v_periods := v_periods || jsonb_build_array(jsonb_build_object('start', v_s1, 'end', v_e1, 'sunk_kw', v_sunk,
-                                                                   'margin_kw', GREATEST(100, 0.10 * v_sunk)));
+    v_periods := v_periods || jsonb_build_array(jsonb_build_object('start', v_s1, 'end', v_e1, 'sunk_kw', round(v_sunk, 1),
+                                                                   'margin_kw', round(GREATEST(100, 0.10 * v_sunk), 1)));
   END IF;
   IF v_e1 < v_m THEN
     v_periods := v_periods || jsonb_build_array(jsonb_build_object('start', v_e1, 'end', v_m, 'sunk_kw', 0, 'margin_kw', 100));
