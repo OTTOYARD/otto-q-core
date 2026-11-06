@@ -38,7 +38,7 @@ def load_shape(path: str) -> list[float]:
 class BatteryLP:
     def __init__(self, conn, run: str, step_min: float, ticks: int, shape: list[float], dr_kwh: float = 600.0,
                  dr_window: tuple[float, float] = (14.0, 20.0), wear: float = 0.02, amort: float = 30.0,
-                 guard: bool = True, blend: bool = False, learned: str | None = None):
+                 guard: bool = True, blend: bool = False, learned: str | None = None, band_hh: int | None = None):
         self.conn, self.run, self.step_h, self.n = conn, run, step_min / 60.0, ticks
         self.shape, self.dr_kwh, self.dr_window, self.wear, self.amort = shape, dr_kwh, dr_window, wear, amort
         # the two guards the first lab day showed it needs (2026-11-06): planned to the edge of the peak already billed
@@ -57,6 +57,10 @@ class BatteryLP:
         # (forecast_learn.py --save: a ridge per half hour ahead on the day plan's own terms and the hour), the building
         # and the sun as the day plan forecasts them, and the shape beyond the model's four hours
         self.learned = None
+        # band_hh (2026-11-06): the learned forecast's upper band (offset_kw) only for the next band_hh half hours, the
+        # mean beyond: on seed 424242 the band on every half hour made the plan save energy for afternoon peaks that
+        # never came and sit out the 6:15 AM surge (q95: no discharge into 1,840 kW; the mean: 1,186 kW)
+        self.band_hh = band_hh
         if learned:
             with open(learned) as fh:
                 self.learned = json.load(fh)
@@ -126,7 +130,8 @@ class BatteryLP:
             x = [act[h], known[h] - act[h], queue[h], persist, base[h], solar[h],
                  math.sin(2 * math.pi * hr / 24), math.cos(2 * math.pi * hr / 24), max(act[h], queue[h], persist)]
             z = [1.0] + [(xi - mu) / sd for xi, mu, sd in zip(x, m["mu"], m["sd"])]
-            ev = max(0.0, sum(wi * zi for wi, zi in zip(m["w"], z)) + float(m.get("offset_kw", 0.0)))
+            off = float(m.get("offset_kw", 0.0)) if (self.band_hh is None or h < self.band_hh) else 0.0
+            ev = max(0.0, sum(wi * zi for wi, zi in zip(m["w"], z)) + off)
             pre.append(max(0.0, base[h] + ev - solar[h]))
         per = max(1, int(round(0.5 / self.step_h)))
         return [pre[j // per] if j // per < len(pre) else x for j, x in enumerate(fc)]
