@@ -30,7 +30,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 SQL = """
 WITH r AS (SELECT sim_run_id AS run FROM ottoq_sim_runs WHERE run_by = 'ab_harness' ORDER BY started_at DESC LIMIT 1),
-o AS (SELECT x.* FROM r, public.ottoq_visit_outcomes(r.run) x),
+o0 AS (SELECT x.* FROM r, public.ottoq_visit_outcomes(r.run) x),
+o AS (SELECT o0.* FROM o0  -- G520: a visit the twin opened while its car was still out at work, which never departed,
+       -- is not a visit (the car came home later, on a visit of its own); counted, it doubles the car and takes its later charge
+       WHERE NOT (o0.departed_at IS NULL AND (SELECT COALESCE(e.payload->>'to', e.payload->'diff'->'current_state'->>'to')
+                    FROM ottoq_events e WHERE e.entity_id = o0.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                     AND e.sim_clock_at <= o0.arrived_at AND (e.payload ? 'to' OR e.payload->'diff' ? 'current_state')
+                   ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) IN ('deployed', 'en_route_to_deployment'))),
 sla AS (SELECT DISTINCT ON (s.fleet_operator_id) s.fleet_operator_id, s.max_queue_wait_minutes
           FROM ottoq_fleet_operator_slas s WHERE s.status = 'active' ORDER BY s.fleet_operator_id, s.version DESC),
 w AS (SELECT o.*, fo.name AS owner, sla.max_queue_wait_minutes AS contract_wait,
@@ -62,12 +68,18 @@ SELECT COALESCE(owner, 'all') AS owner, count(*) AS visits,
 UPTIME_SQL = """
 WITH r AS (SELECT sim_run_id AS run, sim_clock_start AS t0, sim_clock_current AS t1
              FROM ottoq_sim_runs WHERE run_by = 'ab_harness' ORDER BY started_at DESC LIMIT 1),
-o AS (SELECT x.* FROM r, public.ottoq_visit_outcomes(r.run) x),
+o0 AS (SELECT x.* FROM r, public.ottoq_visit_outcomes(r.run) x),
+o AS (SELECT o0.* FROM o0  -- G520: a visit the twin opened while its car was still out at work, which never departed,
+       -- is not a visit (the car came home later, on a visit of its own); counted, it doubles the car and takes its later charge
+       WHERE NOT (o0.departed_at IS NULL AND (SELECT COALESCE(e.payload->>'to', e.payload->'diff'->'current_state'->>'to')
+                    FROM ottoq_events e WHERE e.entity_id = o0.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                     AND e.sim_clock_at <= o0.arrived_at AND (e.payload ? 'to' OR e.payload->'diff' ? 'current_state')
+                   ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) IN ('deployed', 'en_route_to_deployment'))),
 fleet AS (SELECT count(*)::numeric AS n FROM vehicles
            WHERE home_depot_id = '11111111-1111-1111-1111-111111111111' AND category = 'autonomous'),
 h AS (SELECT g AS at FROM r, generate_series(r.t0 + (%(skip)s * interval '1 hour'), r.t1 - (%(tail)s * interval '1 hour'),
                                               interval '30 minutes') g)
-SELECT round(avg(((SELECT n FROM fleet) - (SELECT count(*) FROM o WHERE o.arrived_at <= h.at
+SELECT round(avg(((SELECT n FROM fleet) - (SELECT count(DISTINCT o.vehicle_id) FROM o WHERE o.arrived_at <= h.at
                                                  AND (o.departed_at IS NULL OR o.departed_at > h.at)))
                  / (SELECT n FROM fleet)) * 100, 1) AS out_pct,
        round(avg(public.ottoq_deploy_target_now(r.run, '11111111-1111-1111-1111-111111111111', h.at)
