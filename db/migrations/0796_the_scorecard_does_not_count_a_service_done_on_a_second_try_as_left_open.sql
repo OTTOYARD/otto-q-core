@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261106012557
 -- migration-name:    the_scorecard_does_not_count_a_service_done_on_a_second_try_as_left_open
 --
 -- 0796  **The throughput scorecard does not count a service that was done on a second try as work left open at
@@ -151,3 +151,11 @@ VALUES ('0796_the_scorecard_does_not_count_a_service_done_on_a_second_try_as_lef
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-06 at 01:25:57 UTC (7:25 PM CT on 2026-11-05), ledger 20261106012557, through apply_migration, on
+--   Chase's word ("Approve 0796", read 2026-11-06 01:24 UTC). Nothing live or paused at the twin depot and 0796 not in the
+--   lineage (read 01:24:53 UTC); the function at the md5 P1 names (4e702e55). The text sent was this file before its
+--   version line and this footer were set: 10,324 bytes, md5 1be414df19e519a8e04d9e6c499d8200, equal to the ledger's
+--   statements[1] read back. P0, P1, the anchor, V1 and V2 passed inside the apply (V2 over every run production holds,
+--   358). Read back at 01:26:22 UTC: ottoq_visit_outcomes at md5 81757b43, one '0796_pre' snapshot, the lineage row
+--   FALSE/FALSE. The research lab, given the same file and ledger row, holds the same body (81757b43).
