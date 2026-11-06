@@ -3,4 +3,3 @@
 # (FR-1) does not consult a live call. What happens to the cars and the grid when the call comes? Against
 # dr_event_cascade_116_171717_g517on_call (0797 on, the day plan). The floor's weight at 0 as in production (0797).
 dr_event_cascade_116_171717_lp2_call|--fleet 116 --scenario dr_event_cascade --seed 171717 --dial bess_reserve_uncertainty_weight=0 --lab-sql lab/research/p2_capacity/whatif_forced_dr_call.sql --battery-lp lab/research/p2_capacity/load_shape_normal_day_116_424242.json --tag lp2_call
-dr_event_cascade_116_171717_lp2_call_safe|--fleet 116 --scenario dr_event_cascade --seed 171717 --dial bess_reserve_uncertainty_weight=0 --lab-sql lab/research/p2_capacity/whatif_forced_dr_call.sql --lab-sql lab/research/p2_capacity/whatif_safe_follow.sql --battery-lp lab/research/p2_capacity/load_shape_normal_day_116_424242.json --tag lp2_call_safe
