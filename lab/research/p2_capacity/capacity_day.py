@@ -286,10 +286,33 @@ def main() -> None:
             if commit_mode:
                 conn.commit()
             f = (fl[1] or {}).get("forecast") or {}
+            # the known term's first loop alone (the cars on a charger now, each held at its starting rate until its
+            # energy is in, ottoq_forecast_ev_known_kw loop 1, verbatim), to grade it apart from the second (cars coming
+            # home, each charged from its arrival whether or not a post is free)
+            act = [0.0] * len(f.get("ev_known_kw") or [])
+            for rate, kwh in conn.execute("""
+                    SELECT GREATEST(ottoq_sim_compute_charge_rate(
+                             p_soc_pct := v.current_soc, p_battery_temp_c := COALESCE(s.ambient_temp_c,22)+5,
+                             p_ambient_temp_c := COALESCE(s.ambient_temp_c,22), p_charger_max_kw := ch.max_kw,
+                             p_vehicle_max_kw := v.inlet_max_kw, p_battery_capacity_kwh := v.battery_capacity_kwh,
+                             p_battery_soh_pct := 95, p_noise_seed := 1, p_noise_salt := s.vehicle_id::text), 1),
+                           GREATEST(0,(COALESCE(v.target_soc, public.ottoq_default_target_soc())-v.current_soc)/100.0
+                                      *COALESCE(v.battery_capacity_kwh,75))
+                      FROM ocpp_sessions s JOIN stalls st ON st.id=s.stall_id
+                      JOIN ottoq_ocpp_chargers ch ON ch.charger_id=st.ocpp_charger_id
+                      JOIN vehicles v ON v.id=s.vehicle_id
+                     WHERE s.status='active' AND s.sim_run_id=%s""", (run,)).fetchall():
+                dur = float(kwh) / float(rate) * 60.0
+                for h in range(len(act)):
+                    if h * 30.0 < dur:
+                        act[h] += float(rate)
+            if commit_mode:
+                conn.commit()
             with open(a.log_forecast, "a") as fh:
                 fh.write(json.dumps({"db": db, "run": run, "k": k + 1, "clock": str(fl[0]),
                                      **{key: f.get(key) for key in ("net_kw", "ev_kw", "ev_known_kw", "ev_queue_kw",
                                                                     "base_kw", "solar_kw")},
+                                     "ev_active_kw": [round(x) for x in act],
                                      "ev_persist_kw": (fl[1] or {}).get("ev_persist_kw"),
                                      "mode": (fl[1] or {}).get("mode"), "level_kw": (fl[1] or {}).get("level_kw")}) + "\n")
         if (k + 1) % 12 == 0:
