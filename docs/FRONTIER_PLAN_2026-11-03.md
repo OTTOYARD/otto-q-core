@@ -653,6 +653,12 @@ lower the peak at all: the battery started 25% full, the plan holds a 600 kWh de
 minute of the day (no call came; needed only from 2 PM it costs nothing in hindsight), and its floor rises at every surge
 (G517). The battery's build order is in `docs/AGENT_ARCHITECTURE.md` (where the agent earns its place, item 1).*
 
+*Status 9:02 PM CT on 2026-11-05: the first step of that order is in production. 0797 holds the call reserve from 3 hours before the
+window and lets the floor stop rising at every surge; switched on at the twin depot at 8:57 PM CT on 2026-11-05 after
+three lab gates (at its defaults it reproduces a day exactly; on, the two lab days bill $1,301 and $1,295; on a day with
+a 2 PM call every car is the same and the battery meets the call 85.5% full instead of 74.9%). Next in the order: the
+planner that plans its own refill (`lab/research/p2_capacity/battery_lp.py`, proven in the lab loop).*
+
 ### Phase 4: the inventor. Needs D3.
 
 E6 in the Lab, on the target with the most regret in Phase 3: the charge-line key unless E5 says otherwise.

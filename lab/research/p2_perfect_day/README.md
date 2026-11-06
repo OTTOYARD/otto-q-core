@@ -220,7 +220,8 @@ discharge stay as they were. What decides the bill is how deep the battery may g
 reserves, and whether the plan dares spend into it knowing it can refill later, which a linear program over the day does
 and the day plan does not.
 
-So the order of the battery's build is: the reserves first (G517, measured with the plan as it runs), then a planner
+So the order of the battery's build is: the reserves first (G517, measured with the plan as it runs; built as 0797 and
+on at the twin depot since 8:57 PM CT on 2026-11-05, `lab/research/p2_capacity/g517_lab_2026-11-06.md`), then a planner
 that plans its own refill (the rolling linear program in `bound_energy.py`, held to the 600 kWh reserve from 2 PM), and
 a forecast of the day's shape inside that planner, where it is worth something (on the first day the same planner went
 from $1,583 with the load held flat to $1,152 with the shape). The first day's reserves are being measured the same way

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261106025354
 -- migration-name:    the_battery_holds_its_call_reserve_only_as_the_window_nears_and_its_floor_can_stop_rising_at_a_surge
 --
 -- 0797  **The battery holds its demand-response reserve only as the call window nears, and its floor can stop rising at
@@ -247,3 +247,21 @@ VALUES ('0797_the_battery_holds_its_call_reserve_only_as_the_window_nears_and_it
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-06 at 02:53:54 UTC (8:53 PM CT on 2026-11-05), ledger 20261106025354, through apply_migration, on
+--   Chase's standing word ("continue building as needed. You're the expert, I'm just the CEO", read 2026-11-06 01:24
+--   UTC). Nothing live or paused, 0797 not in the lineage, neither dial catalogued, and the three functions at the md5s P1
+--   names (read 02:52:58 UTC). The text sent was this file before its version line and this footer were set: 17,975 bytes,
+--   md5 47820aceeccb9ac89440a51fb7a48912, equal to the ledger's statements[1] read back. P0, P1, the anchors, V1 and V2
+--   passed inside the apply. Read back at 02:56:08 UTC: md5(prosrc) of the day plan 7b7bc59a, the orchestrator 8f425cda,
+--   the reserve target 22b198bc, equal to ottoq_lab_0797, the research lab's copy that ran the three gates
+--   (lab/research/p2_capacity/g517_lab_2026-11-06.md); three '0797_pre' snapshots; both dials catalogued (24 in 0..24 and
+--   20 in 0..40, not agent-writable); the lineage row FALSE/FALSE. The lab template ottoq_lab took the same text and
+--   ledger row at 03:01:10 UTC and holds the same three bodies.
+-- SWITCHED ON at the twin depot at 02:57:21 UTC (8:57 PM CT): bess_plan_dr_reserve_lead_h 3 and
+--   bess_reserve_uncertainty_weight 0, both receipts ok and unclamped, written in one statement that first read no run
+--   live at the twin. The writer is "Chase (delegated to Claude Code: 0797)": the decision was made under Chase's
+--   delegation, not by him, and the name says so. ottoq_policy_get on the latest twin run reads 3 and 0 (02:57:45 UTC).
+--   Not yet seen in a demo run (rule 12): none has started since. The twin's demo days fall in October and November,
+--   outside the tariff's summer months (June to September), where the call reserve is not held at all, so on those days
+--   only the floor's dial acts.

@@ -159,3 +159,38 @@ ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
   run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
+
+-- G517's fix, shipped (2026-11-06, 8:57 PM CT on 11-05). Evidence: lab/research/p2_capacity/g517_lab_2026-11-06.md,
+-- db/migrations/0797 (applied 02:53:54 UTC, switched on at the twin depot 02:57:21 UTC).
+INSERT INTO public.ottoq_research_findings
+  (slug, phase, item, kind, status, title, summary, metrics, evidence, run_ids, measured_at)
+VALUES
+  ('p2-battery-reserves-shipped', 'P2', 'E5', 'build', 'shipped',
+   'The battery''s reserve fix is on at the twin: it keeps the 600 kWh call reserve from 11 AM, and on a day with a call every car was the same and the battery was fuller',
+   'Shipped to production as 0797 and switched on at the twin depot at 8:57 PM CT on 2026-11-05. Before it, on a summer day the '
+   'battery''s day plan held 600 kWh for a possible 2-8 PM demand-response call from the first minute of the day, and its floor '
+   'rose at every surge, so a battery under about half full sat out the morning surge. Now the plan takes up the reserve 3 hours '
+   'before the window and its floor no longer rises with every surge. Three lab tests on a copy of production''s engine came '
+   'first. At its old settings the change reproduces a day exactly. Switched on, the two normal lab days bill $1,301 and $1,295 '
+   'instead of $1,543 and $1,382 (each at the same end-of-day charge), every car''s day identical. And on a day with a 2 PM call '
+   '(forced in the lab, since the scenario''s own call never fires, G518), every car''s day was identical, the grid and battery '
+   'through the call were identical at every 5-minute reading, and the battery met the call 85.5% full instead of 74.9%; that day''s bill '
+   'went from $1,737 to $1,477 at the same end-of-day charge, where the old reserves had cost $68 more than no battery at all. '
+   'The reserve only matters June to September (the tariff''s summer); the floor change acts all year. Not yet seen in a demo run.',
+   '{"migration": "0797", "ledger_version": "20261106025354", "switched_on_utc": "2026-11-06T02:57:21Z",
+     "dials": {"bess_plan_dr_reserve_lead_h": {"default": 24, "twin": 3}, "bess_reserve_uncertainty_weight": {"default": 20, "twin": 0}},
+     "gate_defaults": {"day": "normal_day 116 cars seed 424242", "energy_commands_md5": "580be767", "sessions_md5": "e297dd82", "equal": true},
+     "gate_on_bill_at_base_end_state_usd": {"normal_day_424242": {"before": 1543.13, "after": 1301.28},
+                                             "normal_day_171717": {"before": 1382.34, "after": 1294.82}},
+     "gate_call_day": {"scenario": "dr_event_cascade", "fleet": 116, "seed": 171717, "call_ct": "14:00", "call_minutes": 122,
+                       "call_cap_kw": 160.9, "battery_at_call_pct": {"before": 74.9, "after": 85.5},
+                       "bill_usd": {"before": 1737.07, "after": 1499.00, "after_at_base_end_state": 1476.66, "no_battery": 1669.31},
+                       "half_hour_peak_kw": {"before": 1679.0, "after": 1305.8},
+                       "grid_and_battery_through_the_call_md5": "47a8c44b", "cars": "every car-facing scorecard line identical"},
+     "demand_reserve_months": [6, 7, 8, 9], "finding": "G517", "seen_in_demo_run": false}',
+   'otto-q-core db/migrations/0797, lab/research/p2_capacity/g517_lab_2026-11-06.md, lab/research/p2_capacity/results.jsonl, lab/research/p2_perfect_day/bound_energy.jsonl, FINDINGS.md G517 and G518',
+   '{}', '2026-11-06 03:04:02+00')
+ON CONFLICT (depot_id, slug) DO UPDATE SET
+  phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
+  title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
+  run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
