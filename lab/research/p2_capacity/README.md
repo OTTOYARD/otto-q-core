@@ -95,16 +95,17 @@ minutes). Whether a third service bay moves the wall is the next lab day
 `post_idle_while_waiting.sql` rebuilds every post and every waiting car tick by tick (posts from `stall.state_changed`,
 cars from `vehicle.state_changed`): the cars parked or at the gate whose charge has not begun, against the posts with no
 car, no reservation and no session, split by whether the post's last session ended in a fault. Read 2026-11-06 between
-03:19 and 03:24 UTC.
+03:49 and 03:50 UTC, with same-tick events in the order they were written (`event_seq`; a first read at 03:19-03:24
+ordered them by `event_id`, a random uuid, and read 115-245 free post-minutes past the first tick).
 
 | day | car-minutes parked or at the gate before the first charge | post-minutes free after a fault while a car waited | post-minutes free, no fault, while a car waited (of them, the day's first tick) |
 |---|---:|---:|---:|
-| 116 cars, 12 h, seed 171717 | 3,395 | 985 | 265 (150) |
-| 150 cars, 12 h, seed 171717 | 5,855 | 1,135 | 395 (150) |
-| 116 cars, 24 h, seed 171717 | 3,965 | 1,155 | 330 (150) |
+| 116 cars, 12 h, seed 171717 | 3,330 | 800 | 200 (150) |
+| 150 cars, 12 h, seed 171717 | 6,015 | 1,130 | 215 (150) |
+| 116 cars, 24 h, seed 171717 | 3,820 | 965 | 220 (150) |
 
 Past the first tick (38 to 49 cars at the gate and all 30 posts free), a working post stood free while a car waited one or
-two posts at a time, 115 to 245 post-minutes a day: the engine seats a car on a working post almost as soon as it frees.
+two posts at a time, 50 to 70 post-minutes a day: the engine seats a car on a working post almost as soon as it frees.
 The posts that stood free while cars waited were posts whose charger had faulted, until the repair (counted to the next
 car plugging in, so an upper bound). So at the posts the perfect day's gain (E5: rescheduling only the posts takes 24,332
 car-minutes to ready to 18,614 at 116 cars) is the order in which cars get a post, not posts left idle, and charger faults

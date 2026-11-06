@@ -7,14 +7,14 @@
 WITH run AS (SELECT sim_run_id, sim_clock_start AS t0, sim_clock_current AS t1 FROM ottoq_sim_runs LIMIT 1),
 ticks AS (SELECT t FROM run, generate_series(run.t0, run.t1, interval '5 min') t),
 posts AS (SELECT s.id AS stall_id FROM stalls s WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.stall_type::text = 'dcfc'),
-ev AS (SELECT e.entity_id AS stall_id, e.sim_clock_at AS at, e.event_id, e.payload->'diff' AS d
+ev AS (SELECT e.entity_id AS stall_id, e.sim_clock_at AS at, e.event_seq, e.payload->'diff' AS d
          FROM ottoq_events e JOIN posts p ON p.stall_id = e.entity_id WHERE e.event_type = 'stall.state_changed'),
 grid AS (
   SELECT tk.t, p.stall_id,
-         COALESCE((SELECT NULLIF(o.d->'current_vehicle_id'->>'to','') FROM ev o WHERE o.stall_id = p.stall_id AND o.d ? 'current_vehicle_id' AND o.at <= tk.t ORDER BY o.at DESC, o.event_id DESC LIMIT 1),
-                  (SELECT NULLIF(o.d->'current_vehicle_id'->>'from','') FROM ev o WHERE o.stall_id = p.stall_id AND o.d ? 'current_vehicle_id' AND o.at > tk.t ORDER BY o.at, o.event_id LIMIT 1)) AS occupant,
-         COALESCE((SELECT NULLIF(o.d->'reserved_by'->>'to','') FROM ev o WHERE o.stall_id = p.stall_id AND o.d ? 'reserved_by' AND o.at <= tk.t ORDER BY o.at DESC, o.event_id DESC LIMIT 1),
-                  (SELECT NULLIF(o.d->'reserved_by'->>'from','') FROM ev o WHERE o.stall_id = p.stall_id AND o.d ? 'reserved_by' AND o.at > tk.t ORDER BY o.at, o.event_id LIMIT 1)) AS reserved,
+         COALESCE((SELECT NULLIF(o.d->'current_vehicle_id'->>'to','') FROM ev o WHERE o.stall_id = p.stall_id AND o.d ? 'current_vehicle_id' AND o.at <= tk.t ORDER BY o.at DESC, o.event_seq DESC LIMIT 1),
+                  (SELECT NULLIF(o.d->'current_vehicle_id'->>'from','') FROM ev o WHERE o.stall_id = p.stall_id AND o.d ? 'current_vehicle_id' AND o.at > tk.t ORDER BY o.at, o.event_seq LIMIT 1)) AS occupant,
+         COALESCE((SELECT NULLIF(o.d->'reserved_by'->>'to','') FROM ev o WHERE o.stall_id = p.stall_id AND o.d ? 'reserved_by' AND o.at <= tk.t ORDER BY o.at DESC, o.event_seq DESC LIMIT 1),
+                  (SELECT NULLIF(o.d->'reserved_by'->>'from','') FROM ev o WHERE o.stall_id = p.stall_id AND o.d ? 'reserved_by' AND o.at > tk.t ORDER BY o.at, o.event_seq LIMIT 1)) AS reserved,
          EXISTS (SELECT 1 FROM ocpp_sessions s, run WHERE s.sim_run_id = run.sim_run_id AND s.stall_id = p.stall_id
                     AND s.started_at <= tk.t AND COALESCE(s.ended_at, 'infinity') > tk.t) AS charging,
          (SELECT s.status FROM ocpp_sessions s, run WHERE s.sim_run_id = run.sim_run_id AND s.stall_id = p.stall_id AND s.ended_at <= tk.t
@@ -29,7 +29,7 @@ vstate AS (
   SELECT tk.t, v.visit_id,
          (SELECT COALESCE(e.payload->>'to', e.payload->'diff'->'current_state'->>'to') FROM ottoq_events e
            WHERE e.entity_id = v.vehicle_id AND e.event_type = 'vehicle.state_changed' AND e.sim_clock_at <= tk.t
-             AND (e.payload ? 'to' OR e.payload->'diff' ? 'current_state') ORDER BY e.sim_clock_at DESC, e.event_id DESC LIMIT 1) AS st
+             AND (e.payload ? 'to' OR e.payload->'diff' ? 'current_state') ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) AS st
     FROM ticks tk JOIN vis v ON v.arrived_at <= tk.t AND (v.first_charge IS NULL OR v.first_charge > tk.t)),
 per_tick AS (
   SELECT g.t,

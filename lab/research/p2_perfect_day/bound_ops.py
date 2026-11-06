@@ -178,7 +178,7 @@ SELECT extract(epoch FROM (COALESCE(ev.at, s.ended_at) - r.t0)) / 60.0 AS down_f
   LEFT JOIN LATERAL (SELECT e.sim_clock_at AS at, (e.payload ->> 'repair_minutes')::numeric AS rep
                        FROM ottoq_events e
                       WHERE e.entity_type = 'ocpp_session' AND e.entity_id = s.id AND e.event_type = 'charge.session_faulted'
-                      ORDER BY e.occurred_at DESC LIMIT 1) ev ON true
+                      ORDER BY e.event_seq DESC LIMIT 1) ev ON true
  WHERE s.sim_run_id = %(run)s AND s.status::text = 'faulted' AND s.ended_at IS NOT NULL
 """
 
