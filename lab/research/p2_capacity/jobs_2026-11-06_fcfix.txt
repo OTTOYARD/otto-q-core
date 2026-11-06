@@ -1,0 +1,7 @@
+# The battery day plan's forecast without the post-blind arrivals (whatif_dayplan_on_charger.sql), against the base days
+# (2026-11-06; LAB ONLY; ottoq_lab as it stands: production's engine through 0797, its twin dials at production's).
+# Bases: normal_day_116_171717_fcaudit and dr_event_cascade_116_171717_fcaudit_call (the audit days: a read changes nothing).
+normal_day_116_171717_fcfix|--fleet 116 --scenario normal_day --seed 171717 --lab-sql lab/research/p2_capacity/whatif_dayplan_on_charger.sql --log-forecast lab/research/p2_capacity/forecast_audit_fcfix.jsonl --tag fcfix
+normal_day_116_424242_fcbase|--fleet 116 --scenario normal_day --seed 424242 --log-forecast lab/research/p2_capacity/forecast_audit.jsonl --tag fcbase
+normal_day_116_424242_fcfix|--fleet 116 --scenario normal_day --seed 424242 --lab-sql lab/research/p2_capacity/whatif_dayplan_on_charger.sql --log-forecast lab/research/p2_capacity/forecast_audit_fcfix.jsonl --tag fcfix
+dr_event_cascade_116_171717_fcfix_call|--fleet 116 --scenario dr_event_cascade --seed 171717 --lab-sql lab/research/p2_capacity/whatif_forced_dr_call.sql --lab-sql lab/research/p2_capacity/whatif_dayplan_on_charger.sql --log-forecast lab/research/p2_capacity/forecast_audit_fcfix.jsonl --tag fcfix_call
