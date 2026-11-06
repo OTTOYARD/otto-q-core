@@ -840,7 +840,8 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'the_arm_is_offered_a_car_again_after_the_ticks_completions_and_a_car_off_its_post_is_let_go_at_once'::text, '0798_the_arm_is_offered_a_car_again_after_the_ticks_completions_and_a_car_off_its_post_is_let_go_at_once.sql'::text),
     ('PENDING'::text, 'plan_follow_yields_to_a_live_grid_call_and_follows_a_plan_only_while_it_is_fresh'::text, '0799_plan_follow_yields_to_a_live_grid_call_and_follows_a_plan_only_while_it_is_fresh.sql'::text),
     ('PENDING'::text, 'the_scorecard_does_not_count_the_arms_routine_clean_as_needed_work_left_open'::text, '0800_the_scorecard_does_not_count_the_arms_routine_clean_as_needed_work_left_open.sql'::text),
-    ('PENDING'::text, 'the_arms_registration_draw_is_keyed_on_what_a_run_reproduces_not_on_the_cycles_minted_id'::text, '0801_the_arms_registration_draw_is_keyed_on_what_a_run_reproduces_not_on_the_cycles_minted_id.sql'::text)
+    ('PENDING'::text, 'the_arms_registration_draw_is_keyed_on_what_a_run_reproduces_not_on_the_cycles_minted_id'::text, '0801_the_arms_registration_draw_is_keyed_on_what_a_run_reproduces_not_on_the_cycles_minted_id.sql'::text),
+    ('PENDING'::text, 'a_recall_deferred_for_want_of_a_stall_opens_no_visit'::text, '0802_a_recall_deferred_for_want_of_a_stall_opens_no_visit.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
