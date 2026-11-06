@@ -191,6 +191,10 @@ given at the base day's end state (the difference valued at the plan's own repla
 | no battery | 1,475 kW | $1,499 | | |
 | perfect foresight, the reserve needed from 2 PM | 850 kW | $1,098 | 1,508 kWh | $1,098 |
 
+- **The first day too** (seed 171717, the battery 71% full at 6 AM; `dr0res0`, read 2026-11-06 00:56 UTC): both reserves
+  off take the half-hour peak from 1,160 to 1,032 kW and the bill from $1,382 to $1,295 at the same end state, $88 of the
+  $298 gap to perfect foresight, every car-facing line identical. So the reserves cost money on both days, most when the
+  battery starts low ($242 on the second day).
 - **Either reserve alone hides the other.** The rising floor off changes nothing while the demand-response reserve still
   holds the battery ($1 at the same end state); the reserve off saves $88; both off save $242 and take the peak from 1,475
   to 1,132 kW, 54% of the gap to perfect foresight ($242 of $445). No demand-response call came, so on this day both
