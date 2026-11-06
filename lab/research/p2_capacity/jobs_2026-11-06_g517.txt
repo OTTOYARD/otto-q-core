@@ -1,0 +1,9 @@
+# 0797 (G517) in the lab, every day cloned from a template with 0797 applied (LAB_DB=ottoq_lab_0797).
+# (1) the dials at their defaults must reproduce the day without 0797: every energy command, every bill, every car
+normal_day_116_424242_g517def|--fleet 116 --scenario normal_day --seed 424242 --tag g517def
+# (2) the dials on (the reserve held from 3 hours before the window; no uncertainty on the floor) on both days
+normal_day_116_424242_g517on|--fleet 116 --scenario normal_day --seed 424242 --dial bess_plan_dr_reserve_lead_h=3 --dial bess_reserve_uncertainty_weight=0 --tag g517on
+normal_day_116_171717_g517on|--fleet 116 --scenario normal_day --seed 171717 --dial bess_plan_dr_reserve_lead_h=3 --dial bess_reserve_uncertainty_weight=0 --tag g517on
+# (3) a demand-response call at 2 PM capping the site at 400 kW, the battery 25% full at 6 AM: the cars, dials off and on
+dr_event_cascade_116_171717_g517def|--fleet 116 --scenario dr_event_cascade --seed 171717 --tag g517def
+dr_event_cascade_116_171717_g517on|--fleet 116 --scenario dr_event_cascade --seed 171717 --dial bess_plan_dr_reserve_lead_h=3 --dial bess_reserve_uncertainty_weight=0 --tag g517on

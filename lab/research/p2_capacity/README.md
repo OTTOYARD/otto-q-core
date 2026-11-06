@@ -48,15 +48,19 @@ curve. More seeds and whole days are running.
 
 ### The first wall is the two service bays, between 150 and 200 cars (12-hour days, seed 171717)
 
-| | 116 cars | 150 cars | 200 cars |
-|---|---:|---:|---:|
-| visits in the 12 hours / left ready by 6 PM | 292 / 253 | 324 / 272 | 379 / 282 |
-| still in the depot at 6 PM | 39 | 52 | 97 |
-| busy: service bays / charging posts / wash bays | 68% / 57% / 43% | 57% / 68% / 49% | **96%** / 77% / 56% |
-| the wall the constraint board named most often | service bays | posts | **service bays** |
-| 9 AM-5 PM arrivals charged within the contract's 30 minutes | 93% | 84% | **63%** |
-| 9 AM-5 PM gate to leaving, median / p95 (min) | 70 / 150 | 85 / 165 | 105 / 225 |
-| fleet out at work / asked for by the work side (9 AM-5 PM) | 75.6% / 85.8% | 76.4% / 85.7% | 71.6% / 85.8% |
+| | 116 cars | 150 cars | 200 cars | 250 cars |
+|---|---:|---:|---:|---:|
+| visits in the 12 hours / left ready by 6 PM | 292 / 253 | 324 / 272 | 379 / 282 | 410 / 296 |
+| still in the depot at 6 PM | 39 | 52 | 97 | 114 |
+| busy: service bays / charging posts / wash bays | 68% / 57% / 43% | 57% / 68% / 49% | **96%** / 77% / 56% | 89% / 75% / 71% |
+| the wall the constraint board named most often | service bays | posts | **service bays** | **service bays** |
+| 9 AM-5 PM arrivals charged within the contract's 30 minutes | 93% | 84% | **63%** | **58%** |
+| 9 AM-5 PM gate to leaving, median / p95 (min) | 70 / 150 | 85 / 165 | 105 / 225 | 100 / 316 |
+| fleet out at work / asked for by the work side (9 AM-5 PM) | 75.6% / 85.8% | 76.4% / 85.7% | 71.6% / 85.8% | 67.6% / 85.9% |
+
+From 200 to 250 cars the depot let out 14 more cars in the 12 hours and held 17 more at 6 PM; under six in ten of the
+day's arrivals got a charger within the contract's 30 minutes, the slowest twentieth took over five hours from the gate
+to leaving, and the fleet out at work fell to 68% of the cars against 86% asked.
 
 From 150 to 200 cars the depot let out 10 more cars in the day and held 45 more at 6 PM; the two service bays ran 96%
 busy, and a third of the cars arriving in the day waited past the contract for a charger. The posts' 77% is a day's
