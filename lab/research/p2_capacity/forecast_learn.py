@@ -80,6 +80,9 @@ def main() -> None:
     ap.add_argument("--lam", type=float, default=10.0)
     ap.add_argument("--save", help="fit on every day but --exclude-seed and write the model (per half hour ahead) here")
     ap.add_argument("--exclude-seed", action="append", default=[], help="a seed whose days the saved model never sees")
+    ap.add_argument("--quantile", type=float,
+                    help="save an upper forecast: each half hour's mean plus this quantile of the training days' misses "
+                         "(2026-11-06: a mean forecast's smooth peaks let the planner charge into a peak it did not see)")
     a = ap.parse_args()
     days = defaultdict(list)
     for line in open(a.audit):
@@ -100,7 +103,10 @@ def main() -> None:
             P = a.lam * np.eye(Z.shape[1])
             P[0, 0] = 0.0
             w = np.linalg.solve(Z.T @ Z + P, Z.T @ y)
-            model["per_half_hour"].append({"h": h, "n": len(tr), "mu": mu.tolist(), "sd": sd.tolist(), "w": w.tolist()})
+            off = float(np.quantile(y - Z @ w, a.quantile)) if a.quantile is not None else 0.0
+            model["per_half_hour"].append({"h": h, "n": len(tr), "mu": mu.tolist(), "sd": sd.tolist(), "w": w.tolist(),
+                                           "offset_kw": off})
+        model["quantile"] = a.quantile
         with open(a.save, "w") as f:
             json.dump(model, f)
         print(f"saved {a.save}: fit on {len(keep)} days ({', '.join(d.removeprefix('ottoq_cap_') for d in model['days'])})")

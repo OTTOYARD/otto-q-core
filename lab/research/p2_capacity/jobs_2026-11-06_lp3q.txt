@@ -1,0 +1,8 @@
+# The battery planner on an upper forecast (2026-11-06; LAB ONLY; ottoq_lab as it stands): the learned mean plus the 80th
+# percentile of the training days' misses per half hour ahead (forecast_learn.py --save --quantile 0.8 --exclude-seed
+# <this seed>), the shape beyond four hours; beside the planner on another day's shape. Bases: <seed>_fcaudit.
+normal_day_116_515151_lp3q|--fleet 116 --scenario normal_day --seed 515151 --battery-lp lab/research/p2_capacity/load_shape_normal_day_116_171717.json --battery-lp-learned lab/research/p2_capacity/forecast_model_q80_ex515151.json --tag lp3q
+normal_day_116_616161_lp3shape|--fleet 116 --scenario normal_day --seed 616161 --battery-lp lab/research/p2_capacity/load_shape_normal_day_116_171717.json --tag lp3shape
+normal_day_116_616161_lp3q|--fleet 116 --scenario normal_day --seed 616161 --battery-lp lab/research/p2_capacity/load_shape_normal_day_116_171717.json --battery-lp-learned lab/research/p2_capacity/forecast_model_q80_ex616161.json --tag lp3q
+normal_day_116_717171_lp3shape|--fleet 116 --scenario normal_day --seed 717171 --battery-lp lab/research/p2_capacity/load_shape_normal_day_116_171717.json --tag lp3shape
+normal_day_116_717171_lp3q|--fleet 116 --scenario normal_day --seed 717171 --battery-lp lab/research/p2_capacity/load_shape_normal_day_116_171717.json --battery-lp-learned lab/research/p2_capacity/forecast_model_q80_ex717171.json --tag lp3q

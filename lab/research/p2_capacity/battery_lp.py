@@ -126,7 +126,7 @@ class BatteryLP:
             x = [act[h], known[h] - act[h], queue[h], persist, base[h], solar[h],
                  math.sin(2 * math.pi * hr / 24), math.cos(2 * math.pi * hr / 24), max(act[h], queue[h], persist)]
             z = [1.0] + [(xi - mu) / sd for xi, mu, sd in zip(x, m["mu"], m["sd"])]
-            ev = max(0.0, sum(wi * zi for wi, zi in zip(m["w"], z)))
+            ev = max(0.0, sum(wi * zi for wi, zi in zip(m["w"], z)) + float(m.get("offset_kw", 0.0)))
             pre.append(max(0.0, base[h] + ev - solar[h]))
         per = max(1, int(round(0.5 / self.step_h)))
         return [pre[j // per] if j // per < len(pre) else x for j, x in enumerate(fc)]
