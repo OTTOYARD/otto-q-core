@@ -37,7 +37,12 @@
 --   V1 the new body is byte for byte the one the research lab ran. V2 on the twin's latest run, rolled back with its rows:
 --   one day's load drawn at a 15-second tick and the next day's the same load averaged over 5-minute ticks, 8 to 11 AM,
 --   grade alike (both 36 steps of 5 minutes; the bills within a cent; the peaks within 0.1 kW; perfect foresight's
---   loads within 0.1 kW a step and its prices equal); and a part-day of under 2 hours is not graded. Skipped with a notice when the twin depot has no run.
+--   loads within 0.1 kW a step and its prices equal); and a part-day of under 2 hours is not graded. Skipped with a
+--   notice when the twin depot has no run.
+--   In the research lab (2026-11-06; lab/research/p2_capacity/g528_lab_2026-11-06.md): at the 5-minute tick the grade is
+--   0805's to the value (424242_b36, the window from 6 PM day 1 and both local days: 0 of 903, 687 and 686 values
+--   differing; realized $1,539.61 as bound_energy.py); at a 2-minute tick energy ($765.55) and wear as bound_energy.py and
+--   the peaks 2-3 kW lower on the 5-minute grid (realized $1,484.35 against $1,485.76); V1 and V2 passed.
 --
 -- ══ §4 LINEAGE ═════════════════════════════════════════════════════════════════════════════════════════════════════
 --

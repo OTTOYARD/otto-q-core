@@ -43,6 +43,13 @@
 --   landed plan the orchestrator's reckoning reads steps 0, 0, 0, 1, 1 at T + 15 s, 2:00, 5:00, 5:15 and 10:00; and the
 --   request's last past step is the mean of the snapshots in it and the tick under way. Skipped with a notice when the
 --   twin depot has no run. V3 the patched bodies are byte for byte the ones the research lab ran.
+--   In the research lab (2026-11-06 18:13-18:35 UTC; lab/research/p2_capacity/g528_lab_2026-11-06.md), seed 424242's
+--   36-hour day billed from 6 PM day 1: at the lab's 5-minute tick this file changes nothing (864 of 864 energy commands,
+--   426 plans and 740 sessions as the recorded p36prod day); at production's 2-minute tick the chain as 0804 left it
+--   followed a plan on 0.6% of ticks (7, after the last plan was asked) and billed the day plan's $1,485.76 to the cent,
+--   and with this file it followed on 99.0% of ticks and billed $1,233.87 (the billed half hour 592 kW against 1,000),
+--   $251.89 saved, 65% of the gap to perfect foresight, every car-facing line of the scorecard the day plan's. V2 passed on
+--   a copy of the p36prod day. One seed: a single reading.
 --
 -- ══ §4 LINEAGE ═════════════════════════════════════════════════════════════════════════════════════════════════════
 --
