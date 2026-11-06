@@ -67,6 +67,10 @@ def main() -> None:
     ap.add_argument("--arms", help="comma-separated planner tags (the first is the copied shape the others are set against)")
     ap.add_argument("--window", type=float, help="the window's start in hours (bound_energy.py --window-start-h)")
     ap.add_argument("--fleet", type=int, default=FLEET)
+    ap.add_argument("--charge-start", action="store_true",
+                    help="also charge each plan for the stored energy it brings into the window above the base day's (a "
+                         "billing window opens on a battery each plan filled its own way), at the same replacement cost; "
+                         "perfect foresight then chooses its own starting charge on the same terms")
     a = ap.parse_args()
     seeds, BASE_TAG, FLEET = a.seeds, a.base, a.fleet
     if a.arms:
@@ -84,20 +88,28 @@ def main() -> None:
             print(f"seed {s}: base day not billed yet")
             continue
         b_end = energy[b]["battery"]["soc_end_kwh"]
+        b_start = energy[b]["battery"]["soc_start_kwh"]
         b_sc = days[b]["scorecard"]
         r = {"base": energy[b]["real_plan"]["total_usd"], "base_peak": energy[b]["real_plan"]["peak30_kw"],
              "base_at": energy[b]["real_plan"].get("peak30_ends_ct", "?"),
              "start": energy[b]["battery"]["soc_start_kwh"], "end": b_end,
              # no battery at the day plan's end-of-day charge: the stored energy the plan bought, at its replacement cost
              "none": energy[b]["no_battery"]["total_usd"] + (b_end - energy[b]["battery"]["soc_start_kwh"]) * RATE_STORED,
-             "pf": energy[b]["perfect_foresight"]["total_usd"],
-             "pf_res": energy_res[b]["perfect_foresight"]["total_usd"] if b in energy_res else None, "arms": {}}
+             "pf": (energy[b]["perfect_foresight_free_start"]["total_usd_at_base_start"]
+                    if a.charge_start and energy[b].get("perfect_foresight_free_start")
+                    else energy[b]["perfect_foresight"]["total_usd"]),
+             "pf_res": (None if b not in energy_res else
+                        energy_res[b]["perfect_foresight_free_start"]["total_usd_at_base_start"]
+                        if a.charge_start and energy_res[b].get("perfect_foresight_free_start")
+                        else energy_res[b]["perfect_foresight"]["total_usd"]), "arms": {}}
         for tag, _ in ARMS:
             d = db(s, tag)
             if d not in energy or d not in days:
                 continue
             e = energy[d]
             adj = e["real_plan"]["total_usd"] - (e["battery"]["soc_end_kwh"] - b_end) * RATE_STORED
+            if a.charge_start:
+                adj += (e["battery"]["soc_start_kwh"] - b_start) * RATE_STORED
             same = all(strip_ids(days[d]["scorecard"].get(k)) == strip_ids(b_sc.get(k)) for k in CAR_KEYS)
             r["arms"][tag] = {"usd": round(adj, 2), "peak": e["real_plan"]["peak30_kw"], "same": same,
                               "end": e["battery"]["soc_end_kwh"], "at": e["real_plan"].get("peak30_ends_ct", "?")}

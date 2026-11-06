@@ -145,29 +145,40 @@ def main() -> None:
     real = bill(real_grid, sum(max(o, 0) * dts[i] for i, o in enumerate(real_out)))
     none = bill([max(p, 0) for p in pre], 0.0)
 
-    s = pywraplp.Solver.CreateSolver("GLOP")
-    c = [s.NumVar(0, pc, f"c{i}") for i in range(n)]
-    d = [s.NumVar(0, pd, f"d{i}") for i in range(n)]
-    e = [s.NumVar(lo_e, hi_e, f"e{i}") for i in range(n + 1)]
-    g = [s.NumVar(0, s.infinity(), f"g{i}") for i in range(n)]
-    spill = [s.NumVar(0, s.infinity(), f"x{i}") for i in range(n)]   # solar the site cannot use (no export credit)
-    p30 = s.NumVar(0, s.infinity(), "p30")
-    s.Add(e[0] == min(max(e0, lo_e), hi_e))
-    for i in range(n):
-        if e_min[i] > lo_e:
-            s.Add(e[i] >= e_min[i])
-        s.Add(e[i + 1] == e[i] + (eff * c[i] - d[i] / eff) * dts[i])
-        s.Add(g[i] == pre[i] + c[i] - d[i] + spill[i])
-    s.Add(e[n] >= min(max(e_end, lo_e), hi_e))
-    for i in range(0, n - win + 1):
-        s.Add(p30 >= sum(g[i:i + win]) * (1.0 / win))
-    over = s.NumVar(0, s.infinity(), "over")
-    s.Add(over >= p30 - billed_before)
-    s.Minimize(sum(rate[i] * g[i] * dts[i] for i in range(n)) + (d_rate / amort) * over
-               + wear * sum(d[i] * dts[i] for i in range(n)))
-    st = s.Solve()
-    best_grid = [g[i].solution_value() for i in range(n)]
-    best = bill(best_grid, sum(d[i].solution_value() * dts[i] for i in range(n)))
+    # perfect foresight; with free_start (a billing window), the battery's charge at the window's start is the plan's to
+    # choose too, every kWh above the battery as it stood paid at the day plan's replacement cost (the cheapest TOU rate
+    # over the round trip), so it bounds a plan that arrives at the window fuller than the day plan did
+    c_rep = min(rate) / (eff * eff)
+
+    def solve_pf(free_start: bool = False):
+        s = pywraplp.Solver.CreateSolver("GLOP")
+        c = [s.NumVar(0, pc, f"c{i}") for i in range(n)]
+        d = [s.NumVar(0, pd, f"d{i}") for i in range(n)]
+        e = [s.NumVar(lo_e, hi_e, f"e{i}") for i in range(n + 1)]
+        g = [s.NumVar(0, s.infinity(), f"g{i}") for i in range(n)]
+        spill = [s.NumVar(0, s.infinity(), f"x{i}") for i in range(n)]   # solar the site cannot use (no export credit)
+        p30 = s.NumVar(0, s.infinity(), "p30")
+        if not free_start:
+            s.Add(e[0] == min(max(e0, lo_e), hi_e))
+        for i in range(n):
+            if e_min[i] > lo_e:
+                s.Add(e[i] >= e_min[i])
+            s.Add(e[i + 1] == e[i] + (eff * c[i] - d[i] / eff) * dts[i])
+            s.Add(g[i] == pre[i] + c[i] - d[i] + spill[i])
+        s.Add(e[n] >= min(max(e_end, lo_e), hi_e))
+        for i in range(0, n - win + 1):
+            s.Add(p30 >= sum(g[i:i + win]) * (1.0 / win))
+        over = s.NumVar(0, s.infinity(), "over")
+        s.Add(over >= p30 - billed_before)
+        s.Minimize(sum(rate[i] * g[i] * dts[i] for i in range(n)) + (d_rate / amort) * over
+                   + wear * sum(d[i] * dts[i] for i in range(n))
+                   + (c_rep * e[0] if free_start else 0))
+        st = s.Solve()
+        best_grid = [g[i].solution_value() for i in range(n)]
+        best = bill(best_grid, sum(d[i].solution_value() * dts[i] for i in range(n)))
+        return best, st, e[0].solution_value()
+
+    best, st, _ = solve_pf(False)
     # ── how much of the prize a forecast of the next H hours would capture: a rolling plan that re-solves every step
     #    seeing the true load H hours ahead and holding the current load flat beyond it (persistence, as the real plan's
     #    floor does), applying only its first step. H = the whole day reproduces the bound (a check on the method).
@@ -241,6 +252,11 @@ def main() -> None:
         ladder["typical_day_shape"]["forecast_mae_kw"] = round(sum(err) / len(err), 1)
         ladder["typical_day_shape"]["forecast_from"] = a.forecast_db
         ladder["next_1h_then_shape"] = rolling(1.0, shape)
+    pf_free = None
+    if a.window_start_h is not None:
+        pf_free, _, e0_free = solve_pf(True)
+        pf_free["start_kwh"] = round(e0_free, 1)
+        pf_free["total_usd_at_base_start"] = round(pf_free["total_usd"] + c_rep * (e0_free - min(max(e0, lo_e), hi_e)), 2)
     out = {"db": a.db, "run": run, "steps": n, "step_h": round(sum(dts) / n, 4), "status": int(st),
            "window_start_h": a.window_start_h,
            "battery": {"capacity_kwh": cap, "max_kw": pd, "rte": rte, "soc_start_kwh": round(e0, 1),
@@ -250,6 +266,7 @@ def main() -> None:
                          if a.dr_reserve_kwh > 0 else None,
            "load_kwh": round(sum(max(p, 0) * dts[i] for i, p in enumerate(pre)), 1),
            "no_battery": none, "real_plan": real, "perfect_foresight": best,
+           "perfect_foresight_free_start": pf_free,
            "battery_earned_usd": round(none["total_usd"] - real["total_usd"], 2),
            "foresight_prize_usd": round(real["total_usd"] - best["total_usd"], 2),
            "forecast_ladder": ladder}
