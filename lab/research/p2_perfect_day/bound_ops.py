@@ -287,7 +287,10 @@ def solve(day: dict, objective: str, seconds: float, owner: str | None = None, f
           immediate_first: bool = False) -> dict:
     """One clairvoyant solve. fix = 'post' or 'bay' holds that lane's jobs at their realized start (the regret split)."""
     Hd = int(math.ceil(day["horizon"]))      # the day's own end: both sides count minutes only up to it
-    H = Hd + 24 * 60                          # the schedule may run past it, as the real day's cars did
+    # the schedule may run past the day's end, as the real day's cars did: a day and, on a day whose work could not fit in
+    # that (2026-11-06: the busy day's service-bay work, 96 cars waiting for two bays by noon, was infeasible inside
+    # Hd + 24 h), as long as all of its work done one job after another. Doors count only to Hd, so this changes no measure
+    H = Hd + max(24 * 60, int(math.ceil(sum(max(j["dur"], 1) for js in day["jobs"].values() for j in js))) + 60)
     m = cp_model.CpModel()
     lanes = defaultdict(list)            # lane -> [(interval, demand)]
     visit_vars = []

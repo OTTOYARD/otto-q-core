@@ -93,6 +93,35 @@ The first row's 150-car figures are the published model re-solved on four worker
   immediate dispatches at the boot, then the rest from the shortest charge up, 16 to 47 minutes). Rehearsed before building anything, as the
   standing rule asks: not built.
 
+### The busy day: no order clears a five-fold service-bay deficit (solved 2026-11-06 06:51-06:53 UTC)
+
+`busy_day` at 116 cars (12 hours, seed 171717; trouble codes at 7 times the rate, 85% of cars starting soiled), the
+corrected model with rule 9's hold. Its service-bay work is 7,454 minutes (97 mechanical PMs of about 40 minutes, 52 sensor
+calibrations of about 60, 3 cosmetic repairs, 2 fault repairs) against 1,440 bay-minutes in the day: more than five times
+what two bays can do. (The model first read this day as infeasible: its horizon, the day plus 24 hours, could not hold the
+work. It now runs as long as the day's work done one job after another; doors count only to the day's end, so the normal
+days' solves, whose work fit, are unchanged.)
+
+| busy day, 116 cars | real | best found (rule 9) |
+|---|---:|---:|
+| minutes to ready | 68,625 | 58,893 (-14.2%; the proven bound, 24,437, is loose on a day this oversubscribed) |
+| cars ready by 6 PM, of 247 visits | 136 | 153 |
+| service-bay jobs finished by 6 PM | 26 | 40 |
+
+- **The real bays were full.** 28 finished bookings took 1,318 minutes and 2 under way at 6 PM 25 more, 1,343 of the 1,440
+  (93%); one bay stood free in 11 ticks, about 55 bay-minutes, while cars waited (at 11:00, 11:45-12:00 and 13:05-13:30
+  UTC: cars owing a service still had a charge to finish, and a car charges before its bays).
+- **The best day's extra 14 jobs are mostly the order:** it does the shortest services first (40-minute PMs before
+  60-minute calibrations, the realized ones averaging 47.6 minutes). That is not a lever to build as it stands: rule 14
+  allows reordering only among one owner's own cars, the kernel's bay line puts overdue work first so that nothing starves,
+  and under a five-fold deficit shortest-first would leave the calibrations waiting all day. Every car still owes what it
+  owes, so the order moves which cars leave by 6 PM, not how much work the day holds.
+- **So the busy day is a capacity finding** (rule 9: never a lever on a vehicle): two service bays meet about a fifth of
+  that day's service work. The lab's capacity curve reads the same wall on normal days at 150-200 cars.
+- A job still under way at 6 PM enters the model at its length to 6 PM, which lets the solver start it earlier for less
+  than its full length: an optimistic bias, small on these days (on the 116-car normal day the cars still in at 6 PM carry
+  30-65 of the gap's minutes; on the busy day 4 jobs, 25 minutes).
+
 ### Correction (2026-11-06): a car holds its post after its charge, and the first model did not count it
 
 The first solves below gave each charge its session's length on a post. On the lab days a car stays on its post until
