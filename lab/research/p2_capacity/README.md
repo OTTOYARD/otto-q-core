@@ -131,3 +131,39 @@ both ways, gives the same four fingerprints (`day_fingerprint.sql`: energy comma
 sessions `c33289e1`, visits `c9e50316`) in 414 s against 1,080 s, beside three other running days (read 2026-11-06
 04:38 UTC). A container restart still redoes the whole day: the replica is cloned anew and the results file is written at
 the end.
+
+### The capacity curve on whole days (2026-11-06; read between 04:55 and 05:17 UTC)
+
+Normal days of 24 hours from 6 AM CT, the twin depot as built (30 fast-charger posts, 2 service bays, 3 wash bays), two
+seeds a fleet size. Arrivals from 9 AM to 5 AM next day (`steady_state.py --skip-h 3 --tail-h 1`, G520's phantom visits
+left out); afternoon fleet out read hour by hour (`uptime_by_hour.sql`, distinct cars); resources over the whole day from
+the lab day's own record.
+
+| fleet, seed | visits an hour | charged within the 30-minute contract wait | wait p50 / p95 | gate to leaving p50 / p95 | 1-7 PM out at work (asked 87%) | cars inside, 1-7 PM | service bays busy | posts busy |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 116, 171717 | 19.8 | 91% | 5 / 35 min | 85 / 490 min | 68% | 38 | 74% | 48% |
+| 116, 424242 | 18.3 | 78% | 15 / 60 min | 105 / 485 min | 65% | 41 | 60% | 48% |
+| 150, 171717 | 22.3 | 62% | 20 / 95 min | 100 / 495 min | 69% | 47 | 74% | 58% |
+| 150, 424242 | 19.8 | 64% | 20 / 151 min | 140 / 585 min | 61% | 58 | 80% | 55% |
+| 200, 171717 | 22.7 | 39% | 98 / 310 min | 140 / 718 min | 59% | 82 | 93% | 72% |
+| 200, 424242 | 22.4 | 37% | 110 / 330 min | 165 / 720 min | 56% | 89 | 93% | 67% |
+
+- **The depot handles about 19 to 23 visits an hour, and comfortably up to about 116 cars.** At 116 cars 78-91% of the
+  cars that charge do so within the 30-minute contract wait, the median wait 5-15 minutes. At 150 cars the same depot
+  takes 20-22 visits an hour and 62-64% are within the wait (the 95th-percentile wait 1.5-2.5 hours); at 200 cars 22-23
+  an hour, 37-39% within it, a median wait over 1.5 hours and a 95th-percentile over 5.
+- **More cars still put more cars to work, by less each time.** Out at work in the afternoon: about 77 cars at 116,
+  98 at 150 and 115 at 200, against the work side's ask of 87% of the fleet (101, 131, 174). The mornings keep up at 116
+  and 150 (80-84% out against 85%); at 200 they fall to 74-78%.
+- **The wall is the two service bays.** The constraint board names them in 20 to 39 of each day's 48 half-hour samples,
+  and at 200 cars they are 93% busy over the whole day, nights included; the posts are 67-72% busy then, full at the
+  afternoon peak. Charging to 100% (rule 9) and the posts' fault repairs set the rest (see the post-time section above).
+- **The busy day is a stress test of the bays, and they fail it at today's 116 cars.** `busy_day` (diagnostic trouble
+  codes at 7 times the rate, 85% of cars starting soiled) at 116 cars, 12 hours: by noon 96 cars sit charged (99-100%)
+  waiting for the two service bays, 71 owing mechanical preventive maintenance and 37 a sensor calibration, which no car
+  leaves without (rule 9); 111 of the 116 cars are still in the depot at 6 PM, and 147 of 150 at 150 cars. The demo runs
+  at the twin depot run this scenario.
+
+Two seeds a size and one depot build: a reading of where the curve bends, not a range. The levers it points to, none of
+them a lever on a vehicle (rules 9 and 13): a third service bay (on a 12-hour day at 200 cars it moved the wall to the
+posts, above), fewer charger faults, and the order in which cars get a post (the perfect day, E5).
