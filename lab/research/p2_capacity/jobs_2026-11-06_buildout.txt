@@ -1,0 +1,11 @@
+# Build-outs on whole days (2026-11-06): what it takes for the twin depot to serve 150-250 cars comfortably. The depot as
+# built is 30 fast-charger posts and 2 service bays (whole days at 150 and 200 cars, and with a third bay, are in
+# results.jsonl). --add-stall dcfc=n copies the depot's last post with its own charger and raises the DC and service limits
+# by the chargers' rating (rule 13: the limit is what is installed); service_bay=n copies the last service bay. LAB ONLY.
+# Run on ottoq_lab as it stands (production's engine through 0797, its twin dials at production's).
+normal_day_200_171717_24h_s3p40|--fleet 200 --scenario normal_day --seed 171717 --ticks 288 --add-stall service_bay=1 --add-stall dcfc=10 --tag 24h_s3p40
+normal_day_200_171717_24h_s4p40|--fleet 200 --scenario normal_day --seed 171717 --ticks 288 --add-stall service_bay=2 --add-stall dcfc=10 --tag 24h_s4p40
+normal_day_200_171717_24h_s4p50|--fleet 200 --scenario normal_day --seed 171717 --ticks 288 --add-stall service_bay=2 --add-stall dcfc=20 --tag 24h_s4p50
+normal_day_200_171717_24h_s3p50|--fleet 200 --scenario normal_day --seed 171717 --ticks 288 --add-stall service_bay=1 --add-stall dcfc=20 --tag 24h_s3p50
+normal_day_150_171717_24h_s3p40|--fleet 150 --scenario normal_day --seed 171717 --ticks 288 --add-stall service_bay=1 --add-stall dcfc=10 --tag 24h_s3p40
+normal_day_250_171717_24h_s4p50|--fleet 250 --scenario normal_day --seed 171717 --ticks 288 --add-stall service_bay=2 --add-stall dcfc=20 --tag 24h_s4p50

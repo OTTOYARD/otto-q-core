@@ -151,21 +151,59 @@ def main() -> None:
     conn.execute(open(os.path.join(HERE, "grow_fleet.sql")).read())
     grown = one("SELECT lab.grow_fleet(%s, %s)", (TWIN, a.fleet))
     added = {}
+    added_kw = 0.0
     for kv in a.add_stall:   # a what-if site: more of one kind of stall, copied from the depot's own
         kind, _, nstr = kv.partition("=")
+        # the source: the depot's last stall of that kind as built, never a lab copy (2026-11-06: with n > 1 the copies
+        # used to copy the copy before; one service bay, as every earlier day added, is unchanged by this)
+        src = one("SELECT s.id FROM stalls s WHERE s.depot_id = %(d)s AND s.stall_type::text = %(k)s "
+                  "AND s.stall_code NOT LIKE '%%-LAB%%' ORDER BY s.stall_code DESC LIMIT 1", {"d": TWIN, "k": kind})
+        if src is None:
+            raise SystemExit(f"--add-stall {kv}: the depot has no {kind} to copy")
         for i in range(int(nstr)):
-            conn.execute("""INSERT INTO stalls
+            p = {"i": i, "src": src}
+            # 2026-11-06: a charging post is its stall and its own charger (each of the depot's 30 posts has one): the
+            # charger is a copy of the source post's, with its own id and identifier, available and fault-free
+            p["ch"] = None
+            if kind in ("dcfc", "l2"):
+                row = conn.execute("""INSERT INTO ottoq_ocpp_chargers
+                                      SELECT (jsonb_populate_record(NULL::ottoq_ocpp_chargers, to_jsonb(c)
+                                              || jsonb_build_object('charger_id', md5('lab-charger:' || c.charger_id || ':' || %(i)s)::uuid,
+                                                                    'ocpp_identifier', c.ocpp_identifier || '-LAB' || (%(i)s + 1),
+                                                                    'serial_number', COALESCE(c.serial_number, '') || '-LAB' || (%(i)s + 1),
+                                                                    'station_state', 'Available', 'last_fault_code', NULL,
+                                                                    'last_fault_at', NULL, 'last_fault_payload', NULL))).*
+                                        FROM ottoq_ocpp_chargers c JOIN stalls s ON s.ocpp_charger_id = c.charger_id
+                                       WHERE s.id = %(src)s
+                                      RETURNING charger_id, max_kw""", p).fetchone()
+                if row is None:
+                    raise SystemExit(f"--add-stall {kv}: the source post has no charger to copy")
+                p["ch"] = str(row[0])
+                added_kw += float(row[1] or 0)
+            new_id = one("""INSERT INTO stalls
                             SELECT (jsonb_populate_record(NULL::stalls, to_jsonb(s)
                                     || jsonb_build_object('id', md5('lab-stall:' || s.id || ':' || %(i)s)::uuid,
                                                           'stall_code', s.stall_code || '-LAB' || (%(i)s + 1),
                                                           'display_name', COALESCE(s.display_name, s.stall_code) || ' (lab)',
                                                           'relative_x', COALESCE(s.relative_x, 0) + 12 * (%(i)s + 1),
+                                                          'ocpp_charger_id', %(ch)s::uuid,
                                                           'current_vehicle_id', NULL, 'reserved_by', NULL,
                                                           'reserved_at', NULL, 'reservation_expires_at', NULL,
                                                           'status', 'available'))).*
-                              FROM stalls s WHERE s.depot_id = %(d)s AND s.stall_type::text = %(k)s
-                             ORDER BY s.stall_code DESC LIMIT 1""", {"i": i, "d": TWIN, "k": kind})
+                              FROM stalls s WHERE s.id = %(src)s
+                            RETURNING id""", p)
+            # and its service-point capabilities, as the source's (read by the site build-outs only, kept faithful)
+            conn.execute("""INSERT INTO ottoq_service_point_capabilities
+                            SELECT (jsonb_populate_record(NULL::ottoq_service_point_capabilities, to_jsonb(k)
+                                    || jsonb_build_object('stall_id', %(new)s::uuid, 'source', 'lab_capacity'))).*
+                              FROM ottoq_service_point_capabilities k WHERE k.stall_id = %(src)s""",
+                         {"new": str(new_id), "src": src})
         added[kind] = int(nstr)
+    if added_kw > 0:
+        # rule 13: a depot's power limits are what is installed; the added chargers are installed with their power
+        conn.execute("UPDATE depots SET dcfc_max_concurrent_kw = COALESCE(dcfc_max_concurrent_kw, 0) + %(kw)s, "
+                     "service_max_kw = COALESCE(service_max_kw, 0) + %(kw)s WHERE id = %(d)s", {"kw": added_kw, "d": TWIN})
+        added["kw"] = added_kw
     one("SELECT set_config('ottoq.sim_run_id', 'none', true)")
     conn.execute("SELECT public.ottoq_tick_invariance_reset_fleet(%s, %s, %s)", (TWIN, a.seed, a.sim_start))
     one("SELECT set_config('ottoq.sim_run_id', '', true)")
