@@ -15,6 +15,15 @@ Supabase project `gxdrcyphqjzjsuhxuqtg` (otto-q-core).
   (footnote ⁶), v38, agent v26 (footnote ⁷), v39, agent v27 (footnote ⁸), and v40, agent v28 (footnote ⁹), and `ottoq-ingest` v16, its v10 (footnote ¹⁰), and `ottoq-depot-v2` v1, its first deploy (footnote ¹¹). `otto-q-api`'s repo copy is ahead of what is deployed, on purpose, until someone can deploy it (footnote ¹²). `ottoq-csms-relay` is in the repo and not deployed: it is deployed after its database half, migration 0697, which holds a DROP a person approves (csms/README.md). And `ottoq-agent-gateway` v2, OTTOYARD sign-in (footnote ¹³). And `ottoq-orchestrator-agent` v43, agent v31, after v41 and v42, which were deployed without an entry here (footnote ¹⁵).
   30 ACTIVE functions.
 
+## NOT YET DEPLOYED: `ottoq-battery-planner` (2026-11-06, B1)
+
+The battery planner's seam (otto-q-core 0804): the database fires it with `{plan_id}` and the vault's anon key; it reads the
+request from the pending `ottoq_energy_plan` row, posts it to ottoq-intelligence `POST /optimize/battery-plan`, and lands the
+answer with `ottoq_bess_planner_land` (service role), which writes the ledger row. Deploy with **verify_jwt on**, after
+0803 and 0804 are applied and the service carries the endpoint (ottoq-intelligence `claude/battery-planner`). It needs the
+same secret `ottoq-cpsat-propose` reads (`OTTOQ_INTEL_TOKEN`; the URL comes from `ottoq_service_endpoints`). Lab-tested
+end to end with the lab's stand-in for this function (`capacity_day.py --planner-service`), not deployed.
+
 ## G67 IS CLOSED, AND THE PULL CORRECTED THE DRIFT LIST IT WAS BASED ON
 
 The six stale copies were replaced with the deployed source, pulled through the

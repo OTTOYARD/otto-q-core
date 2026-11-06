@@ -136,6 +136,14 @@ def main() -> None:
     ap.add_argument("--battery-lp-beyond", choices=("shape", "profile_mean", "profile_upper"), default="shape",
                     help="with --battery-lp-learned-sql: beyond its four hours the shape, or the depot's learned day (mean, "
                          "or its quantile across days)")
+    ap.add_argument("--planner-service", metavar="URL",
+                    help="the production battery planner's chain in the lab (0804): before each tick, every plan the engine "
+                         "asked for (ottoq_energy_plan pending, source bess_planner) is posted to URL/optimize/battery-plan "
+                         "(a local ottoq-intelligence) and landed with ottoq_bess_planner_land, as the edge function "
+                         "ottoq-battery-planner does in production")
+    ap.add_argument("--bess-forecast-model", type=int, metavar="MODEL_ID",
+                    help="before the first tick, copy this ottoq_bess_forecast_models row as the depot's newest (the learned "
+                         "forecast the day reads: a model fitted without the day's own seed)")
     ap.add_argument("--battery-lp-band-hh", type=int,
                     help="with --battery-lp-learned: the model's upper band only for the next N half hours, its mean beyond")
     ap.add_argument("--battery-lp-bill-from-min", type=float, default=0.0,
@@ -266,6 +274,40 @@ def main() -> None:
                        guard=not a.battery_lp_no_guard, blend=a.battery_lp_blend, learned=a.battery_lp_learned,
                        band_hh=a.battery_lp_band_hh, bill_from_min=a.battery_lp_bill_from_min,
                        learned_sql=a.battery_lp_learned_sql, beyond=a.battery_lp_beyond)
+    if a.bess_forecast_model is not None:   # the learned forecast this day reads (0803): the depot's newest usable model
+        conn.execute("""INSERT INTO ottoq_bess_forecast_models (depot_id, note, usable, quantile, lam, fold_by, window_from, runs,
+                                   n_folds, n_examples, features, per_half_hour, profile, diagnostics)
+                        SELECT depot_id, 'lab: this day''s model, a copy of ' || model_id, usable, quantile, lam, fold_by,
+                               window_from, runs, n_folds, n_examples, features, per_half_hour, profile, diagnostics
+                          FROM ottoq_bess_forecast_models WHERE model_id = %s""", (a.bess_forecast_model,))
+    planner = {"posted": 0, "ready": 0, "superseded": 0, "failed": 0, "latency_ms": [], "solve_ms": []}
+
+    def land_pending() -> None:
+        """The edge function's part (0804), in the lab: each pending plan's request to the service, its answer landed."""
+        import urllib.error
+        import urllib.request
+        for pid, req in conn.execute("""SELECT id, detail->'request' FROM ottoq_energy_plan WHERE sim_run_id = %s
+                                         AND source = 'bess_planner' AND plan_state = 'pending' ORDER BY plan_start_clock""",
+                                      (run,)).fetchall():
+            t1 = time.time()
+            try:
+                r = urllib.request.urlopen(urllib.request.Request(
+                    a.planner_service.rstrip("/") + "/optimize/battery-plan", data=json.dumps(req).encode(),
+                    headers={"Content-Type": "application/json"}), timeout=120)
+                status, body = r.status, json.loads(r.read())
+            except urllib.error.HTTPError as e:
+                status, body = e.code, {"error": e.read().decode()[:400]}
+            except Exception as e:   # noqa: BLE001  the service down: the plan fails, the day plan decides
+                status, body = 599, {"error": str(e)[:400]}
+            ms = int((time.time() - t1) * 1000)
+            res = conn.execute("SELECT public.ottoq_bess_planner_land(%s, %s, %s, %s)",
+                               (pid, json.dumps(body), status, ms)).fetchone()[0]
+            planner["posted"] += 1
+            planner[res.get("state") or "failed"] = planner.get(res.get("state") or "failed", 0) + 1
+            planner["latency_ms"].append(ms)
+            if isinstance(body, dict) and body.get("solve_ms") is not None:
+                planner["solve_ms"].append(float(body["solve_ms"]))
+
     patches = {}
     for f in a.lab_sql:      # a what-if change to the engine, on this replica only
         body = open(f).read()
@@ -281,6 +323,10 @@ def main() -> None:
                           (run,)).fetchone()
         if st[0] != "running":
             break
+        if a.planner_service:   # the plan the last tick asked for lands before this one runs, as in production
+            land_pending()
+            if commit_mode:
+                conn.commit()
         if lp is not None:
             lp.plan_now(k)
         if commit_mode:
@@ -380,6 +426,11 @@ def main() -> None:
                            "learned_sql": a.battery_lp_learned_sql, "beyond": a.battery_lp_beyond,
                            "guard": lp.guard}
                           if lp is not None else None),
+           "planner_service": ({"url": a.planner_service, "model_copied": a.bess_forecast_model,
+                                **{k2: v for k2, v in planner.items() if k2 not in ("latency_ms", "solve_ms")},
+                                "latency_ms_mean": round(sum(planner["latency_ms"]) / len(planner["latency_ms"]), 1) if planner["latency_ms"] else None,
+                                "solve_ms_mean": round(sum(planner["solve_ms"]) / len(planner["solve_ms"]), 1) if planner["solve_ms"] else None}
+                               if a.planner_service else None),
            "ticks": ticks, "run_hours": a.run_hours, "commit_each_tick": commit_mode, "step_min": a.step, "sim_start": a.sim_start, "wall_s": wall_s, "clone_s": round(clone_s, 1),
            "error": err, "scorecard": score, "owners": owners, "resources": resources, "walls": walls}
     with open(a.out, "a") as f:
