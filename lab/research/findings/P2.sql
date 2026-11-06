@@ -55,23 +55,33 @@ ON CONFLICT (depot_id, slug) DO UPDATE SET
 -- Every policy pays for its own highest half hour at the daily share of the monthly demand charge (the lab day starts a
 -- fresh run, so nothing was billed before it). A first publication read the month's billed peak from the day's first
 -- snapshot (330.6 kW), which shifted every bill by $224 and left the differences unchanged; it is replaced here.
+-- CORRECTED 2026-11-06 (research wing, reading the planner study): the battery ends a lab day fuller than it starts (here
+-- 579 kWh), and the first text set the day plan's bill, which paid for that energy, against no battery's, which did not.
+-- Every bill is now at the day plan's end-of-day charge, as the policies already were (stored energy at the plan's own
+-- replacement cost, $0.070 a kWh): no battery $1,739, not $1,699, so the plan saves $357, not $317. The same correction
+-- in p2-battery-day-shape, p2-battery-reserves and p2-battery-reserves-shipped ($8 more than no battery, not $68);
+-- the four republished 2026-11-06 08:44:21 UTC.
 INSERT INTO public.ottoq_research_findings
   (slug, phase, item, kind, status, title, summary, metrics, evidence, run_ids, measured_at)
 VALUES
   ('p2-battery-foresight-prize', 'P2', 'E5', 'measurement', 'measured',
-   'The battery''s day plan saves $317 on a 12-hour day, and $843 against the old rule; foresight would add about $298',
+   'The battery''s day plan saves $357 on a 12-hour day, and $835 against the old rule; foresight would add about $298',
    'On the lab''s first full day (a normal day, 116 cars, 12 hours), the depot''s energy bill with no battery would have '
-   'been $1,699 (half-hour peak 1,679 kW). The battery''s day plan, the setting the twin depot runs (energy_reserve_shave '
-   'on), brought it to $1,382 (peak 1,160 kW). The same day with that setting off, the older fixed-target rule, cost '
-   '$2,225: that rule charged the battery into the peak (2,336 kW), worse than no battery at all. With perfect foresight '
+   'been $1,739 (half-hour peak 1,679 kW), counting the 579 kWh the day plan left stored in the battery at the day''s end '
+   'at the plan''s own replacement cost ($1,699 as billed; every bill here is at that end-of-day charge, corrected '
+   '2026-11-06 from a first text that set $1,699 against the plan). The battery''s day plan, the setting the twin depot '
+   'runs (energy_reserve_shave on), brought it to $1,382 (peak 1,160 kW). The same day with that setting off, the older '
+   'fixed-target rule, cost $2,217: that rule charged the battery into the peak (2,336 kW), worse than no battery at all. '
+   'With perfect foresight '
    'of the day''s load the bill would have been $1,085 (peak 735 kW). Plans that see the next 1 to 4 hours perfectly but '
    'assume the load then holds steady do worse than the day plan ($1,515 to $1,583): the money is in knowing the shape of '
    'the whole day, so the AI build is a forecast of the depot''s own charging demand across the day. One day, one seed.',
    '{"scenario": "normal_day", "fleet": 116, "seed": 171717, "hours": 12, "load_kwh": 6803.3,
      "billing": "each policy pays its own highest 30-minute average at 21.40 USD/kW-month (NES GSA-3 summer, a September day) over 30 days",
-     "no_battery": {"total_usd": 1698.86, "peak30_kw": 1679.0},
+     "bills_at": "the day plan''s end-of-day charge (2,701.8 kWh, from 2,123.1 at the start), stored energy at 0.070 USD/kWh",
+     "no_battery": {"total_usd": 1739.37, "as_billed_usd": 1698.86, "peak30_kw": 1679.0},
      "day_plan_energy_reserve_shave_1": {"total_usd": 1382.34, "peak30_kw": 1159.6},
-     "old_rule_energy_reserve_shave_0": {"total_usd": 2224.84, "peak30_kw": 2335.7},
+     "old_rule_energy_reserve_shave_0": {"total_usd": 2217.34, "as_billed_usd": 2224.84, "end_kwh": 2808.9, "peak30_kw": 2335.7},
      "perfect_foresight": {"total_usd": 1084.61, "peak30_kw": 735.3},
      "rolling_lookahead_usd": {"persistence": 1583.27, "1h": 1514.99, "2h": 1549.56, "4h": 1535.47},
      "battery": {"capacity_kwh": 3000, "max_kw": 1500}, "finding": "G370"}',
@@ -103,9 +113,10 @@ VALUES
    'what is known, which the plan takes only as a forecast. Two days: a reading, not a range.',
    '{"scenario": "normal_day", "fleet": 116, "seeds": [171717, 424242], "hours": 12,
      "forecast": "the other lab day''s load before the battery, step by step", "forecast_mae_kw": 217.3,
-     "day_1_seed_171717_usd": {"no_battery": 1698.86, "day_plan": 1382.34, "typical_day_shape": 1151.82,
+     "bills_at": "each day plan''s end-of-day charge (no battery corrected 2026-11-06 from as billed: 1698.86 and 1498.97)",
+     "day_1_seed_171717_usd": {"no_battery": 1739.37, "day_plan": 1382.34, "typical_day_shape": 1151.82,
                                "next_1h_then_shape": 1135.01, "next_1h": 1514.99, "next_4h": 1535.47, "perfect": 1084.61},
-     "day_2_seed_424242_usd": {"no_battery": 1498.97, "day_plan": 1543.13, "typical_day_shape": 1243.38,
+     "day_2_seed_424242_usd": {"no_battery": 1552.96, "day_plan": 1543.13, "typical_day_shape": 1243.38,
                                "next_1h_then_shape": 1207.46, "next_1h": 1378.06, "next_4h": 1313.10, "perfect": 1098.47},
      "with_600_kwh_dr_reserve_from_2pm_usd": {"day_1": {"typical_day_shape": 1151.82, "perfect": 1084.61},
                                              "day_2": {"typical_day_shape": 1245.99, "perfect": 1098.47}},
@@ -138,7 +149,8 @@ VALUES
    '{"scenario": "normal_day", "fleet": 116, "seed": 424242, "hours": 12, "battery_start_pct": 24.6,
      "reserve_dr_kwh": 600, "dr_window_ct": "14:00-20:00", "floor_during_a_surge_pct": 33,
      "bill_at_base_end_state_usd": {"as_run": 1543.13, "dr_reserve_off": 1455.43, "rising_floor_off": 1541.71,
-                                    "both_off": 1301.28, "no_battery": 1498.97, "perfect": 1098.47},
+                                    "both_off": 1301.28, "no_battery": 1552.96, "no_battery_as_billed": 1498.97,
+                                    "perfect": 1098.47},
      "half_hour_peak_kw": {"as_run": 1474.5, "dr_reserve_off": 1354.1, "rising_floor_off": 1474.5, "both_off": 1132.0,
                            "perfect": 850.1},
      "stored_kwh_at_day_end": {"as_run": 1508.4, "dr_reserve_off": 2690.7, "rising_floor_off": 2362.2, "both_off": 2490.9},
@@ -203,7 +215,8 @@ VALUES
    'instead of $1,543 and $1,382 (each at the same end-of-day charge), every car''s day identical. And on a day with a 2 PM call '
    '(forced in the lab, since the scenario''s own call never fires, G518), every car''s day was identical, the grid and battery '
    'through the call were identical at every 5-minute reading, and the battery met the call 85.5% full instead of 74.9%; that day''s bill '
-   'went from $1,737 to $1,477 at the same end-of-day charge, where the old reserves had cost $68 more than no battery at all. '
+   'went from $1,737 to $1,477 at the same end-of-day charge, where the old reserves had cost $8 more than no battery at all '
+   '($1,729 at that charge; first published as $68 more, setting the plan, which stored 854 kWh, against no battery as billed). '
    'The reserve only matters June to September (the tariff''s summer); the floor change acts all year. Not yet seen in a demo run.',
    '{"migration": "0797", "ledger_version": "20261106025354", "switched_on_utc": "2026-11-06T02:57:21Z",
      "dials": {"bess_plan_dr_reserve_lead_h": {"default": 24, "twin": 3}, "bess_reserve_uncertainty_weight": {"default": 20, "twin": 0}},
@@ -212,7 +225,8 @@ VALUES
                                              "normal_day_171717": {"before": 1382.34, "after": 1294.82}},
      "gate_call_day": {"scenario": "dr_event_cascade", "fleet": 116, "seed": 171717, "call_ct": "14:00", "call_minutes": 122,
                        "call_cap_kw": 160.9, "battery_at_call_pct": {"before": 74.9, "after": 85.5},
-                       "bill_usd": {"before": 1737.07, "after": 1499.00, "after_at_base_end_state": 1476.66, "no_battery": 1669.31},
+                       "bill_usd": {"before": 1737.07, "after": 1499.00, "after_at_base_end_state": 1476.66,
+                                    "no_battery_at_base_end_state": 1729.08, "no_battery_as_billed": 1669.31},
                        "half_hour_peak_kw": {"before": 1679.0, "after": 1305.8},
                        "grid_and_battery_through_the_call_md5": "47a8c44b", "cars": "every car-facing scorecard line identical"},
      "demand_reserve_months": [6, 7, 8, 9], "finding": "G517", "seen_in_demo_run": false}',
