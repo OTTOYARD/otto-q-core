@@ -167,3 +167,18 @@ the lab day's own record.
 Two seeds a size and one depot build: a reading of where the curve bends, not a range. The levers it points to, none of
 them a lever on a vehicle (rules 9 and 13): a third service bay (on a 12-hour day at 200 cars it moved the wall to the
 posts, above), fewer charger faults, and the order in which cars get a post (the perfect day, E5).
+
+**A third service bay, on whole days** (seed 171717, read 2026-11-06 05:27-05:31 UTC):
+
+| | 150 cars, 2 bays | 150 cars, 3 bays | 200 cars, 2 bays | 200 cars, 3 bays |
+|---|---:|---:|---:|---:|
+| cars that left in the day | 466 | 488 | 464 | 474 |
+| visits an hour, 9 AM-5 AM arrivals | 22.3 | 23.1 | 22.7 | 23.1 |
+| charged within the contract wait | 62% | 56% | 39% | 40% |
+| 1-7 PM out at work | 69% | 67% | 59% | 63% |
+| service bays busy | 74% | 65% | 93% | 85% |
+| the wall named most (of 48) | service bays 27 | posts 21 | service bays 37 | posts 24 |
+
+A third bay lets 22 more cars out of the day at 150 cars (+4.7%) and 10 at 200 (+2.2%), and moves the wall to the posts at
+both sizes; at 150 the cars it lets through then wait a little longer for a post (56% within the contract wait against
+62%). So the depot's next 50 cars need the posts as well as the bays: a third bay alone buys a few percent. One seed each.

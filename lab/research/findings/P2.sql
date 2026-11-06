@@ -226,8 +226,9 @@ VALUES
    'constraint board names most is the two service bays (93% busy over the whole day at 200 cars); the posts are full at '
    'the afternoon peak and lose time to charger faults. On the busy-day stress scenario (trouble codes at 7 times the rate) '
    'the bays fail at today''s 116 cars: by noon 96 charged cars wait for maintenance or calibration, which no car leaves '
-   'without. Levers, none of them on a vehicle: a third service bay, fewer charger faults, better ordering of who gets a '
-   'post. Two seeds a size: where the curve bends, not a range.',
+   'without. Levers, none of them on a vehicle: a third service bay lets 22 more cars out of the day at 150 cars (+5%) and 10 '
+   'at 200 (+2%) and moves the wall to the posts, so the next 50 cars need posts as well as bays; fewer charger faults; '
+   'better ordering of who gets a post. Two seeds a size: where the curve bends, not a range.',
    '{"depot": "twin as built: 30 dcfc posts, 2 service bays, 3 wash bays", "days": "normal_day, 24 h from 6 AM CT, arrivals 9 AM-5 AM",
      "by_fleet": {
        "116": {"seeds": [171717, 424242], "visits_per_hour": [19.8, 18.3], "within_contract_wait_pct": [91, 78], "wait_p50_min": [5, 15], "wait_p95_min": [35, 60],
@@ -236,10 +237,10 @@ VALUES
                "afternoon_out_pct": [69, 61], "service_bays_busy_pct": [74, 80], "posts_busy_pct": [58, 55]},
        "200": {"seeds": [171717, 424242], "visits_per_hour": [22.7, 22.4], "within_contract_wait_pct": [39, 37], "wait_p50_min": [98, 110], "wait_p95_min": [310, 330],
                "afternoon_out_pct": [59, 56], "service_bays_busy_pct": [93, 93], "posts_busy_pct": [72, 67]}},
-     "afternoon_asked_pct": 87, "busy_day_116": {"cars_inside_at_noon_waiting_for_bays": 96, "owing_mechanical_pm": 71, "owing_sensor_calibration": 37,
+     "afternoon_asked_pct": 87, "third_service_bay_seed_171717": {"150": {"cars_left": [466, 488], "within_contract_wait_pct": [62, 56], "wall": ["service_bay", "posts"]}, "200": {"cars_left": [464, 474], "within_contract_wait_pct": [39, 40], "wall": ["service_bay", "posts"]}}, "busy_day_116": {"cars_inside_at_noon_waiting_for_bays": 96, "owing_mechanical_pm": 71, "owing_sensor_calibration": 37,
      "in_depot_at_6pm": 111}, "phantom_visits_left_out": "G520"}',
    'otto-q-core lab/research/p2_capacity/README.md (the capacity curve on whole days), results.jsonl, steady_state.py, uptime_by_hour.sql',
-   '{}', '2026-11-06 05:17:03+00')
+   '{}', '2026-11-06 05:31:34+00')
 ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
