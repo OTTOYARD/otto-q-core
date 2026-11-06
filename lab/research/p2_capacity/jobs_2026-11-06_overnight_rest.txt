@@ -1,0 +1,6 @@
+# The overnight list's days not yet started when its runner was stopped at 04:30 UTC so that 0798's test days and the
+# commit-mode check could take the next free cores (the four days it had started ran on). Start after those have started.
+normal_day_150_424242|--fleet 150 --scenario normal_day --seed 424242
+normal_day_200_424242|--fleet 200 --scenario normal_day --seed 424242
+busy_day_116_171717|--fleet 116 --scenario busy_day --seed 171717
+busy_day_150_171717|--fleet 150 --scenario busy_day --seed 171717
