@@ -13,18 +13,17 @@ Supabase project `gxdrcyphqjzjsuhxuqtg` (otto-q-core).
   deploy (footnote ²), and `ottoq-cpsat-propose` v11 and `ottoq-orchestrator-agent` v34 (footnote ³), and
   `ottoq-orchestrator-agent` v35, agent v23 (footnote ⁴), v36, agent v24 (footnote ⁵), v37, agent v25
   (footnote ⁶), v38, agent v26 (footnote ⁷), v39, agent v27 (footnote ⁸), and v40, agent v28 (footnote ⁹), and `ottoq-ingest` v16, its v10 (footnote ¹⁰), and `ottoq-depot-v2` v1, its first deploy (footnote ¹¹). `otto-q-api`'s repo copy is ahead of what is deployed, on purpose, until someone can deploy it (footnote ¹²). `ottoq-csms-relay` is in the repo and not deployed: it is deployed after its database half, migration 0697, which holds a DROP a person approves (csms/README.md). And `ottoq-agent-gateway` v2, OTTOYARD sign-in (footnote ¹³). And `ottoq-orchestrator-agent` v43, agent v31, after v41 and v42, which were deployed without an entry here (footnote ¹⁵).
-  30 ACTIVE functions.
+  And `ottoq-battery-planner` v1, its first deploy (footnote ¹⁶).
+  31 ACTIVE functions.
 
-## NOT YET DEPLOYED: `ottoq-battery-planner` (2026-11-06, B1)
+## DEPLOYED: `ottoq-battery-planner` v1 (2026-11-06, B1 and B2)
 
 The battery planner's seam (otto-q-core 0804): the database fires it with `{plan_id}` and the vault's anon key; it reads the
 request from the pending `ottoq_energy_plan` row, posts it to ottoq-intelligence `POST /optimize/battery-plan`, and lands the
-answer with `ottoq_bess_planner_land` (service role), which writes the ledger row. Deploy with **verify_jwt on**, after
-0803 and 0804 are applied and the service carries the endpoint (ottoq-intelligence `claude/battery-planner`). It needs the
-same secret `ottoq-cpsat-propose` reads (`OTTOQ_INTEL_TOKEN`; the URL comes from `ottoq_service_endpoints`). Lab-tested
-end to end with the lab's stand-in for this function (`capacity_day.py --planner-service`), not deployed. Since 0805 it
-also takes `{hindsight_id}`: a day's grade against perfect foresight, read from `ottoq_bess_hindsight` and landed by
-`ottoq_bess_hindsight_land`. Type-checked with `deno check` 2.1.4 (2026-11-06).
+answer with `ottoq_bess_planner_land` (service role), which writes the ledger row. Since 0805 it also takes `{hindsight_id}`:
+a day's grade against perfect foresight, read from `ottoq_bess_hindsight` and landed by `ottoq_bess_hindsight_land`. It reads
+the same secret `ottoq-cpsat-propose` reads (`OTTOQ_INTEL_TOKEN`; the URL comes from `ottoq_service_endpoints`). Deployed
+with **verify_jwt on** on Chase's word, after 0803-0807 were applied and the service carried the endpoint (footnote ¹⁶).
 
 ## G67 IS CLOSED, AND THE PULL CORRECTED THE DRIFT LIST IT WAS BASED ON
 
@@ -123,6 +122,7 @@ against this table without trusting any metadata column.
 | ottoq-amend | 9 | true | 2026-06-18 04:24 | yes | `70f038ae2cfdb8891f2589f2e3158cc59792f0318718963cfa9c544249b1376b` |
 | ottoq-approval-copilot | 4 | true | 2026-07-25 01:46 | yes | `3abc122e20aa24a1222abe7a3bd7ce8ef6e91f78cc236b5afe2f0dc7f46293c0` |
 | ottoq-assign-optimize | 8 | true | 2026-09-09 03:41 | yes | `5508a9c95d4b98e736b3215fca9cc006ae6b5e4a399de174165cad69f100c34e` |
+| ottoq-battery-planner | 1 | true | 2026-11-06 18:59 | yes¹⁶ | `8662cb77f55199d58f0cf6630b17fbd4d3c7df3b75df89644b6c83edbf93c879` |
 | ottoq-benchmark-run | 7 | true | 2026-07-11 15:55 | yes | `abf1ac4718537993239bf33dc2ff29ed7a03e3f7324519c13af36a8a4a238155` |
 | ottoq-cleaning-cadence | 7 | true | 2026-06-18 18:21 | yes | `e829fe2709f831e04f6eac24c89f4cfee759f99a7b5ee2033f9dd2131bff5e25` |
 | ottoq-cpsat-propose | 11 | false | 2026-10-07 13:56 | yes³ | `7c40c6fe93cf6c21a77958033a4015f12051f720c3a5c94305985a443aa121b5` |
@@ -339,3 +339,16 @@ repo.
 ¹¹ **`ottoq-depot-v2` v1 is its first deploy, 2026-10-09 at 8:05 PM CT (01:05 UTC on 2026-10-10), for step 3 of the twin data contract review (migrations 0650, 0651, 0652).** The v2 operator door: `POST /events`, `GET /directives`, `GET /jwks` (contract/README.md). Through the Supabase MCP `deploy_edge_function` with three files, entrypoint `ottoq-depot-v2/index.ts`, `verify_jwt` **false** on purpose, as `ottoq-ingest` v16 (footnote ¹⁰): the source key is the credential and the gateway refuses the legacy JWT keys the apps ship. Read back with `get_edge_function`, the response saved to a file by the tool and hashed from that file (nothing retyped): all three byte-identical to the repo at commit `0b2de06` (index.ts `a9344660`, `ottoq-depot-v2/contract_schemas.ts` `fc55ef4c`, `_shared/depot_v2.ts` `f27bd1d6`). The function now imports a shared module and a generated one, so a future deploy sends all three. The depot's Ed25519 signing key was made by the function on its first `GET /jwks` (kid `ottoq-depot-118daaffe483095d`, private half in Vault) and no key was configured by hand. Probed from outside the same minute, `db/checks/0430` §2: unknown route 404, no key 401, malformed key 401, wrong method 405, wrong content type 415, a shadow-key batch of 10 in a dry run (5 applied, 1 late, 1 duplicate, 3 refused: another fleet's car, another operator's source, and a schema failure at the edge; nothing kept), a shadow key's directive read 403, and the probe key after revocation 401. **Not yet seen live:** a signed directive batch, which needs a running twin run (step 4).
 
 ¹² **`otto-q-api`: the repo copy is ahead of the deployed v26 (listed as version 28 by the API, same 2026-04-19 01:54 UTC deploy), on purpose, for G394.** Until 2026-10-10 this directory's `index.ts` was byte-identical to the deployed source (sha256 `01762cf6…`, the hash in the table). It now carries ten more lines, right after the source-key block in the route handler: a request that is not GET, HEAD or OPTIONS needs a valid `X-OTTO-Q-API-Key` or the service key as its bearer token, or it gets 401 `UNAUTHORIZED` (repo sha256 `fe35634f…`). Every write route writes with the service role, and four weeks of function logs (2026-09-12 to 10-10, `function_edge_logs` by function id) show apps calling GET routes only: `fleet/summary`, `progression-decisions`, `energy/history`, `fleet/schedule-intelligence`, the `ai/…` reads and the `ottow/…` reads. **Not deployed:** the file is 399 KB and the Supabase MCP deploy tool takes a file's content inline, so this session cannot send it without retyping it, and CI has no Supabase token by decision (2026-09-21). Two ways to ship it, either one a founder action: the dashboard's editor (Edge Functions → otto-q-api → Code: paste the ten lines after the `X-OTTO-Q-API-Key` block, then Deploy, keeping "Enforce JWT verification" off), or `supabase functions deploy otto-q-api --no-verify-jwt` from a checkout that has a token. After it ships: `POST /api/v1/tasks` with no credential answers 401, `GET /api/v1/fleet/summary` still answers 200.
+
+¹⁶ **`ottoq-battery-planner` v1, 2026-11-06 at 12:59 PM CT (18:59:37 UTC), its first deploy, on Chase's "OK, deploy the
+edge function".** Through the Supabase MCP `deploy_edge_function`, `verify_jwt` true, one file, `index.ts`, from
+`claude/frontier-agent-roles` at `4fcae21` (the trailing-slash fix on the service address). Read back with
+`get_edge_function`: version 1, ACTIVE, `ezbr_sha256` `3e1c58b6`, and the source byte-identical to the repo file (`cmp`;
+md5 `e1f1a7d4`, sha256 `8662cb77`). After 0803-0807 were applied (17:47-18:41 UTC) and ottoq-intelligence #21 was merged
+and deployed (aws-deploy-ssm run 23, 18:56:04-18:57:55 UTC: the box's `/health` listed `energy_mpc`, `cp_sat_forward_lex`
+and `battery_planner`, and its `/assign` smoke test came back 200 from CP-SAT). Probed at 19:00:44 UTC through `net.http_post`
+as the database fires it, read 19:00:53 UTC: with the vault's anon key, a plan that does not exist answered 404 "no such
+plan" and a grade that does not exist 404 "no such grade" (the gateway took the key; the function read both tables);
+with no key, 401 from the gateway. Nothing written. Its first real calls: the hindsight sweep, run by hand at 19:02:05 UTC
+after `bess_hindsight_enabled` went on at the twin depot, fired two grades (demo runs 78c0624c on 2026-10-23 and 763734d4
+on 2026-10-25, about 9 sim-hours each) and both landed `graded` at 19:02:06 UTC, HTTP 200 in 53 and 36 ms.

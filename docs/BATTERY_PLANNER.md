@@ -59,8 +59,8 @@ solvers run. So production needs the forecast in the database, the solver in the
 | 0799: plan-follow yields to a live grid call; follows a plan only while it is fresh | otto-q-core `db/migrations/0799_…` | **applied** 2026-11-06 17:40:23 UTC (ledger `20261106174023`) |
 | 0803: the per-tick forecast log, the nightly refit, the forecast reader | otto-q-core `db/migrations/0803_…` | **applied** 17:47:49 UTC (`20261106174749`); the log **on** at the twin depot since 17:54:09 UTC |
 | 0804: the planner's request, fire and landing; the orchestrator's hook | otto-q-core `db/migrations/0804_…` | **applied** 17:50:51 UTC (`20261106175051`); its dials off |
-| `ottoq-battery-planner` edge function | otto-q-core `edge-functions/ottoq-battery-planner/` | **not deployed** |
-| `POST /optimize/battery-plan` | ottoq-intelligence PR #21 (`claude/battery-planner`) | **draft PR** |
+| `ottoq-battery-planner` edge function | otto-q-core `edge-functions/ottoq-battery-planner/` | **deployed** v1, 18:59:37 UTC, verify_jwt on |
+| `POST /optimize/battery-plan` | ottoq-intelligence #21 | **merged** 18:55:30 UTC, **deployed** 18:57:55 UTC (`/health` lists `battery_planner`) |
 | 0806: a plan starts at the fire's clock; once per step of sim time (G528) | otto-q-core `db/migrations/0806_…` | **applied** 18:39:52 UTC (`20261106183952`) |
 | 0807: the daily grade in 5-minute steps whatever the tick (G527) | otto-q-core `db/migrations/0807_…` | **applied** 18:41:39 UTC (`20261106184139`) |
 
@@ -83,9 +83,15 @@ solvers run. So production needs the forecast in the database, the solver in the
    Production ticks every 2 minutes and 55 of 57 demo runs ticked under 5 sim-minutes, so without 0806 the battery
    never follows a plan there, and without 0807 a grade of a fast-ticking run means nothing. At a 5-minute tick neither
    changes anything.
-2. Merge ottoq-intelligence #21 and run its deploy workflow. `/health` lists `battery_planner`.
-3. Deploy `ottoq-battery-planner` with verify_jwt on. It reads the service's address from `ottoq_service_endpoints` and the
+2. ~~Merge ottoq-intelligence #21 and run its deploy workflow.~~ **Done**: Chase merged it at 12:55 PM CT; the automatic
+   deploy (aws-deploy-ssm run 23) finished at 12:57 PM CT, the box's `/health` listing `battery_planner` and its `/assign`
+   smoke test answering 200 from CP-SAT.
+3. ~~Deploy `ottoq-battery-planner` with verify_jwt on.~~ **Done** at 12:59 PM CT on Chase's "OK, deploy the edge
+   function" (v1, the source byte-identical to the repo). Probed as the database fires it: 404 for a plan and a grade that
+   do not exist with the vault's key, 401 with none. It reads the service's address from `ottoq_service_endpoints` and the
    token secret `ottoq-cpsat-propose` already uses.
+3b. ~~Turn on `bess_hindsight_enabled` at the twin depot.~~ **Done** at 1:02 PM CT under "Chase (delegated to Claude Code:
+   0805)"; the first two grades landed at once (§6).
 4. ~~Turn on `bess_forecast_learning` = 1 at the twin depot.~~ **Done** at 17:54:09 UTC (11:54 AM CT) under "Chase (delegated
    to Claude Code: 0803)". From then on every demo run logs its ticks. The nightly refit (5:26 AM CT) writes a usable model
    once it has 3 local days with 200 examples at every half hour ahead.
@@ -149,7 +155,19 @@ from. `ottoq_bess_hindsight_board` is the one line a day a person or an agent re
 **Not yet safe on a fast-ticking demo run (G527, read on production's data 2026-11-06 17:58 UTC).** The latest twin run,
 edf611ad, ticked about every 12 sim-seconds: its 74 snapshots span 14.6 sim-minutes, the segment rounds its step to 0
 minutes and its demand window to one snapshot, and the slice is billed at a full day's demand rate. The lab's days tick
-every 5 minutes and never showed it. Fixed by 0807 (applied 18:41:39 UTC); `bess_hindsight_enabled` stays off until the edge function is deployed.
+every 5 minutes and never showed it. Fixed by 0807 (applied 18:41:39 UTC).
+
+**The first grades, in production (2026-11-06 19:02 UTC).** `bess_hindsight_enabled` went on at the twin depot at 19:02:02 UTC
+and the sweep, run once by hand, graded the two past demo days still in the database long enough to grade (9 sim-hours each;
+four shorter runs were passed over, as 0807 intends). Both through the deployed chain, HTTP 200 in 53 and 36 ms:
+
+| day | run | realized | no battery | perfect foresight | captured | left on the table | billed half hour |
+|---|---|---:|---:|---:|---:|---:|---:|
+| 2026-10-23, 8 AM-5 PM | 78c0624c | $1,376.77 | $1,544.05 | $1,216.31 | 51.0% | $160.46 | 1,086 kW (no battery 1,371; perfect 806) |
+| 2026-10-25, 8 AM-5 PM | 763734d4 | $1,378.26 | $1,479.42 | $1,120.02 | 28.2% | $258.24 | 1,222 kW (no battery 1,384; perfect 806) |
+
+Both days ran on the day plan before today's battery changes and without the planner. Each part-day pays a whole day's
+demand rate for its own peak, as the research lab bills a day.
 
 Lab check: on the same window the grade bills exactly as the research lab's `bound_energy.py` ($1,539.61 realized,
 $1,497.50 no battery). Two lab days were graded end to end: 52.8% captured with $211.74 left on the first; −1.6% with
