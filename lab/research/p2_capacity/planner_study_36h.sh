@@ -6,6 +6,7 @@
 #   jobs  two planner days per seed to jobs_2026-11-06_p36.txt (run with LAB_DB=ottoq_lab_0801): the next seed's 36-hour
 #         load as the copied shape, and the learned forecast with its band (the shape beyond its four hours)
 #   bill  every finished day's bill over the window from hour 12 (6 PM day 1) to the end (bound_energy.py
+#         TAGS="..." bills other arms' days, e.g. TAGS="p36prof dp36learn"
 #         --window-start-h 12); the base days also holding the 600 kWh call reserve
 set -eu
 cmd=$1; shift
@@ -37,7 +38,7 @@ case "$cmd" in
     wc -l $J ;;
   bill)
     for s in "$@"; do
-      for tag in b36 p36shape p36q80; do
+      for tag in ${TAGS:-b36 p36shape p36q80}; do
         db=ottoq_cap_normal_day_116_${s}_$tag
         psql -h /var/tmp -p 55433 -U postgres -Atc "SELECT 1 FROM pg_database WHERE datname = '$db'" | grep -q 1 || continue
         $PY -I - "$db" <<'PYEOF' || continue

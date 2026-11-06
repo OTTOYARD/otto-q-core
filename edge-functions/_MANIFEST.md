@@ -22,7 +22,9 @@ request from the pending `ottoq_energy_plan` row, posts it to ottoq-intelligence
 answer with `ottoq_bess_planner_land` (service role), which writes the ledger row. Deploy with **verify_jwt on**, after
 0803 and 0804 are applied and the service carries the endpoint (ottoq-intelligence `claude/battery-planner`). It needs the
 same secret `ottoq-cpsat-propose` reads (`OTTOQ_INTEL_TOKEN`; the URL comes from `ottoq_service_endpoints`). Lab-tested
-end to end with the lab's stand-in for this function (`capacity_day.py --planner-service`), not deployed.
+end to end with the lab's stand-in for this function (`capacity_day.py --planner-service`), not deployed. Since 0805 it
+also takes `{hindsight_id}`: a day's grade against perfect foresight, read from `ottoq_bess_hindsight` and landed by
+`ottoq_bess_hindsight_land`. Type-checked with `deno check` 2.1.4 (2026-11-06).
 
 ## G67 IS CLOSED, AND THE PULL CORRECTED THE DRIFT LIST IT WAS BASED ON
 

@@ -843,7 +843,8 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'the_arms_registration_draw_is_keyed_on_what_a_run_reproduces_not_on_the_cycles_minted_id'::text, '0801_the_arms_registration_draw_is_keyed_on_what_a_run_reproduces_not_on_the_cycles_minted_id.sql'::text),
     ('PENDING'::text, 'a_recall_deferred_for_want_of_a_stall_opens_no_visit'::text, '0802_a_recall_deferred_for_want_of_a_stall_opens_no_visit.sql'::text),
     ('PENDING'::text, 'the_battery_learns_its_load_forecast_from_the_depots_own_days'::text, '0803_the_battery_learns_its_load_forecast_from_the_depots_own_days.sql'::text),
-    ('PENDING'::text, 'the_battery_plans_its_day_on_the_learned_forecast_and_the_planner_answers_from_outside'::text, '0804_the_battery_plans_its_day_on_the_learned_forecast_and_the_planner_answers_from_outside.sql'::text)
+    ('PENDING'::text, 'the_battery_plans_its_day_on_the_learned_forecast_and_the_planner_answers_from_outside'::text, '0804_the_battery_plans_its_day_on_the_learned_forecast_and_the_planner_answers_from_outside.sql'::text),
+    ('PENDING'::text, 'the_battery_grades_its_day_against_perfect_foresight'::text, '0805_the_battery_grades_its_day_against_perfect_foresight.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

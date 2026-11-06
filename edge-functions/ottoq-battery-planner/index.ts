@@ -9,6 +9,10 @@
 // ledger row (ottoq_model_call_ledger, provider intelligence_battery_planner). So a caller holding the anon key can do
 // one thing: make a plan the depot already asked for, once (a landed plan is not pending).
 //
+// 0805 (B2): the same function grades a day in hindsight. Body {hindsight_id}: the request is read from the pending row of
+// ottoq_bess_hindsight (the day's realized load: for the planner, perfect foresight) and the answer handed to
+// public.ottoq_bess_hindsight_land. The battery never follows a hindsight row: it is not a plan and not in ottoq_energy_plan.
+//
 // Deploy with verify_jwt ON (the default): the anon key is a JWT the gateway verifies. The service URL is data
 // (public.ottoq_service_endpoints, 0398), with OTTOQ_INTEL_URL as the fallback; the token is a secret
 // (OTTOQ_INTEL_TOKEN), as for ottoq-cpsat-propose. NO FALLBACK CREDENTIAL: an unset token is a failed plan with its
@@ -33,27 +37,47 @@ Deno.serve(async (req) => {
 
   const body = await req.json().catch(() => ({}));
   const planId = typeof body?.plan_id === "string" ? body.plan_id : "";
-  if (!UUID.test(planId)) return json({ ok: false, error: "plan_id (a uuid) is required" }, 400);
-
-  const sb = createClient(supabaseUrl, serviceKey);
-  const { data: plan, error: planError } = await sb.from("ottoq_energy_plan")
-    .select("id,source,plan_state,detail").eq("id", planId).maybeSingle();
-  if (planError) return json({ ok: false, error: planError.message }, 500);
-  if (!plan) return json({ ok: false, error: "no such plan" }, 404);
-  if (plan.source !== "bess_planner" || plan.plan_state !== "pending") {
-    return json({ ok: false, error: `the plan is ${plan.source}/${plan.plan_state}, not a pending battery plan` }, 409);
+  const hindsightId = Number.isSafeInteger(body?.hindsight_id) && body.hindsight_id > 0 ? body.hindsight_id as number : 0;
+  if (!UUID.test(planId) && !hindsightId) {
+    return json({ ok: false, error: "plan_id (a uuid) or hindsight_id (a positive integer) is required" }, 400);
   }
 
-  const land = async (answer: unknown, httpStatus: number, latencyMs: number) => {
-    const { data, error } = await sb.rpc("ottoq_bess_planner_land", {
-      p_plan_id: planId, p_response: answer, p_http_status: httpStatus, p_latency_ms: latencyMs,
-    });
-    return json({ ok: !error && data?.ok === true, landed: data ?? null, latency_ms: latencyMs, error: error?.message ?? null },
-                error ? 500 : 200);
-  };
+  const sb = createClient(supabaseUrl, serviceKey);
+  let request: unknown;
+  let land: (answer: unknown, httpStatus: number, latencyMs: number) => Promise<Response>;
+  if (hindsightId) {
+    const { data: row, error: rowError } = await sb.from("ottoq_bess_hindsight")
+      .select("hindsight_id,state,request").eq("hindsight_id", hindsightId).maybeSingle();
+    if (rowError) return json({ ok: false, error: rowError.message }, 500);
+    if (!row) return json({ ok: false, error: "no such grade" }, 404);
+    if (row.state !== "pending") return json({ ok: false, error: `the grade is ${row.state}, not pending` }, 409);
+    request = row.request;
+    land = async (answer, httpStatus, latencyMs) => {
+      const { data, error } = await sb.rpc("ottoq_bess_hindsight_land", {
+        p_hindsight_id: hindsightId, p_response: answer, p_http_status: httpStatus, p_latency_ms: latencyMs,
+      });
+      return json({ ok: !error && data?.ok === true, landed: data ?? null, latency_ms: latencyMs, error: error?.message ?? null },
+                  error ? 500 : 200);
+    };
+  } else {
+    const { data: plan, error: planError } = await sb.from("ottoq_energy_plan")
+      .select("id,source,plan_state,detail").eq("id", planId).maybeSingle();
+    if (planError) return json({ ok: false, error: planError.message }, 500);
+    if (!plan) return json({ ok: false, error: "no such plan" }, 404);
+    if (plan.source !== "bess_planner" || plan.plan_state !== "pending") {
+      return json({ ok: false, error: `the plan is ${plan.source}/${plan.plan_state}, not a pending battery plan` }, 409);
+    }
+    request = plan.detail?.request;
+    land = async (answer, httpStatus, latencyMs) => {
+      const { data, error } = await sb.rpc("ottoq_bess_planner_land", {
+        p_plan_id: planId, p_response: answer, p_http_status: httpStatus, p_latency_ms: latencyMs,
+      });
+      return json({ ok: !error && data?.ok === true, landed: data ?? null, latency_ms: latencyMs, error: error?.message ?? null },
+                  error ? 500 : 200);
+    };
+  }
 
-  const request = plan.detail?.request;
-  if (!request || typeof request !== "object") return await land({ error: "the plan carries no request" }, 422, 0);
+  if (!request || typeof request !== "object") return await land({ error: "the row carries no request" }, 422, 0);
 
   // 0398: THE ADDRESS OF A SERVICE THAT MOVES IS DATA, NOT A DEPLOY-TIME SECRET; the env var is the fallback.
   let intelligenceUrl = envIntelligenceUrl;

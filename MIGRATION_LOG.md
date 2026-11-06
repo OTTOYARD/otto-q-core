@@ -248,7 +248,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0804 — GENERATED, not a log
+## Index, 0134–0805 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0559, 0560, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0603, 0604, 0605, 0606, 0607, 0608, 0609, 0610, 0611, 0612, 0613, 0614, 0615, 0616, 0617, 0618, 0619, 0620, 0621, 0622, 0623, 0624, 0625, 0626, 0627, 0628, 0629, 0630, 0631, 0632, 0633, 0634, 0635, 0636, 0637, 0638, 0639, 0640, 0641, 0642, 0643, 0644, 0647, 0648, 0649, 0650, 0651, 0652, 0653, 0654, 0655, 0656, 0657, 0658, 0659, 0690, 0691, 0692, 0693, 0694, 0695, 0696, 0698, 0699, 0714, 0738, 0749, 0755, 0759, 0760, 0761, 0762, 0763, 0764, 0765, 0766, 0767, 0768, 0769, 0780, 0781, 0782, 0783, 0784, 0785, 0792, 0793, 0794, 0795, 0796, 0797, 0798 — which are indexed below as well as logged above; the log row is
@@ -879,7 +879,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0802](db/migrations/0802_a_recall_deferred_for_want_of_a_stall_opens_no_visit.sql) | `PENDING` | no — pending | **A recall that is deferred for want of a stall opens no visit.** (G520) |
 | [0803](db/migrations/0803_the_battery_learns_its_load_forecast_from_the_depots_own_days.sql) | `PENDING` | no — pending | **The battery learns its load forecast from the depot's own days.** (B1, the production battery planner's first |
 | [0804](db/migrations/0804_the_battery_plans_its_day_on_the_learned_forecast_and_the_planner_answers_from_outside.sql) | `PENDING` | no — pending | **The battery plans its day on the learned forecast, and the planner answers from outside.** (B1, the production |
+| [0805](db/migrations/0805_the_battery_grades_its_day_against_perfect_foresight.sql) | `PENDING` | no — pending | **The battery grades each day it ran against perfect foresight.** (B2, the battery's hindsight; the measurement an |
 
-612 migrations indexed.
+613 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
