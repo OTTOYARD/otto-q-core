@@ -122,7 +122,8 @@ def main() -> None:
     db = f"ottoq_cap_{a.scenario}_{a.fleet}_{a.seed}" + (f"_{a.tag}" if a.tag else "")
     admin = psycopg.connect(host=HOST, port=PORT, user="postgres", dbname="postgres", autocommit=True)
     if admin.execute("SELECT count(*) FROM pg_database WHERE datname = %s", (db,)).fetchone()[0]:
-        admin.execute(f"DROP DATABASE {db}")
+        # FORCE: a day killed mid-run leaves its backend rolling back for minutes, holding the replica (2026-11-06)
+        admin.execute(f"DROP DATABASE {db} WITH (FORCE)")
     clone_s = clone_database(admin, TEMPLATE, db)
     conn = psycopg.connect(host=HOST, port=PORT, user="postgres", dbname=db, autocommit=False)
 
