@@ -357,3 +357,42 @@ ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
   run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
+
+-- E8, the battery planner in steady state (2026-11-06): 36-hour lab days billed 6 PM to 6 PM. Evidence:
+-- lab/research/p2_capacity/planner_36h_lab_2026-11-06.md, planner_table.py --charge-start, bound_energy.py --window-start-h 12.
+-- Published 2026-11-06 11:09:35 UTC.
+INSERT INTO public.ottoq_research_findings
+  (slug, phase, item, kind, status, title, summary, metrics, evidence, run_ids, measured_at)
+VALUES
+  ('p2-battery-planner-steady-state', 'P2', 'E8', 'measurement', 'measured',
+   'In steady state the battery planner on a learned forecast saves $226 a day on the twin''s day plan, on all six lab seeds',
+   'Billed over the last 24 hours of 36-hour lab days (6 PM to 6 PM: the evening, the night''s refill, the next morning and '
+   'the day), so the lab day''s 6 AM start-up is not what the bill pays for. Six seeds, 116 cars, every car''s day the same '
+   'in every plan; each plan charged for the stored energy it brings into the window and credited for what it leaves, at '
+   'the day plan''s replacement cost. In steady state the bill is the evening''s wave of returns (975-1,160 kW at 10:15-11:35 '
+   'PM): the day plan charges the battery into the wave and saves $73 a day on no battery ($1,551 against $1,624). The '
+   'planner on the learned forecast and its 80th-percentile band fills the battery by 6 PM for the evening it knows is '
+   'billed and holds the billed half hour to 628-748 kW: $1,325 a day, $226 less than the day plan on all six seeds '
+   '($164-300) and $37 less than the same planner on another day''s load; perfect foresight $1,129. The day plan with '
+   'G524''s forecast fix moves nothing (-$1). The build is production''s optimizer fed this forecast and band, the tariff, the '
+   'billed peak and the call reserve, with plan-follow on: about $6,800 a month at one depot on the twin''s demand model. Lab '
+   'days, one scenario: a reading of the method, not a forecast of production''s bill.',
+   '{"scenario": "normal_day", "fleet": 116, "run_hours": 36, "billed_window": "6 PM day 1 to 6 PM day 2",
+     "lab_template": "ottoq_lab_0801", "billing_period_from_min": 720,
+     "seeds": [171717, 424242, 616161, 818181, 919191, 373737], "cars_identical_in_every_plan": 6,
+     "mean_bill_usd": {"no_battery": 1624.11, "day_plan": 1550.64, "day_plan_g524_fix": 1551.86,
+                       "planner_on_another_days_load": 1361.64, "planner_learned_q80": 1324.62,
+                       "perfect_foresight_free_ends": 1128.94},
+     "saving_on_day_plan_usd": {"planner_on_another_days_load": 188.99, "planner_learned_q80": 226.02, "day_plan_g524_fix": -1.23},
+     "planner_learned_q80_by_seed_usd": {"171717": 164.35, "424242": 195.72, "616161": 300.41, "818181": 284.98, "919191": 190.14, "373737": 220.51},
+     "seeds_beating_day_plan": {"planner_on_another_days_load": 6, "planner_learned_q80": 6, "day_plan_g524_fix": 1},
+     "share_of_gap_to_perfect_foresight_closed": {"planner_on_another_days_load": 0.45, "planner_learned_q80": 0.54},
+     "billed_peak_kw": {"day_plan": "975-1160 at 10:15-11:35 PM", "planner_learned_q80": "628-748"},
+     "accounting": "stored energy at 0.070 USD/kWh at the window''s start and end for every plan; perfect foresight chooses both on the same terms; checked against day 1''s real cost on two seeds (95.37 vs 93.74, 133.82 vs 116.11 USD)",
+     "billing": "the window pays its own highest 30-minute average at 21.40 USD/kW-month over 30 days, TOU energy, 0.02 USD/kWh wear"}',
+   'otto-q-core lab/research/p2_capacity/planner_36h_lab_2026-11-06.md, results.jsonl (tags b36, p36shape, p36q80, b36fc), lab/research/p2_perfect_day/bound_energy.jsonl',
+   '{}', '2026-11-06 11:07:56+00')
+ON CONFLICT (depot_id, slug) DO UPDATE SET
+  phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
+  title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
+  run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
