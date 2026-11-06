@@ -647,6 +647,12 @@ against the day plan's $1,382 and no battery's $1,699 on the same day (each payi
 fixed-target rule cost $2,225). The penalty (information relaxation) is not built;
 more days and fleet sizes are running (`lab/research/p2_capacity/`).*
 
+*Correction 9:36 PM CT on 2026-11-05: that first model gave each charge its session's length on a post, and a car holds its post about
+5 minutes longer while the robot unplugs it (10% more post time). With the car's time on the post, solved like for like:
+116 cars 24,332 real, 20,055 best found (18% less), 16,185 bound (33%); 150 cars 29,100 real, 25,188 found (13%), 18,935
+bound (35%). The room is real and smaller than first published; the owner and lane figures above are the first model's
+and are re-solved on the corrected one when the lab's cores are free (`lab/research/p2_perfect_day/README.md`).*
+
 *Status 2026-11-05 (5:29 PM CT), the battery on a second day (seed 424242): planning on a typical day's shape (the other
 lab day's load) closes 67-77% of the gap to perfect foresight on both days, and on the second day the day plan did not
 lower the peak at all: the battery started 25% full, the plan holds a 600 kWh demand-response reserve from the first

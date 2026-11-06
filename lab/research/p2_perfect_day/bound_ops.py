@@ -92,6 +92,31 @@ SELECT o.visit_id::text, extract(epoch FROM (s.started_at - r.t0)) / 60.0 AS sta
    AND (o.departed_at IS NULL OR s.started_at < o.departed_at) AND s.status::text <> 'faulted'
 """
 
+# --post-occupancy: a charge holds its post from the car's arrival on the post to its leaving it, not only for the session
+# (the robot unplugs it after the session ends: on the lab days a car leaves its post a tick after its session ended).
+# Read from the stall's own pointer (stall.state_changed, current_vehicle_id), the session's bounds where none is found.
+SESSIONS_OCC_SQL = """
+WITH o AS (SELECT * FROM public.ottoq_visit_outcomes(%(run)s)),
+     r AS (SELECT sim_clock_start AS t0, sim_clock_current AS t1 FROM ottoq_sim_runs WHERE sim_run_id = %(run)s),
+     s AS (SELECT o.visit_id, s.vehicle_id, s.stall_id, s.started_at, s.ended_at
+             FROM o, ocpp_sessions s
+            WHERE s.sim_run_id = %(run)s AND s.vehicle_id = o.vehicle_id AND s.started_at >= o.arrived_at
+              AND (o.departed_at IS NULL OR s.started_at < o.departed_at) AND s.status::text <> 'faulted'),
+     occ AS (SELECT s.*,
+                    COALESCE((SELECT max(e.sim_clock_at) FROM ottoq_events e
+                               WHERE e.entity_id = s.stall_id AND e.event_type = 'stall.state_changed'
+                                 AND e.payload -> 'diff' -> 'current_vehicle_id' ->> 'to' = s.vehicle_id::text
+                                 AND e.sim_clock_at <= s.started_at), s.started_at) AS occ_from,
+                    COALESCE((SELECT min(e.sim_clock_at) FROM ottoq_events e
+                               WHERE e.entity_id = s.stall_id AND e.event_type = 'stall.state_changed'
+                                 AND e.payload -> 'diff' -> 'current_vehicle_id' ->> 'from' = s.vehicle_id::text
+                                 AND e.sim_clock_at >= s.ended_at), s.ended_at) AS occ_to
+               FROM s)
+SELECT occ.visit_id::text, extract(epoch FROM (occ.occ_from - r.t0)) / 60.0 AS start,
+       extract(epoch FROM (COALESCE(occ.occ_to, r.t1) - occ.occ_from)) / 60.0 AS dur, occ.occ_to IS NULL AS censored
+  FROM occ, r
+"""
+
 BOOKINGS_SQL = """
 WITH o AS (SELECT * FROM public.ottoq_visit_outcomes(%(run)s)),
      r AS (SELECT sim_clock_start AS t0, sim_clock_current AS t1 FROM ottoq_sim_runs WHERE sim_run_id = %(run)s)
@@ -158,7 +183,7 @@ SELECT extract(epoch FROM (COALESCE(ev.at, s.ended_at) - r.t0)) / 60.0 AS down_f
 """
 
 
-def load(db: str, run: str | None) -> dict:
+def load(db: str, run: str | None, occupancy: bool = False) -> dict:
     conn = psycopg.connect(host=HOST, port=PORT, user="postgres", dbname=db)
     if run is None:
         run = conn.execute("SELECT sim_run_id::text FROM ottoq_sim_runs WHERE run_by = 'ab_harness' "
@@ -174,7 +199,7 @@ def load(db: str, run: str | None) -> dict:
     for vid, svc, conc, bay, est, lane, must in cur.fetchall():
         atoms[vid].append({"svc": svc, "conc": conc, "bay": bay, "est_min": float(est) if est is not None else None,
                            "lane": lane, "must_do": must})
-    cur.execute(SESSIONS_SQL, {"run": run})
+    cur.execute(SESSIONS_OCC_SQL if occupancy else SESSIONS_SQL, {"run": run})
     for vid, start, dur, cen in cur.fetchall():
         sess[vid].append({"start": float(start), "dur": float(dur), "censored": cen})
     cur.execute(BOOKINGS_SQL, {"run": run})
@@ -344,18 +369,21 @@ def main() -> None:
     ap.add_argument("--owners", action="store_true", help="also each owner's own best (door), the others free")
     ap.add_argument("--engine-order", action="store_true",
                     help="hold each car's work in the engine's own order (repair first on a fault, else charge before bays)")
+    ap.add_argument("--post-occupancy", action="store_true",
+                    help="a charge holds its post from the car's arrival on it to its leaving it (SESSIONS_OCC_SQL), not the session only")
+    ap.add_argument("--objectives", default="door,on_time,wait", help="comma-separated: door, on_time, wait")
     ap.add_argument("--out", default=os.path.join(HERE, "bound_ops.jsonl"))
     a = ap.parse_args()
     global NUM_WORKERS
     NUM_WORKERS = a.workers
-    day = load(a.db, a.run)
+    day = load(a.db, a.run, occupancy=a.post_occupancy)
     real = realized(day)
     out = {"db": day["db"], "run": day["run"], "scenario": day["scenario"], "seed": day["seed"], "lab": day["lab"],
-           "engine_order": a.engine_order,
+           "engine_order": a.engine_order, "post_occupancy": a.post_occupancy,
            "horizon_min": day["horizon"], "units": day["units"], "faults": len(day["faults"]),
            "visits": len(day["visits"]), "jobs": sum(len(j) for j in day["jobs"].values()),
            "realized": real, "solves": []}
-    for obj in ("door", "on_time", "wait"):
+    for obj in [x.strip() for x in a.objectives.split(",") if x.strip()]:
         out["solves"].append(solve(day, obj, a.seconds, engine_order=a.engine_order))
     if a.split:
         for fix in ("bay", "post"):

@@ -25,6 +25,37 @@ replicas keep every row of the run.
 
 ## What it found
 
+### Correction (2026-11-06): a car holds its post after its charge, and the first model did not count it
+
+The first solves below gave each charge its session's length on a post. On the lab days a car stays on its post until
+the robot has unplugged it, about a tick after the session ends: 4.8 minutes a charge on average, 10% more post time
+(12,470 session minutes against 13,740 post minutes at 116 cars; 14,945 against 16,375 at 150). So the first model
+let a post take its next car sooner than the depot can, and its perfect day was too good. `bound_ops.py
+--post-occupancy` gives each charge the minutes its car held the post (`SESSIONS_OCC_SQL`, from the stall's own
+pointer). Solved like for like (engine order, door, one worker, 120 s; read 2026-11-06 03:30 UTC):
+
+| 116 cars, seed 171717, minutes to ready | best found | proven bound |
+|---|---:|---:|
+| the real day | 24,332 | |
+| first model (session on the post) | 18,043 (-25.8%) | 14,915 (-38.7%) |
+| **the car's time on the post** | **20,055 (-17.6%)** | **16,185 (-33.5%)** |
+
+| 150 cars, seed 171717, minutes to ready (read 2026-11-06 03:35 UTC) | best found | proven bound |
+|---|---:|---:|
+| the real day | 29,100 | |
+| first model (session on the post) | 22,333 (-23.3%) | 17,505 (-39.8%) |
+| **the car's time on the post** | **25,188 (-13.4%)** | **18,935 (-34.9%)** |
+
+The gap is real and smaller: the best day found is 13-18% better, not the 28-30% the first model's solves found, and no
+schedule can be more than a third better (33-35%). The first model's reading that the room does not shrink as the
+depot fills is withdrawn: found, it fell from 17.6% at 116 cars to 13.4% at 150, while the bound held at a third; one
+worker for 120 s is a weak search on the larger day, so neither says yet how the room moves with the fleet. What the first model said about owners (holding each to no
+worse cost the best day almost nothing) and about where the gap sits (the charging posts' share is the larger) is
+re-solved on the corrected model when the lab's cores are free; until then the tables below are the first model's.
+And on the posts the gain is the order in which cars get one, not posts left idle: a working post almost never stood
+free while a car waited (`lab/research/p2_capacity/post_idle_while_waiting.sql`).
+
+
 ### The first lab day (solved 2026-11-05 22:05-22:21 UTC = 4:05-4:21 PM CT)
 
 normal_day at the twin depot as built today, 116 cars, seed 171717, 12 hours from 6 AM CT at 5-minute ticks, production's
