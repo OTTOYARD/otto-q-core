@@ -1,0 +1,4 @@
+# G528 in the research lab (2026-11-06; LAB ONLY; LAB_DB=ottoq_lab_0806m: ottoq_lab_0804m with 0806 applied). Seed 424242:
+# at the lab's 5-minute tick, which must reproduce p36prod exactly, and at production's 2-minute tick with the fix.
+normal_day_116_424242_p36g528|--fleet 116 --scenario normal_day --seed 424242 --ticks 432 --run-hours 36 --dial bess_plan_bill_from_min=720 --dial bess_planner_enabled=1 --dial energy_mpc_follow=1 --dial bess_planner_beyond=0 --planner-service http://127.0.0.1:8088 --bess-forecast-model 3 --tag p36g528
+normal_day_116_424242_p36t2fix|--fleet 116 --scenario normal_day --seed 424242 --ticks 1080 --step 2 --run-hours 36 --dial bess_plan_bill_from_min=720 --dial bess_planner_enabled=1 --dial energy_mpc_follow=1 --dial bess_planner_beyond=0 --planner-service http://127.0.0.1:8088 --bess-forecast-model 3 --tag p36t2fix

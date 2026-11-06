@@ -1,0 +1,5 @@
+# G528 in the research lab (2026-11-06; LAB ONLY; LAB_DB=ottoq_lab_0804m: 0804 as production holds it). Seed 424242 at
+# production's 2-minute tick (1,080 ticks over 36 hours, billed from 6 PM day 1): the day plan alone, and the planner's chain
+# as 0804 left it (the plan starts one step after the fire, so a 2-minute tick reads step -1).
+normal_day_116_424242_b36t2|--fleet 116 --scenario normal_day --seed 424242 --ticks 1080 --step 2 --run-hours 36 --dial bess_plan_bill_from_min=720 --tag b36t2
+normal_day_116_424242_p36t2pre|--fleet 116 --scenario normal_day --seed 424242 --ticks 1080 --step 2 --run-hours 36 --dial bess_plan_bill_from_min=720 --dial bess_planner_enabled=1 --dial energy_mpc_follow=1 --dial bess_planner_beyond=0 --planner-service http://127.0.0.1:8088 --bess-forecast-model 3 --tag p36t2pre

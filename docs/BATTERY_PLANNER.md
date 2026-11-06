@@ -61,6 +61,8 @@ solvers run. So production needs the forecast in the database, the solver in the
 | 0804: the planner's request, fire and landing; the orchestrator's hook | otto-q-core `db/migrations/0804_…` | **applied** 17:50:51 UTC (`20261106175051`); its dials off |
 | `ottoq-battery-planner` edge function | otto-q-core `edge-functions/ottoq-battery-planner/` | **not deployed** |
 | `POST /optimize/battery-plan` | ottoq-intelligence PR #21 (`claude/battery-planner`) | **draft PR** |
+| 0806: a plan starts at the fire's clock; once per step of sim time (G528) | otto-q-core `db/migrations/0806_…` | **pending** |
+| 0807: the daily grade in 5-minute steps whatever the tick (G527) | otto-q-core `db/migrations/0807_…` | **pending** |
 
 **Lab checks** (each in its migration's header or the PR):
 
@@ -76,6 +78,11 @@ solvers run. So production needs the forecast in the database, the solver in the
 ## 4. Switching it on (each step a person's)
 
 1. ~~Apply 0799, then 0803, then 0804.~~ **Done** 2026-11-06, 11:40-11:50 AM CT, each on Chase's confirmation at the connector's prompt.
+1b. Apply 0806 (G528: a plan starts at the fire's own clock, so a tick shorter than the plan's 5-minute step follows
+   it; the planner asked once per step of sim time) and 0807 (G527: the daily grade reads its day in 5-minute steps).
+   Production ticks every 2 minutes and 55 of 57 demo runs ticked under 5 sim-minutes, so without 0806 the battery
+   never follows a plan there, and without 0807 a grade of a fast-ticking run means nothing. At a 5-minute tick neither
+   changes anything.
 2. Merge ottoq-intelligence #21 and run its deploy workflow. `/health` lists `battery_planner`.
 3. Deploy `ottoq-battery-planner` with verify_jwt on. It reads the service's address from `ottoq_service_endpoints` and the
    token secret `ottoq-cpsat-propose` already uses.
