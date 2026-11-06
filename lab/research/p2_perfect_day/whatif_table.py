@@ -35,6 +35,13 @@ def latest(path: str, key, pred=lambda d: True) -> dict:
     return out
 
 
+def strip_ids(x):
+    """A scorecard block without the run's own id, which every day carries and no car feels."""
+    if isinstance(x, dict):
+        return {k: strip_ids(v) for k, v in x.items() if k != "sim_run_id"}
+    return x
+
+
 def main() -> None:
     dbs = sys.argv[1:]
     energy = latest(os.path.join(HERE, "bound_energy.jsonl"), lambda d: d["db"], lambda d: not d.get("dr_reserve"))
@@ -48,7 +55,7 @@ def main() -> None:
         e = energy[db]
         rp, end = e["real_plan"], e["battery"]["soc_end_kwh"]
         adj = rp["total_usd"] - (end - b_end) * RATE_STORED      # ending emptier leaves energy to buy back
-        same = all(days[db]["scorecard"].get(k) == b_sc.get(k) for k in car_keys)
+        same = all(strip_ids(days[db]["scorecard"].get(k)) == strip_ids(b_sc.get(k)) for k in car_keys)
         tag = days[db].get("tag") or "base"
         print(f"{tag} | {rp['peak30_kw']} | {rp['total_usd']:.2f} | {end} | {adj:.2f} | {'identical' if same else 'DIFFERENT'}")
     nb = energy[base]["no_battery"]

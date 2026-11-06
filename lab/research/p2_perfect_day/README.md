@@ -162,13 +162,27 @@ Needed only from 2 PM, the same reserve costs nothing in hindsight on either day
 foresight is $1,085 and $1,098 exactly as without it, and the typical-day plans pay $0 and $3 more ($1,152 and $1,246).
 The battery refills well before the window anyway (on the second day from 25% to 52% between 8 AM and 1 PM, without trying).
 
-| what the reserves cost on the second day (seed 424242) | half-hour peak | bill |
-|---|---:|---:|
-| the day plan as it runs (both reserves) | 1,475 kW | $1,543 |
-| the demand-response reserve off (`dr0`) | running | |
-| the rising floor off (`res0`) | running | |
-| both off (`dr0res0`) | running | |
-| perfect foresight, the reserve needed from 2 PM | 850 kW | $1,098 |
+What the reserves cost on the second day, measured with the plan as it runs: the same day (seed 424242, 116 cars)
+re-run in the lab with one reserve or both switched off (`lab/research/p2_capacity/`, tags `dr0`, `res0`, `dr0res0`;
+`whatif_table.py`, read 2026-11-06 00:03 UTC = 6:03 PM CT on 11-05). Every car-facing scorecard line is identical across
+the four days: the battery's plan never limits a car. The days end with different energy stored, so each bill is also
+given at the base day's end state (the difference valued at the plan's own replacement cost, $0.070 per kWh).
+
+| the second day (seed 424242) | half-hour peak | bill | stored at day end | bill at the base day's end state |
+|---|---:|---:|---:|---:|
+| the day plan as it runs (both reserves) | 1,475 kW | $1,543 | 1,508 kWh | $1,543 |
+| the demand-response reserve off (`dr0`) | 1,354 kW | $1,538 | 2,691 kWh | $1,455 |
+| the rising floor off (`res0`) | 1,475 kW | $1,601 | 2,362 kWh | $1,542 |
+| both off (`dr0res0`) | 1,132 kW | $1,370 | 2,491 kWh | $1,301 |
+| no battery | 1,475 kW | $1,499 | | |
+| perfect foresight, the reserve needed from 2 PM | 850 kW | $1,098 | 1,508 kWh | $1,098 |
+
+- **Either reserve alone hides the other.** The rising floor off changes nothing while the demand-response reserve still
+  holds the battery ($1 at the same end state); the reserve off saves $88; both off save $242 and take the peak from 1,475
+  to 1,132 kW, 54% of the gap to perfect foresight ($242 of $445). No demand-response call came, so on this day both
+  off is what "the reserve needed only from 2 PM" would have done, with nothing to refill against.
+- The rest of the gap ($203) is the plan's forecast and its algorithm; the forecast what-ifs (`shape`, `shape_dr0res0`)
+  measure how much of it a typical day's shape recovers with the plan as it runs.
 
 The proposed fix keeps the reserve and needs it by the window: the plan may spend it before 2 PM when it can refill it by
 then, and the floor hedges the plan's own forecast error, not the surge it is planning for. It is built behind a dial and
