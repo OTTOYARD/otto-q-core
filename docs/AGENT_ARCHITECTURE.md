@@ -197,12 +197,13 @@ which on `57188f55` above is when CP-SAT's proposals started to be enacted.
    reserve costs nothing in hindsight on either day. So the build is, in order: (a) the demand-response reserve needed by
    its window, and a floor that hedges the plan's own forecast error rather than the surge it plans for (G517, sized in the
    lab first, and tested on a day with a call so a call never slows a car; on the second day both reserves off took the
-   bill from $1,543 to $1,301 with every car's day identical; built as 0797 and switched on at the twin depot at 8:57 PM CT on 2026-11-05: on a lab
-   day with a 2 PM call every car's day was the same and the battery met the call 85.5% full instead of 74.9%); (b) a
-   planner that plans the battery's refill along with
-   its discharge, so it dares spend into the 6 AM surge (the rolling linear program in
-   `lab/research/p2_perfect_day/bound_energy.py`, held to the reserve from 2 PM), because given a typical day's shape the
-   day plan as it runs moved nothing (the surge sets the billed peak before the rest-of-day forecast can matter); and (c)
+   bill from $1,543 to $1,301 with every car's day identical; built as 0797 and switched on at the twin depot at 8:57 PM
+   CT on 2026-11-05: on a lab day with a 2 PM call every car's day was the same and the battery met the call 85.5% full
+   instead of 74.9%); (b) a planner that plans the battery's refill along with its discharge, so it dares spend into the
+   6 AM surge (the rolling linear program in `lab/research/p2_perfect_day/bound_energy.py`, held to the reserve from
+   2 PM; in the engine's loop, `lab/research/p2_capacity/battery_lp.py`), because given a typical day's shape the day
+   plan as it runs moved nothing (the surge sets the billed peak before the rest-of-day forecast can matter). It reaches
+   the engine through the plan-follow branch, which must first answer a live call and refuse a stale plan (G519); and (c)
    inside that planner, a forecast of the depot's own charging load across the day, from what the engine already learns
    (the dispatch curve, the return model, the charge clock, the line) and refit overnight from each day's real load (rule
    10 allows production to update its estimates overnight), worth $431 on the first day to that planner against holding

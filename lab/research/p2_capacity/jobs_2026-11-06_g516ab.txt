@@ -1,0 +1,5 @@
+# G516 whole (2026-11-06): both halves of the cabin-clean fix together -- the routine of a car that left its post is
+# cancelled before the starter (whatif_g516_cancel_before_start.sql), and the routine is offered again after the
+# completion step (whatif_g516_offer_after_completion.sql). Against the base days already in results.jsonl.
+normal_day_150_171717_g516ab|--fleet 150 --scenario normal_day --seed 171717 --lab-sql lab/research/p2_capacity/whatif_g516_cancel_before_start.sql --lab-sql lab/research/p2_capacity/whatif_g516_offer_after_completion.sql --tag g516ab
+normal_day_116_171717_g516ab|--fleet 116 --scenario normal_day --seed 171717 --lab-sql lab/research/p2_capacity/whatif_g516_cancel_before_start.sql --lab-sql lab/research/p2_capacity/whatif_g516_offer_after_completion.sql --tag g516ab
