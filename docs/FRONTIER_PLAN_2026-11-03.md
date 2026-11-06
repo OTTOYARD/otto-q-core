@@ -658,6 +658,16 @@ and 35%); no owner worse still costs nothing; each owner on its own 29-42% bette
 46 of 93 and 18 to 35 of 89. The lane split cannot be read on the corrected model (holding either lane at the kernel's
 starts is infeasible), so Phase 4's first target rests on the post-idle measure: at the posts the gain is ordering.*
 
+*Corrected again 12:47 AM CT on 2026-11-06 (G522): the model let work start at the car's call home (a visit opens while the
+car drives, 10 minutes on average), dropped service-bay work for trouble codes that no task names (184 of 980 minutes at
+116 cars), closed a visit 3 minutes after its last job where a lab tick takes 5, and let the solver serve an owner's
+immediate dispatch later than the kernel did (rule 9). Corrected, immediates kept first: best found 9.7% better at 116
+cars and 7.2% at 150 (bound 18% and 21%); past the lab day's 6 AM start-up the kernel is within 6.6% of the best day
+found at both sizes. The 22% / 19% and a-third readings are withdrawn. The charge line's tie at the boot was rehearsed and
+decides no seat, so Phase 4's charge-line target is not built; the room left is small, and the capacity curve's levers
+(the service bays, the posts, charger faults) are larger. The same error had understated the capacity curve: from the
+gate, 91-99% of cars charge within the contract wait at 116 cars, 70-72% at 150, 40-43% at 200.*
+
 *Status 2026-11-05 (5:29 PM CT), the battery on a second day (seed 424242): planning on a typical day's shape (the other
 lab day's load) closes 67-77% of the gap to perfect foresight on both days, and on the second day the day plan did not
 lower the peak at all: the battery started 25% full, the plan holds a 600 kWh demand-response reserve from the first

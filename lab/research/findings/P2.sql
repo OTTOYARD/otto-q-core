@@ -5,44 +5,47 @@
 
 -- E5, the first perfect day (2026-11-05 CT), CORRECTED 2026-11-06: the first model gave each charge its session's length
 -- on a post; a car holds its post about 5 minutes longer while the robot unplugs it. bound_ops.py --post-occupancy.
+-- CORRECTED AGAIN 2026-11-06 06:46 UTC (G522): work released at the gate, every bay booking a job, a tick's readiness
+-- check, and rule 9's hold on immediate dispatches (--immediate-first).
 INSERT INTO public.ottoq_research_findings
   (slug, phase, item, kind, status, title, summary, metrics, evidence, run_ids, measured_at)
 VALUES
   ('p2-perfect-day-first', 'P2', 'E5', 'measurement', 'measured',
-   'The best possible day, corrected: about a fifth less time in the depot found, and no schedule can save more than a third',
-   'Corrected 2026-11-06. The first version of this measure counted a car''s time on a charger as its charging session '
-   'only; on the lab days a car holds its post about 5 minutes longer while the robot unplugs it (4.8 minutes a charge, '
-   '10% more post time), so the solver could turn posts over faster than the depot can, and its best day was too good. '
-   'With the car''s time on the post, on the lab''s first full day at the twin depot (a normal day, 116 cars, 12 hours '
-   'from 6 AM, in the engine''s own job order) the real day used 24,332 car-minutes from arrival to ready; the best day '
-   'the solver found needs 20,055 (18% less, against 18,043 or 26% in the first model on the same solver time), and no '
-   'schedule can go below 16,185 (33% less); with more search the best found is 18,991 (22% less). Re-solved on the '
-   'corrected model, holding every owner to no worse than the real day still costs nothing (18,966), each owner on its '
-   'own could be 29-40% better, 46 of the 93 cars with a due time could be ready by it (38 were), and minutes past the '
-   '30-minute contract wait fall from 3,365 to 1,199. On the chargers the gain is the order in which cars get a post, '
-   'not posts left idle: on the lab days a working post almost never stood free while a car waited.',
+   'The best possible day, corrected again: about a tenth less time in the depot found, and no schedule can save more than a fifth',
+   'Corrected twice on 2026-11-06. First, a car holds its post about 5 minutes longer than its session while the robot '
+   'unplugs it. Then the model turned out to let work start when a car was called home rather than when it reached the '
+   'gate (a visit opens while the car drives, 10 minutes on average), to drop service-bay work for trouble codes that no '
+   'task names, to close a visit 3 minutes after its last job where the lab''s tick takes 5, and to let the solver serve an '
+   'owner''s immediate dispatch later than the engine did, which rule 9 does not allow. With all of that fixed, on the '
+   'lab''s first full day at the twin depot (a normal day, 116 cars, 12 hours from 6 AM, the engine''s own job order, every '
+   'immediate dispatch no later than the engine served it) the real day used 24,332 car-minutes from arrival to ready; the '
+   'best day the solver found needs 21,977 (9.7% less) and no schedule can go below 19,911 (18.2% less). Holding every '
+   'owner to no worse still costs nothing (22,035). Most of the room is the lab day''s 6 AM start, when the whole fleet is '
+   'at the depot at once: the cars that reached the gate in its first two hours carry 1,447 of the 2,355 minutes, and past '
+   'the start-up the engine is within 6.6% of the best day found. The solved day serves short and middle charges sooner '
+   '(standard charges under 20 minutes wait 2 minutes from the gate instead of 12) and long ones a little later, and every '
+   'owner waits less on average. Minutes past the 30-minute contract wait, from the gate: 2,740 real, 1,394 best. The '
+   'first readings (22% better found, a third at most) are withdrawn. One day, one seed.',
    '{"scenario": "normal_day", "fleet": 116, "seed": 171717, "visits": 292, "hours": 12,
-     "correction": "2026-11-06: a charge holds its post for the car''s time on it (sessions 12,470 min, posts 13,740 min)",
+     "model": {"post_occupancy": true, "engine_order": true, "release": "the car at the gate", "bay_bookings": "all",
+               "ready_min": 5, "immediate_first": true, "workers": 4, "seconds_per_solve": 120},
+     "corrections_2026_11_06": ["the car''s time on its post", "work released at the gate, not the call home (G522)",
+                                "every bay booking a job (184 of 980 service-bay minutes had been dropped)",
+                                "the readiness check one 5-minute tick, every visit through the gate",
+                                "immediate dispatches no later than the kernel served them (rule 9)"],
      "minutes_to_ready": {"real": 24332,
-                          "post_occupancy_engine_order_1worker_120s": {"best_found": 20055, "bound": 16185},
-                          "post_occupancy_engine_order_2workers_120s": {"best_found": 18991, "bound": 16188},
-                          "post_occupancy_no_owner_worse_2workers": {"best_found": 18966, "bound": 16185},
-                          "post_occupancy_due_ready_by_due": {"real": 38, "best": 46, "of": 93},
-                          "post_occupancy_past_contract_min": {"real": 3365, "best": 1199, "bound": 159},
-                          "post_occupancy_owner_own_best_pct": {"Tesla Robotaxi TN": -33, "Waymo Nashville": -29, "Zoox Southeast": -40},
-                          "session_only_engine_order_1worker_120s": {"best_found": 18043, "bound": 14915},
-                          "session_only_engine_order_4workers_120s": {"best_found": 17154, "bound": 15307},
-                          "session_only_any_order_4workers": {"best_found": 16687, "bound": 15079},
-                          "session_only_no_owner_worse": {"best_found": 17057, "bound": 15354}},
-     "session_only_by_owner_minutes_to_ready": {"Tesla Robotaxi TN": {"real": 6710, "fair_best": 4463},
-                                   "Waymo Nashville": {"real": 11890, "fair_best": 8941},
-                                   "Zoox Southeast": {"real": 5732, "fair_best": 3653}},
-     "session_only_past_contract_wait_min": {"real": 3365, "fair_best": 1116, "best_on_its_own": 839, "bound": 231},
-     "session_only_due_cars_on_time": {"real": 38, "best": 48, "of": 93},
-     "session_only_regret_split": {"posts_free_bays_held": 18614, "bays_free_posts_held": 20796},
+                          "corrected": {"best_found": 21977, "bound": 19911},
+                          "corrected_no_owner_worse": {"best_found": 22035, "bound": 19862},
+                          "corrected_without_rule9_hold": {"best_found": 21805, "bound": 19810},
+                          "published_first": {"best_found": 18939, "bound": 16673}},
+     "gap_by_when_the_car_reached_the_gate": {"start_up_first_2h": {"visits": 94, "real": 10470, "solved": 9023},
+                                              "rest_of_day": {"visits": 198, "real": 13862, "solved": 12954}},
+     "waits_after_the_car_was_free_min": {"post": {"real": 3527, "solved": 2577}, "service_bay": {"real": 744, "solved": 327},
+                                          "wash_bay": {"real": 655, "solved": 32}},
+     "past_contract_wait_from_gate_min": {"real": 2740, "best": 1394, "bound": 305},
      "solver": "CP-SAT, OR-Tools 9.15.6755"}',
-   'otto-q-core lab/research/p2_perfect_day/ (README correction, bound_ops.jsonl, bound_ops.py --post-occupancy), lab/research/p2_capacity/post_idle_while_waiting.sql',
-   '{}', '2026-11-06 05:35:49+00')
+   'otto-q-core lab/research/p2_perfect_day/ (README correction 2, bound_ops.jsonl, bound_ops.py --post-occupancy --engine-order --immediate-first, regret_split.py); FINDINGS G522',
+   '{}', '2026-11-06 06:45:54+00')
 ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
@@ -152,37 +155,34 @@ INSERT INTO public.ottoq_research_findings
   (slug, phase, item, kind, status, title, summary, metrics, evidence, run_ids, measured_at)
 VALUES
   ('p2-perfect-day-150', 'P2', 'E5', 'measurement', 'measured',
-   'At 150 cars, corrected: the best day found is 19% better and no schedule can be more than 35% better',
-   'Corrected 2026-11-06 (the first model counted a car''s time on a charger as its session only, and a car holds its post '
-   'about 5 minutes longer while the robot unplugs it). On a normal day at 150 cars (seed 171717, 324 visits, 12 hours), '
-   'a solver with perfect hindsight keeping the engine''s own job order found a day with 25,188 car-minutes from arrival '
-   'to ready against the real 29,100 (13% less; 22,333 or 23% in the first model on the same solver time), and no schedule '
-   'can go below 18,935 (35% less). The first version said the room better decisions can win does not shrink as the '
-   'depot fills; that is withdrawn: found, it fell from 18% at 116 cars to 13% at 150 while the bound held at about a '
-   'third, and a single solver worker for 120 seconds is a weak search on the larger day, so neither number yet says how '
-   'the room moves with the fleet. With two workers the best found is 23,506 (19% less); no owner worse still costs nothing '
-   '(23,483), each owner on its own could be 32-42% better, 35 of 89 due cars could be ready by their due time (18 were), '
-   'and minutes past the contract wait fall from 4,290 to 2,220. One day, one seed.',
-   '{"scenario": "normal_day", "fleet": 150, "seed": 171717, "visits": 324, "hours": 12, "charger_faults": 20,
-     "correction": "2026-11-06: a charge holds its post for the car''s time on it (sessions 14,945 min, posts 16,375 min)",
+   'At 150 cars, corrected again: the best day found is 7% better and no schedule can be more than 21% better',
+   'Corrected twice on 2026-11-06 (see the first perfect day: the car''s time on its post; then work released at the gate, '
+   'the service bays'' whole load, a tick''s readiness check and rule 9''s hold on immediate dispatches). On a normal day at '
+   '150 cars (seed 171717, 324 visits, 12 hours) the real day used 29,100 car-minutes from arrival to ready; the best day '
+   'found keeping every immediate dispatch no later than the engine served it needs 27,012 (7.2% less), and no schedule can '
+   'go below 23,026 (20.9% less). The 6 AM start-up and the rest of the day carry the room about evenly (967 and 1,121 '
+   'minutes); past the start-up the engine is within 6.6% of the best day found, as at 116 cars. The solved day gains most '
+   'on the wash bays (1,152 minutes of waiting real, 55 solved), then the posts (5,591 against 5,136) and the service bays '
+   '(279 against 75); short and middle charges are served sooner, long ones a little later. Holding every owner to no '
+   'worse, the solver found no day in 120 s, which is not a proof that none exists. Minutes past the contract wait from '
+   'the gate: 3,665 real, 2,520 best. The earlier readings (19% better found, 35% at most) are withdrawn. One day, one seed.',
+   '{"scenario": "normal_day", "fleet": 150, "seed": 171717, "visits": 324, "hours": 12,
+     "model": {"post_occupancy": true, "engine_order": true, "release": "the car at the gate", "bay_bookings": "all",
+               "ready_min": 5, "immediate_first": true, "workers": 4, "seconds_per_solve": 120},
      "minutes_to_ready": {"real": 29100,
-                          "post_occupancy_engine_order_1worker_120s": {"best_found": 25188, "bound": 18935},
-                          "post_occupancy_engine_order_2workers_120s": {"best_found": 23506, "bound": 18935},
-                          "post_occupancy_no_owner_worse_2workers": {"best_found": 23483, "bound": 18935},
-                          "post_occupancy_due_ready_by_due": {"real": 18, "best": 35, "of": 89},
-                          "post_occupancy_past_contract_min": {"real": 4290, "best": 2220, "bound": 34},
-                          "post_occupancy_owner_own_best_pct": {"Tesla Robotaxi TN": -32, "Waymo Nashville": -32, "Zoox Southeast": -42},
-                          "session_only_engine_order_1worker_120s": {"best_found": 22333, "bound": 17505},
-                          "session_only_engine_order_2workers_120s": {"best_found": 20993, "bound": 17505},
-                          "session_only_no_owner_worse": {"best_found": 20950, "bound": 17505}},
-     "session_only_by_owner_minutes_to_ready": {"Tesla Robotaxi TN": {"real": 12430, "own_best": 7630},
-                                   "Waymo Nashville": {"real": 11090, "own_best": 7129},
-                                   "Zoox Southeast": {"real": 5580, "own_best": 2918}},
-     "session_only_due_cars_on_time": {"real": 18, "best": 39, "of": 89},
-     "session_only_past_contract_wait_min": {"real": 4290, "best_on_its_own": 1459},
+                          "corrected": {"best_found": 27012, "bound": 23026},
+                          "corrected_no_owner_worse": {"status": "UNKNOWN in 120 s"},
+                          "corrected_without_rule9_hold": {"best_found": 26670, "bound": 22572},
+                          "published_first_two_workers": {"best_found": 23506, "bound": 18935}},
+     "gap_by_when_the_car_reached_the_gate": {"start_up_first_2h": {"visits": 109, "real": 12130, "solved": 11163},
+                                              "rest_of_day": {"visits": 215, "real": 16970, "solved": 15849}},
+     "waits_after_the_car_was_free_min": {"post": {"real": 5591, "solved": 5136}, "service_bay": {"real": 279, "solved": 75},
+                                          "wash_bay": {"real": 1152, "solved": 55}},
+     "past_contract_wait_from_gate_min": {"real": 3665, "best": 2520, "bound": 250},
+     "service_bay_minutes_dropped_by_the_first_models": 344,
      "solver": "CP-SAT, OR-Tools 9.15.6755"}',
-   'otto-q-core lab/research/p2_perfect_day/ (README correction, bound_ops.jsonl, bound_ops.py --post-occupancy)', '{}',
-   '2026-11-06 05:35:49+00')
+   'otto-q-core lab/research/p2_perfect_day/ (README correction 2, bound_ops.jsonl, bound_ops.py --post-occupancy --engine-order --immediate-first, regret_split.py); FINDINGS G522',
+   '{}', '2026-11-06 06:45:54+00')
 ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,

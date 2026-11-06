@@ -25,6 +25,74 @@ replicas keep every row of the run.
 
 ## What it found
 
+### Correction 2 (2026-11-06, solved 06:06-06:46 UTC, the last set 06:29-06:46): released at the gate, the service bays' whole load, a tick's readiness check, and the owners' immediate turnarounds kept first
+
+Tracing why short charges seemed to wait as long as long ones on the lab days (they did not: much of their "wait" was
+the drive home), the model turned out to hand the solver time the depot never had in four more places, and to ignore a
+rule in a fifth. Every number in this file before this section is the earlier models'.
+
+1. **It let work start at the call home.** A visit opens when its car is called home, not when it reaches the gate: on
+   the 116-car day 228 of 292 visits open while the car drives, 10 minutes on average and up to 60. The solver could
+   plug a car in while it was still on the road. Now no job starts before the car's first arrival at the gate after
+   the call, and the contract wait (the `wait` measure) runs from there. The capacity readers carried the same error
+   (G522, `lab/research/p2_capacity/README.md`).
+2. **It dropped bay work no atom names.** A service booking carries no `need_atom`, and the needs card sends a car with
+   an open trouble code (severity 3 or worse) to a service bay for a fault repair its visit's atoms do not list.
+   Matched only to atoms, the model dropped 184 of 980 booked service-bay minutes at 116 cars and 344 of 824 at 150: a
+   wall freer than the real one. Now every bay booking a visit held is a job.
+3. **It closed a visit 3 minutes after its last job**, the readiness check's estimate, where 199 of the 234 visits that
+   left the 116-car day were ready exactly 5 minutes after it (one tick). Now 5 (`--ready-min`).
+4. **It let a visit with no place-holding work leave at its call.** Now every visit reaches the gate and passes its
+   check.
+5. **It let the solver plug in an owner's immediate dispatch later than the kernel did**, which rule 9 does not allow:
+   an owner's immediate turnaround is honoured as asked, and the kernel serves it first. On the 116-car day the best
+   schedule found plugged 11 of 81 in later, 618 minutes in all. `--immediate-first` holds every immediate dispatch to
+   no later than the kernel served it.
+
+Each correction applied on top of the ones before it, engine order, four workers, 120 s a solve (`bound_ops.jsonl`;
+the published row's 116-car solve ran 180 s):
+
+| minutes to ready, best found / proven bound | 116 cars, seed 171717 (real 24,332) | 150 cars, seed 171717 (real 29,100) |
+|---|---:|---:|
+| the published model (the car's time on its post, from the call) | 18,939 / 16,673 (-22% / -31%) | 23,546 / 19,428 (-19% / -33%) |
+| ... immediates kept first (rule 9) | 19,286 / 16,750 | 24,193 / 19,724 |
+| released at the gate (without rule 9's hold) | 20,694 / 18,640 | 25,495 / 21,447 |
+| ... and every bay booking a job | 21,019 / 19,017 | |
+| ... and a tick's readiness check, every visit through the gate | 21,805 / 19,810 (-10.4% / -18.6%) | 26,670 / 22,572 (-8.4% / -22.4%) |
+| **all five (rule 9's hold too)** | **21,977 / 19,911 (-9.7% / -18.2%)** | **27,012 / 23,026 (-7.2% / -20.9%)** |
+| all five, and no owner worse than the real day | 22,035 / 19,862 | none found in 120 s (UNKNOWN, not proven infeasible) |
+| minutes past the contract wait from the gate: real / best / bound | 2,740 / 1,394 / 305 | 3,665 / 2,520 / 250 |
+
+The first row's 150-car figures are the published model re-solved on four workers (published from two: 23,506 /
+18,935). The 150-car "every bay booking" step was not solved on its own.
+
+**What it says now.**
+
+- **The room better decisions could win is about a tenth, not a fifth.** At 116 cars the best day found under rule 9
+  is 9.7% better and no schedule can be more than 18% better; at 150 cars 7.2% better found and no schedule more than
+  21%. The published reading (22% and 19% found, a third at most) is withdrawn. At 116 cars holding every owner to no
+  worse still costs nothing (22,035); at 150 cars the solver found no such day in 120 s, which is not a proof that none
+  exists.
+- **At 116 cars most of it is the lab day's start-up.** A lab day begins at 6 AM with the whole fleet at the depot,
+  which no overnight operation would ask of a depot (`lab/research/p2_capacity/README.md`). The cars that reached the
+  gate in its first two hours carry 1,447 of the 2,355 minutes at 116 cars (13.8% of theirs), the rest of the day 908;
+  at 150 cars the halves are even, 967 (8.0%) and 1,121. **Past the start-up the kernel is within 6.6% of the best day
+  found, at both sizes** (`regret_split.py`, rule 9's hold on).
+- **Where it sits** (116 cars, rule 9): waiting for a post 3,527 minutes real against 2,577 solved, for a service bay
+  744 against 327, for a wash bay 655 against 32; at 150 cars 5,591 against 5,136, 279 against 75 and 1,152 against
+  55. The solved day serves short and middle charges sooner (standard
+  charges under 20 minutes wait 2 minutes from the gate instead of 12, 20-40 minutes 4.5 instead of 17, 40-60 minutes 10
+  instead of 26) and long ones a little later (60-90 minutes 27 instead of 21, over 90 minutes 37 instead of 34); every
+  owner waits less on average (at 150 cars the same shape: under 20 minutes 12 to 3, 20-40 minutes 25 to 10, over 90
+  minutes 57 to 62). On the bays the real day's waits are a handful of long ones (five service-bay waits of 90
+  to 170 minutes hold 680 of the 744; eight wash waits of 30 to 135 minutes about 420 of the 655), one of them a car
+  owing a fault repair and a deep clean that waited for a full service bay while a wash bay stood free (G523).
+- **The charge line's tie at the 6 AM boot decides no seat.** At the boot clock every waiting car has waited 0 minutes,
+  so the kernel's ratio ties and the line falls back to lowest battery first; but the first tick runs 5 minutes in, when
+  every boot car has waited and the ratio already favours short charges (on the 116-car day the first tick seated the 11
+  immediate dispatches at the boot, then the rest from the shortest charge up, 16 to 47 minutes). Rehearsed before building anything, as the
+  standing rule asks: not built.
+
 ### Correction (2026-11-06): a car holds its post after its charge, and the first model did not count it
 
 The first solves below gave each charge its session's length on a post. On the lab days a car stays on its post until
