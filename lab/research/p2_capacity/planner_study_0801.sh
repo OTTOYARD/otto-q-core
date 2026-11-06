@@ -44,6 +44,14 @@ case "$cmd" in
       for tag in b801 p801shape p801mean p801q80 p801q90 p801q95; do
         db=ottoq_cap_normal_day_116_${s}_$tag
         psql -h /var/tmp -p 55433 -U postgres -Atc "SELECT 1 FROM pg_database WHERE datname = '$db'" | grep -q 1 || continue
+        # only a finished day: its row in the results file, whole and without an error (a day still running has a replica)
+        $PY -I - "$db" <<'PYEOF' || continue
+import json, sys
+db = sys.argv[1]
+ok = any(d["db"] == db and not d.get("error") and d.get("ticks") == 144
+         for d in (json.loads(l) for l in open("lab/research/p2_capacity/results.jsonl") if l.strip()))
+sys.exit(0 if ok else 1)
+PYEOF
         if [ "$tag" = b801 ]; then
           grep -q "\"db\": \"$db\"" $E 2>/dev/null || $PY -I lab/research/p2_perfect_day/bound_energy.py --db $db > /dev/null
           grep "\"db\": \"$db\"" $E | grep -q '"dr_reserve": {' || \
