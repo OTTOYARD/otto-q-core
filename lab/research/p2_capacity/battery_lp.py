@@ -38,7 +38,7 @@ def load_shape(path: str) -> list[float]:
 class BatteryLP:
     def __init__(self, conn, run: str, step_min: float, ticks: int, shape: list[float], dr_kwh: float = 600.0,
                  dr_window: tuple[float, float] = (14.0, 20.0), wear: float = 0.02, amort: float = 30.0,
-                 guard: bool = True):
+                 guard: bool = True, blend: bool = False):
         self.conn, self.run, self.step_h, self.n = conn, run, step_min / 60.0, ticks
         self.shape, self.dr_kwh, self.dr_window, self.wear, self.amort = shape, dr_kwh, dr_window, wear, amort
         # the two guards the first lab day showed it needs (2026-11-06): planned to the edge of the peak already billed
@@ -47,6 +47,12 @@ class BatteryLP:
         # (a forecast is a shape, not a promise), and (b) a half hour wholly in the future is planned to stay a margin under
         # the plan's peak, max(100 kW, 10% of the peak already billed), the margin the day plan keeps under its level.
         self.guard = guard
+        # blend (2026-11-06): the shape is another day's; the engine knows this day's near term (sessions under way, cars
+        # coming home, the queue on site: the day plan's own forecast terms, ottoq_bess_day_plan's 'forecast'). With blend,
+        # each step is forecast at least at what the engine knows is coming, base + max(known, queue) - solar, without
+        # the day plan's persistence floor (the last hour's draw held for the whole horizon, which would hold the
+        # forecast up all day). On the call day the shape came in 126 kW under the morning (G519's lab record).
+        self.blend = blend
         b = conn.execute("""SELECT capacity_kwh, max_charge_kw, max_discharge_kw, roundtrip_efficiency_pct,
                                    COALESCE(soc_min_floor_pct, 10), COALESCE(soc_max_ceiling_pct, 90)
                               FROM ottoq_bess_units WHERE depot_id = %s ORDER BY bess_id LIMIT 1""", (TWIN,)).fetchone()
@@ -95,6 +101,16 @@ class BatteryLP:
         # the forecast, the current step included: the engine dispatches after this tick's sessions start, which this
         # plan (made before the tick, as an outside service's would be) cannot see; the shape knows the day's surges
         fc = [self.shape[k + j] if k + j < len(self.shape) else last_pre for j in range(m)]
+        if self.blend:
+            clk = c.execute("SELECT sim_clock_current FROM ottoq_sim_runs WHERE sim_run_id = %s", (self.run,)).fetchone()[0]
+            f = c.execute("SELECT public.ottoq_bess_day_plan(%s, %s, %s, NULL) -> 'forecast'", (self.run, TWIN, clk)).fetchone()[0]
+            if f:
+                arr = lambda key: [float(x) for x in (f.get(key) or [])]
+                base, known, queue, solar = arr("base_kw"), arr("ev_known_kw"), arr("ev_queue_kw"), arr("solar_kw")
+                nb = min(len(base), len(known), len(queue), len(solar))
+                eng = [max(0.0, base[i] + max(known[i], queue[i]) - solar[i]) for i in range(nb)]
+                per = max(1, int(round(0.5 / self.step_h)))          # this plan's steps in the day plan's half hour
+                fc = [max(x, eng[j // per]) if j // per < nb else x for j, x in enumerate(fc)]
         if self.guard:
             fc = [max(x, last_pre) if j < self.win else x for j, x in enumerate(fc)]
         s = pywraplp.Solver.CreateSolver("GLOP")

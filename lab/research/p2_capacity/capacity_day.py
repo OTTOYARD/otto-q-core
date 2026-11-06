@@ -124,6 +124,12 @@ def main() -> None:
                          "shape (make_load_shape.py), and have the engine follow it (energy_mpc_follow = 1): battery_lp.py")
     ap.add_argument("--battery-lp-dr-kwh", type=float, default=600.0,
                     help="the demand-response reserve the linear program holds from 2 PM (the day plan's 600)")
+    ap.add_argument("--battery-lp-blend", action="store_true",
+                    help="forecast each step at least at what the engine knows is coming (the day plan's known sessions, "
+                         "returns and queue, its building profile and solar), the shape beyond it (battery_lp.py)")
+    ap.add_argument("--log-forecast", metavar="JSONL",
+                    help="after every tick, read the battery day plan's own forecast (ottoq_bess_day_plan, read-only) at the "
+                         "run's clock and append it to this file, to grade it against what the depot then drew")
     ap.add_argument("--battery-lp-no-guard", action="store_true",
                     help="plan to the edge of the billed peak on the shape alone (the first cut, which ratcheted it)")
     ap.add_argument("--one-transaction", action="store_true",
@@ -237,7 +243,7 @@ def main() -> None:
                           SET param_value = EXCLUDED.param_value, updated_by = EXCLUDED.updated_by""", (run,))
         dials["energy_mpc_follow"] = 1.0
         lp = BatteryLP(conn, run, a.step, a.ticks, load_shape(a.battery_lp), dr_kwh=a.battery_lp_dr_kwh,
-                       guard=not a.battery_lp_no_guard)
+                       guard=not a.battery_lp_no_guard, blend=a.battery_lp_blend)
     patches = {}
     for f in a.lab_sql:      # a what-if change to the engine, on this replica only
         body = open(f).read()
@@ -274,6 +280,18 @@ def main() -> None:
                 conn.execute("ROLLBACK TO SAVEPOINT t")
                 err = {"tick": st[1] + 1, "error": str(e)[:400]}
                 break
+        if a.log_forecast:   # the day plan's forecast as it stands after this tick (a STABLE read; changes nothing)
+            fl = conn.execute("""SELECT r.sim_clock_current, public.ottoq_bess_day_plan(r.sim_run_id, %s, r.sim_clock_current, NULL)
+                                   FROM ottoq_sim_runs r WHERE r.sim_run_id = %s""", (TWIN, run)).fetchone()
+            if commit_mode:
+                conn.commit()
+            f = (fl[1] or {}).get("forecast") or {}
+            with open(a.log_forecast, "a") as fh:
+                fh.write(json.dumps({"db": db, "run": run, "k": k + 1, "clock": str(fl[0]),
+                                     **{key: f.get(key) for key in ("net_kw", "ev_kw", "ev_known_kw", "ev_queue_kw",
+                                                                    "base_kw", "solar_kw")},
+                                     "ev_persist_kw": (fl[1] or {}).get("ev_persist_kw"),
+                                     "mode": (fl[1] or {}).get("mode"), "level_kw": (fl[1] or {}).get("level_kw")}) + "\n")
         if (k + 1) % 12 == 0:
             print(f"tick {k + 1}/{a.ticks} at {time.time() - t0:.0f} s", flush=True)
         if (k + 1) % a.sample_every == 0:
@@ -304,6 +322,7 @@ def main() -> None:
     out = {"db": db, "run": run, "scenario": a.scenario, "seed": a.seed, "fleet": a.fleet, "grown": grown,
            "dials": dials, "tag": a.tag, "added_stalls": added, "lab_sql": patches,
            "battery_lp": ({"shape": os.path.basename(a.battery_lp), "dr_kwh": a.battery_lp_dr_kwh, "plans": lp.plans,
+                           "blend": a.battery_lp_blend,
                            "guard": lp.guard}
                           if lp is not None else None),
            "ticks": ticks, "commit_each_tick": commit_mode, "step_min": a.step, "sim_start": a.sim_start, "wall_s": wall_s, "clone_s": round(clone_s, 1),
