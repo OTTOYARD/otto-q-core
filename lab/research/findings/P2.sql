@@ -63,3 +63,92 @@ ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
   run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
+
+-- The battery on two days (2026-11-05 CT): a typical day's shape as the forecast. Evidence: bound_energy.jsonl
+-- (--forecast-db; --dr-reserve-kwh 600 for the reserve needed from 2 PM).
+INSERT INTO public.ottoq_research_findings
+  (slug, phase, item, kind, status, title, summary, metrics, evidence, run_ids, measured_at)
+VALUES
+  ('p2-battery-day-shape', 'P2', 'E5', 'measurement', 'measured',
+   'A rough idea of the day''s shape is most of the battery''s prize',
+   'On two lab days (a normal day, 116 cars, 12 hours, two seeds), each day''s battery was planned on the other day''s '
+   'charging load as its forecast, which was off by 217 kW on average, and re-planned every five minutes on what had '
+   'actually happened. It came to $1,152 against the battery''s day plan''s $1,382 and perfect foresight''s $1,085 on the '
+   'first day, and $1,243 against $1,543 and $1,098 on the second. Plans that see the next one to four hours exactly but '
+   'assume the load then holds steady did worse on both days. Part of each gap is the day plan''s two reserves, which these '
+   'plans do not hold (see the reserves finding); holding a 600 kWh demand-response reserve from 2 PM costs them $0 and $3. '
+   'The build this points to: a learned forecast of the depot''s own charging across the day, refit overnight, in the day '
+   'plan''s hands, with the AI proposing tomorrow''s adjustments from what is known (the fleet''s schedule, the weather, a '
+   'demand-response notice), which the plan takes only as a forecast. Two days: a reading, not a range.',
+   '{"scenario": "normal_day", "fleet": 116, "seeds": [171717, 424242], "hours": 12,
+     "forecast": "the other lab day''s load before the battery, step by step", "forecast_mae_kw": 217.3,
+     "day_1_seed_171717_usd": {"no_battery": 1698.86, "day_plan": 1382.34, "typical_day_shape": 1151.82,
+                               "next_1h_then_shape": 1135.01, "next_1h": 1514.99, "next_4h": 1535.47, "perfect": 1084.61},
+     "day_2_seed_424242_usd": {"no_battery": 1498.97, "day_plan": 1543.13, "typical_day_shape": 1243.38,
+                               "next_1h_then_shape": 1207.46, "next_1h": 1378.06, "next_4h": 1313.10, "perfect": 1098.47},
+     "with_600_kwh_dr_reserve_from_2pm_usd": {"day_1": {"typical_day_shape": 1151.82, "perfect": 1084.61},
+                                             "day_2": {"typical_day_shape": 1245.99, "perfect": 1098.47}},
+     "billing": "each policy pays its own highest 30-minute average at 21.40 USD/kW-month (NES GSA-3 summer) over 30 days"}',
+   'otto-q-core lab/research/p2_perfect_day/bound_energy.jsonl, README.md', '{}', '2026-11-05 23:35:00+00')
+ON CONFLICT (depot_id, slug) DO UPDATE SET
+  phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
+  title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
+  run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
+
+-- G517, sized with the plan as it runs (2026-11-05 CT). Evidence: lab/research/p2_capacity/ (tags dr0, res0, dr0res0),
+-- lab/research/p2_perfect_day/whatif_table.py.
+INSERT INTO public.ottoq_research_findings
+  (slug, phase, item, kind, status, title, summary, metrics, evidence, run_ids, measured_at)
+VALUES
+  ('p2-battery-reserves', 'P2', 'E5', 'measurement', 'measured',
+   'The battery sat out the morning surge holding 600 kWh for a call that never came; fixing its two reserves saved $242 that day',
+   'On the second lab day (a normal day, 116 cars, seed 424242) the battery started 25% full. In summer the day plan holds '
+   '600 kWh for a possible demand-response call between 2 and 8 PM, from the first minute of the day, and its floor rises '
+   'to 33% at every surge; so it never discharged, and the half-hour peak was 1,475 kW with the battery and without it. The '
+   'same day re-run in the lab with every car''s day identical: the demand-response reserve off saves $88, the rising floor '
+   'off saves nothing while the reserve still holds the battery, and both off save $242 (peak 1,132 kW), 54% of the gap to '
+   'perfect foresight (each bill at the same end-of-day charge). No call came on either lab day, and needed only from 2 PM '
+   'the reserve costs nothing in hindsight. The reserve keeps cars charging through a call, so the fix keeps it and needs it '
+   'by its window, and the floor hedges the plan''s own forecast error instead of the surge; it is tested on a day with a '
+   'call before anyone switches it on (FINDINGS G517). One day, one seed.',
+   '{"scenario": "normal_day", "fleet": 116, "seed": 424242, "hours": 12, "battery_start_pct": 24.6,
+     "reserve_dr_kwh": 600, "dr_window_ct": "14:00-20:00", "floor_during_a_surge_pct": 33,
+     "bill_at_base_end_state_usd": {"as_run": 1543.13, "dr_reserve_off": 1455.43, "rising_floor_off": 1541.71,
+                                    "both_off": 1301.28, "no_battery": 1498.97, "perfect": 1098.47},
+     "half_hour_peak_kw": {"as_run": 1474.5, "dr_reserve_off": 1354.1, "rising_floor_off": 1474.5, "both_off": 1132.0,
+                           "perfect": 850.1},
+     "stored_kwh_at_day_end": {"as_run": 1508.4, "dr_reserve_off": 2690.7, "rising_floor_off": 2362.2, "both_off": 2490.9},
+     "stored_energy_valued_at_usd_kwh": 0.070, "cars": "every car-facing scorecard line identical", "finding": "G517"}',
+   'otto-q-core lab/research/p2_capacity/results.jsonl, lab/research/p2_perfect_day/bound_energy.jsonl, FINDINGS.md G517',
+   '{}', '2026-11-06 00:03:21+00')
+ON CONFLICT (depot_id, slug) DO UPDATE SET
+  phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
+  title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
+  run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
+
+-- E5 at 150 cars (2026-11-05 CT). Evidence: lab/research/p2_perfect_day/bound_ops.jsonl.
+INSERT INTO public.ottoq_research_findings
+  (slug, phase, item, kind, status, title, summary, metrics, evidence, run_ids, measured_at)
+VALUES
+  ('p2-perfect-day-150', 'P2', 'E5', 'measurement', 'measured',
+   'At 150 cars the best possible day is still about 28% better, with no owner worse off',
+   'On a normal day at 150 cars (seed 171717, 324 visits, 12 hours), a solver with perfect hindsight, keeping the engine''s '
+   'own job order, found a day with 20,993 car-minutes from arrival to ready against the real 29,100 (28% less), and no '
+   'schedule can go below 17,505 (40% less). Holding every owner to no worse than the real day costs nothing (20,950). The '
+   'gap is the same size as at today''s 116 cars (30% found, 37% bound): the room better decisions can win does not shrink '
+   'as the depot fills. At most 39 of the 89 cars with a due time could have been ready by it (18 were). Solved on 2 '
+   'workers beside running lab days, so the best found is conservative. One day, one seed.',
+   '{"scenario": "normal_day", "fleet": 150, "seed": 171717, "visits": 324, "hours": 12, "charger_faults": 20,
+     "minutes_to_ready": {"real": 29100, "engine_order": {"best_found": 20993, "bound": 17505},
+                          "engine_order_no_owner_worse": {"best_found": 20950, "bound": 17505}},
+     "by_owner_minutes_to_ready": {"Tesla Robotaxi TN": {"real": 12430, "own_best": 7630},
+                                   "Waymo Nashville": {"real": 11090, "own_best": 7129},
+                                   "Zoox Southeast": {"real": 5580, "own_best": 2918}},
+     "due_cars_on_time": {"real": 18, "best": 39, "of": 89},
+     "past_contract_wait_min": {"real": 4290, "best_on_its_own": 1459},
+     "solver": "CP-SAT, OR-Tools 9.15.6755, 120 s per solve, 2 workers"}',
+   'otto-q-core lab/research/p2_perfect_day/bound_ops.jsonl, README.md', '{}', '2026-11-05 23:55:47+00')
+ON CONFLICT (depot_id, slug) DO UPDATE SET
+  phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
+  title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
+  run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
