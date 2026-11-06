@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
   let httpStatus = 0;
   let answer: unknown;
   try {
-    const r = await fetch(`${intelligenceUrl}/optimize/battery-plan`, {
+    const r = await fetch(`${intelligenceUrl.replace(/\/$/, "")}/optimize/battery-plan`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${intelligenceToken}` },
       body: JSON.stringify(request),
