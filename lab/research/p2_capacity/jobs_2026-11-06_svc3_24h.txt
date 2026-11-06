@@ -1,0 +1,4 @@
+# A third service bay on whole days (2026-11-06): the wall the capacity curve names, at 150 and 200 cars, seed 171717,
+# against normal_day_150_171717_24h and normal_day_200_171717_24h. Commit mode.
+normal_day_150_171717_24h_svc3|--fleet 150 --scenario normal_day --seed 171717 --ticks 288 --add-stall service_bay=1 --tag 24h_svc3
+normal_day_200_171717_24h_svc3|--fleet 200 --scenario normal_day --seed 171717 --ticks 288 --add-stall service_bay=1 --tag 24h_svc3
