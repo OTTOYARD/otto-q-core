@@ -45,7 +45,12 @@
 --         a floor per step from the demand-response reserve as the depot's dials hold it (bess_plan_dr_reserve_kwh from
 --           bess_plan_dr_reserve_lead_h before the window, declining to nothing through it, summer only), read at each
 --           step's own clock, so a horizon past midnight holds tomorrow's as tomorrow comes;
---         the day plan's demand rate per kW, its replacement cost (the energy left at the end) and its wear per kWh.
+--         the day plan's demand rate per kW, its replacement cost (the energy left at the end) and its wear per kWh;
+--         and step_cap: no step of a billing period may draw more than the period's peak. The demand charge bills 30-minute
+--           averages, so a plan is otherwise free to charge in full-power bursts inside a half hour, and the depot follows
+--           a plan at the step its clock is in: with every answer landing two ticks late, bursts from successive plans
+--           stacked in the half hours before 1 PM and billed 1,135-1,171 kW, above the day plan (the research lab,
+--           2026-11-06). The service's own default leaves it off, which is the research lab's planner exactly.
 --   (b) public.ottoq_bess_planner_fire(run, depot, clock, tick, day_plan): writes the request into a 'pending' row of
 --       ottoq_energy_plan (source 'bess_planner', plan_start_clock the next step's end, so the next tick reads its step 0)
 --       and asks the edge function ottoq-battery-planner for it with net.http_post (fire and forget, the anon key from
@@ -319,7 +324,9 @@ BEGIN
       'demand_usd_kw', COALESCE((v_plan->>'demand_usd_per_kw_day')::numeric, 0),
       'periods', v_periods, 'past_grid_kw', to_jsonb(v_past), 'window_steps', v_win, 'soc_floor_kwh', to_jsonb(v_floor),
       'wear_usd_kwh', COALESCE((v_plan->>'degradation_usd_kwh')::numeric, 0.02),
-      'terminal_usd_kwh', COALESCE((v_plan->>'replacement_usd_kwh')::numeric, 0)));
+      'terminal_usd_kwh', COALESCE((v_plan->>'replacement_usd_kwh')::numeric, 0),
+      -- no step draws more than its period's peak: a plan followed a few steps late cannot stack charging bursts (0804 §2(a))
+      'step_cap', true));
 END;
 $function$;
 

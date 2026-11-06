@@ -32,6 +32,9 @@ def main() -> None:
     ap.add_argument("--tag", default="p36e2e")
     ap.add_argument("--beyond", type=int, choices=(0, 1), default=0)
     ap.add_argument("--template", default="ottoq_lab_0804m")
+    ap.add_argument("--log-from", metavar="DB",
+                    help="copy the six in-tick logs from this database (a template or a replica cloned from one) instead of "
+                         "the b36log replicas; each seed's run is the one its held-out model left out")
     a = ap.parse_args()
     with psycopg.connect(host=HOST, port=PORT, user="postgres", dbname="postgres", autocommit=True) as admin:
         if not admin.execute("SELECT 1 FROM pg_database WHERE datname = %s", (a.template,)).fetchone():
@@ -39,7 +42,20 @@ def main() -> None:
     runs, models = {}, {}
     with psycopg.connect(host=HOST, port=PORT, user="postgres", dbname=a.template, autocommit=True) as dst:
         have = {str(r[0]) for r in dst.execute("SELECT DISTINCT sim_run_id FROM ottoq_bess_forecast_log")}
-        for s in SEEDS:
+        if a.log_from:
+            with psycopg.connect(host=HOST, port=PORT, user="postgres", dbname=a.log_from) as src:
+                every = {str(r[0]) for r in src.execute("SELECT DISTINCT sim_run_id FROM ottoq_bess_forecast_log")}
+                for note, fit_runs in src.execute("""SELECT note, runs FROM ottoq_bess_forecast_models
+                                                    WHERE note LIKE 'lab: the six in-tick 36-hour logs less %%'"""):
+                    left = every - {str(x) for x in fit_runs}
+                    if len(left) == 1:
+                        runs[note.rsplit(" ", 1)[1]] = left.pop()
+                if not have:
+                    rows = src.execute(f"SELECT {COLS} FROM ottoq_bess_forecast_log ORDER BY sim_run_id, sim_clock").fetchall()
+                    with dst.cursor() as cur:
+                        cur.executemany(f"INSERT INTO ottoq_bess_forecast_log ({COLS}) VALUES ({', '.join(['%s'] * 19)})", rows)
+                    print(f"copied {len(rows)} in-tick rows from {a.log_from}; runs by seed {runs}")
+        for s in ([] if a.log_from else SEEDS):
             with psycopg.connect(host=HOST, port=PORT, user="postgres", dbname=f"ottoq_cap_normal_day_116_{s}_b36log") as src:
                 rows = src.execute(f"SELECT {COLS} FROM ottoq_bess_forecast_log ORDER BY sim_clock").fetchall()
             runs[s] = str(rows[0][1])

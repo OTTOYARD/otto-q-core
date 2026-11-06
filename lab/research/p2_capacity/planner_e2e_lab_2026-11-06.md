@@ -37,4 +37,41 @@ or would the learned forecast inside the day plan do as well?
 
 ## Results
 
+### The forecast production would have, in the lab planner (read 2026-11-06 by 15:14 UTC)
+
+Every day kept every car-facing line of its base day's scorecard (6 of 6 seeds, every arm).
+
+| seed | day plan | no battery | copied day beyond (p36q80) | learned day, mean (p36prof) | learned day, q80 (p36profq) | day plan on the learned forecast (dp36learn) | perfect foresight |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 171717 | 1512.83 (1000, 23:35) | 1683.91 | 1348.48 (748) | 1335.81 (729) | 1363.84 (770) | 1546.17 (1043) | 1119.34 |
+| 424242 | 1539.61 (1019, 23:00) | 1610.88 | 1343.89 (711) | 1323.15 (678) | 1330.89 (694) | 1496.33 (946) | 1141.76 |
+| 616161 | 1696.98 (1160, 22:45) | 1701.86 | 1396.57 (704) | 1397.88 (704) | 1401.55 (708) | 1698.17 (1156) | 1212.05 |
+| 818181 | 1576.41 (1066, 22:45) | 1617.14 | 1291.43 (628) | 1298.18 (638) | 1305.83 (655) | 1538.00 (1003) | 1129.14 |
+| 919191 | 1486.24 (1018, 22:50) | 1529.85 | 1296.10 (730) | 1290.00 (722) | 1295.30 (723) | 1450.25 (957) | 1051.27 |
+| 373737 | 1491.76 (975, 22:15) | 1601.00 | 1271.25 (632) | 1279.40 (646) | 1292.05 (661) | 1456.42 (921) | 1120.10 |
+
+| plan | mean bill | saving on the day plan | seeds better | share of the gap to perfect foresight |
+|---|---:|---:|---:|---:|
+| the day plan as it runs | $1,550.64 | | | 0% |
+| the planner, a copied day beyond (the steady-state study) | $1,324.62 | $226.02 | 6 of 6 | 54% |
+| **the planner, the depot's learned day beyond (mean)** | **$1,320.74** | **$229.90** | **6 of 6** | **55%** |
+| the planner, the learned day's 80th percentile beyond | $1,331.58 | $219.06 | 6 of 6 | 52% |
+| no planner: the day plan on the learned forecast | $1,530.89 | $19.75 | 4 of 6 | 5% |
+
+Bills in USD over the window from 6 PM day 1 at the base day's battery states (half-hour peak kW, and the half hour's end
+CT for the day plan). The control `p36sqlshape` (the database's forecast with the copied day) is `p36q80` by another
+road, within the rounding of the forecast's inputs: $1,343.88 against $1,343.89 on 424242 (711 kW both), $1,297.22 against
+$1,296.10 on 919191 (732 against 730 kW).
+
+- **What production would have is as good as the copied day.** Beyond the forecast's four hours, the depot's own learned
+  day (the mean of its past days by half hour) does as well as another seed's whole day copied step by step: $229.90 a day
+  against $226.02, better on 3 seeds of 6. The cautious version (the 80th percentile across days) does a little worse,
+  $219.06: holding energy for a worse evening than comes costs more than it saves. `bess_planner_beyond` stays 0 (the
+  mean).
+- **The gain is the planner's.** The same learned forecast inside the day plan saves $19.75 a day, better on 4 seeds of 6,
+  5% of the gap. The day plan holds a level and charges into the evening's wave; it does not budget the battery for the
+  evening it can now see.
+
+### Production's chain, end to end
+
 PENDING.
