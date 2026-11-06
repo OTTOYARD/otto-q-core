@@ -14,8 +14,9 @@ orchestrator's MPC bridge reads it (`energy_mpc_follow` = 1, FR-1): the engine f
 limits, exactly as it would follow the production bridge's plan. The cars' charging is never touched: they charge against
 the installed service limit and demand-response calls (`ottoq_effective_charge_cap_kw`, 0136).
 
-LAB ONLY. One lab day runs in one transaction, so `now()` and the plan's created_at default are the same for every plan of
-the day; each new plan therefore marks the earlier ones superseded, and the orchestrator finds one plan 'ready'.
+LAB ONLY. Each new plan marks the earlier ones superseded, so the orchestrator finds one plan 'ready' (a day run in one
+transaction, `capacity_day.py --one-transaction`, gives every plan the same created_at, so the newest cannot be told by its
+time).
 """
 from __future__ import annotations
 
