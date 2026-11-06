@@ -261,3 +261,40 @@ ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
   run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
+
+-- What it takes to serve 150-250 cars comfortably (2026-11-06, published 07:54:39 UTC). Evidence: lab/research/p2_capacity/
+-- README.md (build-outs on whole days), buildout_table.py, capacity_day.py --add-stall.
+INSERT INTO public.ottoq_research_findings
+  (slug, phase, item, kind, status, title, summary, metrics, evidence, run_ids, measured_at)
+VALUES
+('p2-buildout', 'P2', 'P2.1', 'measurement', 'measured',
+   'What it takes to serve 200 cars comfortably: 3-4 service bays and 50 fast-charger posts, and then the wash bays',
+   'Whole lab days (24 hours from 6 AM) at the twin depot with posts and service bays added (each post with its own '
+   'charger, the site''s power limits raised with them: rule 13), seed 171717, waits counted from the gate. The depot as '
+   'built (2 service bays, 30 posts) serves 116 cars comfortably: 99% charge inside the 30-minute contract wait. A third '
+   'service bay alone buys little (150 cars: 488 visits a day against 466, and the charge wait gets worse). Bays and posts '
+   'together change everything: with 3 bays and 40 posts, 150 cars are as comfortable as 116 are today (98% inside the wait, '
+   'median wait 0, 556 visits a day); with 3 or 4 bays and 50 posts, 200 cars are (97-99%, 665-690 visits a day, against '
+   '43% and 464 on the depot as built); and 250 cars on 4 bays and 50 posts still charge 98% inside the wait (702 visits a '
+   'day). The next wall is the three wash bays. The afternoon share of the fleet out at work stays 66-71% against an ask of '
+   '87% whatever the build: past the depot''s own capacity, uptime is set by how long a full charge takes (rule 9), not by '
+   'the depot''s size. One seed, one day each: where the curve moves, not a range.',
+   '{"days": "normal_day, 24 h from 6 AM CT, arrivals 9 AM-5 AM, seed 171717", "wait_measured_from": "the gate",
+     "by_site": {
+       "2_bays_30_posts": {"116": {"served": 435, "within_contract_wait_pct": 99, "wait_p95_min": 20},
+                           "150": {"served": 466, "within_contract_wait_pct": 72, "wait_p95_min": 90},
+                           "200": {"served": 464, "within_contract_wait_pct": 43, "wait_p95_min": 295}},
+       "3_bays_30_posts": {"150": {"served": 488, "within_contract_wait_pct": 62}, "200": {"served": 474, "within_contract_wait_pct": 43}},
+       "3_bays_40_posts": {"150": {"served": 556, "within_contract_wait_pct": 98, "wait_p95_min": 20}, "200": {"served": 613, "within_contract_wait_pct": 69}},
+       "4_bays_40_posts": {"200": {"served": 589, "within_contract_wait_pct": 67}},
+       "3_bays_50_posts": {"200": {"served": 665, "within_contract_wait_pct": 97, "wait_p95_min": 20}},
+       "4_bays_50_posts": {"200": {"served": 690, "within_contract_wait_pct": 99, "wait_p95_min": 15},
+                           "250": {"served": 702, "within_contract_wait_pct": 98, "wait_p95_min": 25}}},
+     "afternoon_out_at_work_pct_range": [59, 71], "afternoon_asked_pct": 87, "next_wall": "wash_bay",
+     "power_limits": "each added post with its own 350 kW charger; DC and service limits raised by the chargers'' rating"}',
+   'otto-q-core lab/research/p2_capacity/README.md (what it takes to serve 150-250 cars comfortably), buildout_table.py, capacity_day.py --add-stall, results.jsonl',
+   '{}', '2026-11-06 07:47:47+00')
+ON CONFLICT (depot_id, slug) DO UPDATE SET
+  phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
+  title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
+  run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
