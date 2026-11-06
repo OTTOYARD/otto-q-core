@@ -79,6 +79,18 @@ transition rate, and P2's first published metrics named it by mistake: the dolla
 applies the first-block rate to the whole peak; NES bills the kW above 1,000 at $21.78, about $8.60 a day more at a
 1,679 kW peak, for every policy whose peak is over 1,000 kW.
 
+### Across the lab's days so far (the engine's own job order)
+
+| day | visits | minutes to ready, real | best found | proven bound | no owner worse, best found | due cars ready by due, real / best | minutes past the contract wait, real / best on its own |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 116 cars, seed 171717 (4 workers) | 292 | 24,332 | 17,154 (-30%) | 15,307 (-37%) | 17,057 | 38 / 48 of 93 | 3,365 / 839 |
+| 116 cars, seed 424242 (2 workers) | 269 | 25,015 | 17,765 (-29%) | 15,390 (-38%) | 17,802 | 17 / 39 of 84 | 3,565 / 378 |
+| 150 cars, seed 171717 (2 workers) | 324 | 29,100 | 20,993 (-28%) | 17,505 (-40%) | 20,950 | 18 / 39 of 89 | 4,290 / 1,459 |
+
+Each owner's own best on the second 116-car day (others free): Tesla 7,700 to 4,553 (-41%), Waymo 11,630 to 7,964 (-32%),
+Zoox 5,685 to 3,098 (-46%) (`bound_ops.jsonl`, written 2026-11-06 00:19:18 UTC). Three days, two seeds: the gap is about
+the same each time, 28-30% found and 37-40% to the bound, and holding every owner to no worse never costs more than 0.3%.
+
 ### At 150 cars (one day, seed 171717; solved 2026-11-05 23:45-23:56 UTC = 5:45-5:56 PM CT)
 
 normal_day at 150 cars (`ottoq_cap_normal_day_150_171717`, 324 visits, 20 charger faults), the engine's own job order,
