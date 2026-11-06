@@ -78,6 +78,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("audit", nargs="?", default=os.path.join(HERE, "forecast_audit.jsonl"))
     ap.add_argument("--lam", type=float, default=10.0)
+    ap.add_argument("--save", help="fit on every day but --exclude-seed and write the model (per half hour ahead) here")
+    ap.add_argument("--exclude-seed", action="append", default=[], help="a seed whose days the saved model never sees")
     a = ap.parse_args()
     days = defaultdict(list)
     for line in open(a.audit):
@@ -85,6 +87,24 @@ def main() -> None:
             r = json.loads(line)
             days[(r["db"], r["run"])].append(r)
     data = {d: examples(rs, drawn(*d)) for d, rs in days.items()}
+    if a.save:   # the model the planner reads (battery_lp.py --learned): fit on the days of every other seed
+        keep = {d: ex for d, ex in data.items() if not any(f"_{sd}_" in d[0] or d[0].endswith(f"_{sd}") for sd in a.exclude_seed)}
+        model = {"lam": a.lam, "features": ["1", "on_charger", "arrivals", "queue", "last_hour", "base", "solar",
+                                            "sin_hour", "cos_hour", "rule_without_arrivals"],
+                 "days": sorted(d[0] for d in keep), "per_half_hour": []}
+        for h in range(AHEAD):
+            tr = [e for ex in keep.values() for e in ex if e["h"] == h]
+            X, y = np.array([e["x"] for e in tr]), np.array([e["y"] for e in tr])
+            mu, sd = X[:, 1:].mean(0), X[:, 1:].std(0) + 1e-9
+            Z = np.hstack([X[:, :1], (X[:, 1:] - mu) / sd])
+            P = a.lam * np.eye(Z.shape[1])
+            P[0, 0] = 0.0
+            w = np.linalg.solve(Z.T @ Z + P, Z.T @ y)
+            model["per_half_hour"].append({"h": h, "n": len(tr), "mu": mu.tolist(), "sd": sd.tolist(), "w": w.tolist()})
+        with open(a.save, "w") as f:
+            json.dump(model, f)
+        print(f"saved {a.save}: fit on {len(keep)} days ({', '.join(d.removeprefix('ottoq_cap_') for d in model['days'])})")
+        return
     print(f"{len(data)} days; leave-one-day-out ridge (lambda {a.lam}), per half hour ahead: mean absolute error, kW "
           f"(bias in brackets)")
     for held in data:

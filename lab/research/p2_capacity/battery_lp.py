@@ -38,7 +38,7 @@ def load_shape(path: str) -> list[float]:
 class BatteryLP:
     def __init__(self, conn, run: str, step_min: float, ticks: int, shape: list[float], dr_kwh: float = 600.0,
                  dr_window: tuple[float, float] = (14.0, 20.0), wear: float = 0.02, amort: float = 30.0,
-                 guard: bool = True, blend: bool = False):
+                 guard: bool = True, blend: bool = False, learned: str | None = None):
         self.conn, self.run, self.step_h, self.n = conn, run, step_min / 60.0, ticks
         self.shape, self.dr_kwh, self.dr_window, self.wear, self.amort = shape, dr_kwh, dr_window, wear, amort
         # the two guards the first lab day showed it needs (2026-11-06): planned to the edge of the peak already billed
@@ -53,6 +53,13 @@ class BatteryLP:
         # the day plan's persistence floor (the last hour's draw held for the whole horizon, which would hold the
         # forecast up all day). On the call day the shape came in 126 kW under the morning (G519's lab record).
         self.blend = blend
+        # learned (2026-11-06): the EV charging of the next four hours predicted by a model fitted on other lab days
+        # (forecast_learn.py --save: a ridge per half hour ahead on the day plan's own terms and the hour), the building
+        # and the sun as the day plan forecasts them, and the shape beyond the model's four hours
+        self.learned = None
+        if learned:
+            with open(learned) as fh:
+                self.learned = json.load(fh)
         b = conn.execute("""SELECT capacity_kwh, max_charge_kw, max_discharge_kw, roundtrip_efficiency_pct,
                                    COALESCE(soc_min_floor_pct, 10), COALESCE(soc_max_ceiling_pct, 90)
                               FROM ottoq_bess_units WHERE depot_id = %s ORDER BY bess_id LIMIT 1""", (TWIN,)).fetchone()
@@ -84,6 +91,46 @@ class BatteryLP:
         ws, we = self.dr_window
         return self.dr_kwh * (we - h) / (we - ws) if ws <= h < we else 0.0
 
+    def _learned_fc(self, k: int, fc: list[float]) -> list[float]:
+        """The pre-battery load of the next half hours from the learned EV model, the shape beyond."""
+        c = self.conn
+        clk = c.execute("SELECT sim_clock_current FROM ottoq_sim_runs WHERE sim_run_id = %s", (self.run,)).fetchone()[0]
+        dp = c.execute("SELECT public.ottoq_bess_day_plan(%s, %s, %s, NULL)", (self.run, TWIN, clk)).fetchone()[0] or {}
+        f = dp.get("forecast") or {}
+        arr = lambda key: [float(x) for x in (f.get(key) or [])]
+        base, known, queue, solar = arr("base_kw"), arr("ev_known_kw"), arr("ev_queue_kw"), arr("solar_kw")
+        persist = float(dp.get("ev_persist_kw") or 0)
+        nb = min(len(base), len(known), len(queue), len(solar), len(self.learned["per_half_hour"]))
+        act = [0.0] * nb      # the cars on a charger now, held at their starting rate (the known term's first loop)
+        for rate, kwh in c.execute("""
+                SELECT GREATEST(ottoq_sim_compute_charge_rate(
+                         p_soc_pct := v.current_soc, p_battery_temp_c := COALESCE(s.ambient_temp_c,22)+5,
+                         p_ambient_temp_c := COALESCE(s.ambient_temp_c,22), p_charger_max_kw := ch.max_kw,
+                         p_vehicle_max_kw := v.inlet_max_kw, p_battery_capacity_kwh := v.battery_capacity_kwh,
+                         p_battery_soh_pct := 95, p_noise_seed := 1, p_noise_salt := s.vehicle_id::text), 1),
+                       GREATEST(0,(COALESCE(v.target_soc, public.ottoq_default_target_soc())-v.current_soc)/100.0
+                                  *COALESCE(v.battery_capacity_kwh,75))
+                  FROM ocpp_sessions s JOIN stalls st ON st.id=s.stall_id
+                  JOIN ottoq_ocpp_chargers ch ON ch.charger_id=st.ocpp_charger_id
+                  JOIN vehicles v ON v.id=s.vehicle_id
+                 WHERE s.status='active' AND s.sim_run_id=%s""", (self.run,)).fetchall():
+            dur = float(kwh) / float(rate) * 60.0
+            for h in range(nb):
+                if h * 30.0 < dur:
+                    act[h] += float(rate)
+        pre = []
+        for h in range(nb):
+            m = self.learned["per_half_hour"][h]
+            lt = (clk + __import__("datetime").timedelta(minutes=30 * h)).astimezone(CT)
+            hr = lt.hour + lt.minute / 60.0
+            x = [act[h], known[h] - act[h], queue[h], persist, base[h], solar[h],
+                 math.sin(2 * math.pi * hr / 24), math.cos(2 * math.pi * hr / 24), max(act[h], queue[h], persist)]
+            z = [1.0] + [(xi - mu) / sd for xi, mu, sd in zip(x, m["mu"], m["sd"])]
+            ev = max(0.0, sum(wi * zi for wi, zi in zip(m["w"], z)))
+            pre.append(max(0.0, base[h] + ev - solar[h]))
+        per = max(1, int(round(0.5 / self.step_h)))
+        return [pre[j // per] if j // per < len(pre) else x for j, x in enumerate(fc)]
+
     def plan_now(self, k: int) -> dict:
         """Before tick k (0-based) runs: solve steps k..n-1 and write the plan the orchestrator will read at step k."""
         c = self.conn
@@ -111,6 +158,8 @@ class BatteryLP:
                 eng = [max(0.0, base[i] + max(known[i], queue[i]) - solar[i]) for i in range(nb)]
                 per = max(1, int(round(0.5 / self.step_h)))          # this plan's steps in the day plan's half hour
                 fc = [max(x, eng[j // per]) if j // per < nb else x for j, x in enumerate(fc)]
+        if self.learned is not None:
+            fc = self._learned_fc(k, fc)
         if self.guard:
             fc = [max(x, last_pre) if j < self.win else x for j, x in enumerate(fc)]
         s = pywraplp.Solver.CreateSolver("GLOP")
