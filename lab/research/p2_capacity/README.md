@@ -62,6 +62,25 @@ From 200 to 250 cars the depot let out 14 more cars in the 12 hours and held 17 
 day's arrivals got a charger within the contract's 30 minutes, the slowest twentieth took over five hours from the gate
 to leaving, and the fleet out at work fell to 68% of the cars against 86% asked.
 
+### A third service bay at 200 cars moves the wall to the posts (one day, seed 171717)
+
+| 200 cars, 12 hours | two service bays | three service bays (`svc3`) |
+|---|---:|---:|
+| visits / left ready by 6 PM / still in the depot | 379 / 282 / 97 | 375 / 281 / 94 |
+| busy: service bays / posts / wash bays | 96% / 77% / 56% | 80% / 78% / 62% |
+| the wall the constraint board named most often | service bays (14 of 24 samples) | posts (15) |
+| 9 AM-5 PM arrivals charged within the contract's 30 minutes | 97 of 155 (63%) | 123 of 171 (72%) |
+| 9 AM-5 PM wait p50 / p95, gate to leaving p50 (min) | 20 / 145, 105 | 15 / 130, 95 |
+| fleet out at work / asked (9 AM-5 PM) | 71.6% / 85.8% | 74.6% / 85.8% |
+| post time lost to charger faults | 9.4% (19 faults) | 5.1% (16 faults) |
+
+The third bay takes the service bays off the wall (96% to 80% busy) and the posts become it; the day's arrivals got
+chargers sooner (63% to 72% within the contract wait) and the fleet out at work rose 3 points, but the 12 hours let out
+the same number of cars, because what limits a 12-hour day is the 6 AM wave. And this day drew fewer charger faults (5.1%
+of post time against 9.4%), so part of the gain may be the faults' luck, not the bay: one day each, a reading.
+Charger faults are a capacity lever of their own: 5-13% of post time on these days, so a fault rate halved is worth about
+two posts at 30.
+
 From 150 to 200 cars the depot let out 10 more cars in the day and held 45 more at 6 PM; the two service bays ran 96%
 busy, and a third of the cars arriving in the day waited past the contract for a charger. The posts' 77% is a day's
 average of a different thing: read hour by hour on the 200-car day, the posts were charging 75-89% of every hour, and
