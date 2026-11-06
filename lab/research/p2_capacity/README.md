@@ -111,3 +111,12 @@ car plugging in, so an upper bound). So at the posts the perfect day's gain (E5:
 car-minutes to ready to 18,614 at 116 cars) is the order in which cars get a post, not posts left idle, and charger faults
 are the posts' loss. A first pass of this measure read 2,500 post-minutes "empty while cars waited" at 116 cars: it counted
 cars still driving home (a visit opens when the car is called, before it arrives) and posts in repair as free.
+
+### The exit-first charge key, off for a day (one day, seed 171717)
+
+`normal_day_116_171717_exit0` is the 116-car 12-hour day with `charge_order_exit_first` at 0 (0781's key, which within each
+owner's own cars charges first those whose charge is their way out), against the same day with the twin depot's setting:
+257 cars left against 253, 34 of 77 cars with a due time on time against 38 of 85, and from 9 AM to 5 PM 92% charged within
+the contract wait against 93%, gate to leaving 70 minutes at the median either way (read 2026-11-06 04:31 UTC). The owners'
+rows move further (Waymo 103 cars left against 95, Zoox 71 against 74), but a change re-draws the day after the first
+returns, so one day each cannot separate the key from the draw: no case to change the setting on this.
