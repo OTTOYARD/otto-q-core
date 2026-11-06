@@ -39,7 +39,7 @@ class BatteryLP:
     def __init__(self, conn, run: str, step_min: float, ticks: int, shape: list[float], dr_kwh: float = 600.0,
                  dr_window: tuple[float, float] = (14.0, 20.0), wear: float = 0.02, amort: float = 30.0,
                  guard: bool = True, blend: bool = False, learned: str | None = None, band_hh: int | None = None,
-                 bill_from_min: float = 0.0):
+                 bill_from_min: float = 0.0, learned_sql: int | None = None, beyond: str = "shape"):
         self.conn, self.run, self.step_h, self.n = conn, run, step_min / 60.0, ticks
         self.shape, self.dr_kwh, self.dr_window, self.wear, self.amort = shape, dr_kwh, dr_window, wear, amort
         # the two guards the first lab day showed it needs (2026-11-06): planned to the edge of the peak already billed
@@ -69,6 +69,13 @@ class BatteryLP:
         if learned:
             with open(learned) as fh:
                 self.learned = json.load(fh)
+        # learned_sql (2026-11-06, 0803): the same learned forecast read from the database, as production would read it
+        # (ottoq_bess_learned_forecast, a model of ottoq_bess_forecast_models by id), and beyond its four hours either the
+        # shape ('shape') or the depot's learned load by half hour of the day, its mean ('profile_mean') or its quantile
+        # across days ('profile_upper'): production has no other day's load to copy, it has its own past days
+        self.learned_sql, self.beyond = learned_sql, beyond
+        if beyond not in ("shape", "profile_mean", "profile_upper"):
+            raise ValueError(f"beyond: {beyond}")
         b = conn.execute("""SELECT capacity_kwh, max_charge_kw, max_discharge_kw, roundtrip_efficiency_pct,
                                    COALESCE(soc_min_floor_pct, 10), COALESCE(soc_max_ceiling_pct, 90)
                               FROM ottoq_bess_units WHERE depot_id = %s ORDER BY bess_id LIMIT 1""", (TWIN,)).fetchone()
@@ -141,6 +148,32 @@ class BatteryLP:
         per = max(1, int(round(0.5 / self.step_h)))
         return [pre[j // per] if j // per < len(pre) else x for j, x in enumerate(fc)]
 
+    def _learned_sql_fc(self, k: int, fc: list[float]) -> list[float]:
+        """The pre-battery load from the database's learned forecast (0803): its next 8 half hours, and the depot's
+        learned day beyond them when beyond is a profile (the shape where the depot has no day for that half hour)."""
+        c = self.conn
+        clk = c.execute("SELECT sim_clock_current FROM ottoq_sim_runs WHERE sim_run_id = %s", (self.run,)).fetchone()[0]
+        lf = c.execute("SELECT public.ottoq_bess_learned_forecast(%s, %s, %s, NULL, %s)",
+                       (self.run, TWIN, clk, self.learned_sql)).fetchone()[0]
+        if not lf:
+            return fc
+        near = [float(lf["pre_upper_kw"][h]) if (self.band_hh is None or h < self.band_hh) else float(lf["pre_mean_kw"][h])
+                for h in range(len(lf["pre_upper_kw"]))]
+        key = {"profile_mean": "pre_mean_kw", "profile_upper": "pre_upper_kw"}.get(self.beyond)
+        prof = lf.get("profile") or []
+        per = max(1, int(round(0.5 / self.step_h)))
+        out = []
+        for j, x in enumerate(fc):
+            hh = j // per
+            if hh < len(near):
+                out.append(near[hh])
+            elif key is not None and prof:
+                p = prof[hh % len(prof)]          # the same half hour of a later day
+                out.append(float(p[key]) if p and p.get(key) is not None else x)
+            else:
+                out.append(x)
+        return out
+
     def plan_now(self, k: int) -> dict:
         """Before tick k (0-based) runs: solve steps k..n-1 and write the plan the orchestrator will read at step k."""
         c = self.conn
@@ -170,6 +203,8 @@ class BatteryLP:
                 fc = [max(x, eng[j // per]) if j // per < nb else x for j, x in enumerate(fc)]
         if self.learned is not None:
             fc = self._learned_fc(k, fc)
+        if self.learned_sql is not None:
+            fc = self._learned_sql_fc(k, fc)
         if self.guard:
             fc = [max(x, last_pre) if j < self.win else x for j, x in enumerate(fc)]
         s = pywraplp.Solver.CreateSolver("GLOP")

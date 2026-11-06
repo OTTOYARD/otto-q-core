@@ -130,6 +130,12 @@ def main() -> None:
     ap.add_argument("--battery-lp-learned", metavar="MODEL_JSON",
                     help="the planner forecasts the next four hours' EV charging with this learned model "
                          "(forecast_learn.py --save), the shape beyond (battery_lp.py)")
+    ap.add_argument("--battery-lp-learned-sql", type=int, metavar="MODEL_ID",
+                    help="with --battery-lp: the learned forecast read from the database (0803's ottoq_bess_learned_forecast, "
+                         "this model of ottoq_bess_forecast_models in the template), as production would read it")
+    ap.add_argument("--battery-lp-beyond", choices=("shape", "profile_mean", "profile_upper"), default="shape",
+                    help="with --battery-lp-learned-sql: beyond its four hours the shape, or the depot's learned day (mean, "
+                         "or its quantile across days)")
     ap.add_argument("--battery-lp-band-hh", type=int,
                     help="with --battery-lp-learned: the model's upper band only for the next N half hours, its mean beyond")
     ap.add_argument("--battery-lp-bill-from-min", type=float, default=0.0,
@@ -258,7 +264,8 @@ def main() -> None:
         dials["energy_mpc_follow"] = 1.0
         lp = BatteryLP(conn, run, a.step, a.ticks, load_shape(a.battery_lp), dr_kwh=a.battery_lp_dr_kwh,
                        guard=not a.battery_lp_no_guard, blend=a.battery_lp_blend, learned=a.battery_lp_learned,
-                       band_hh=a.battery_lp_band_hh, bill_from_min=a.battery_lp_bill_from_min)
+                       band_hh=a.battery_lp_band_hh, bill_from_min=a.battery_lp_bill_from_min,
+                       learned_sql=a.battery_lp_learned_sql, beyond=a.battery_lp_beyond)
     patches = {}
     for f in a.lab_sql:      # a what-if change to the engine, on this replica only
         body = open(f).read()
@@ -370,6 +377,7 @@ def main() -> None:
            "dials": dials, "tag": a.tag, "added_stalls": added, "lab_sql": patches,
            "battery_lp": ({"shape": os.path.basename(a.battery_lp), "dr_kwh": a.battery_lp_dr_kwh, "plans": lp.plans,
                            "blend": a.battery_lp_blend, "learned": a.battery_lp_learned, "band_hh": a.battery_lp_band_hh, "bill_from_min": a.battery_lp_bill_from_min,
+                           "learned_sql": a.battery_lp_learned_sql, "beyond": a.battery_lp_beyond,
                            "guard": lp.guard}
                           if lp is not None else None),
            "ticks": ticks, "run_hours": a.run_hours, "commit_each_tick": commit_mode, "step_min": a.step, "sim_start": a.sim_start, "wall_s": wall_s, "clone_s": round(clone_s, 1),

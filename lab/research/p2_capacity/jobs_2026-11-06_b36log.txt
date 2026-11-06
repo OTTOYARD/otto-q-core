@@ -1,0 +1,4 @@
+# 0803's per-tick battery forecast log in a live 36-hour lab day (2026-11-06; LAB ONLY; LAB_DB=ottoq_lab_0803 = ottoq_lab_0801
+# + 0803): the same seed as its b36 base day with bess_forecast_learning on, which must leave every car-facing line and every
+# battery command the base day's, and write one log row a tick. The post-tick audit is kept beside it for comparison.
+normal_day_116_424242_b36log|--fleet 116 --scenario normal_day --seed 424242 --ticks 432 --run-hours 36 --dial bess_plan_bill_from_min=720 --dial bess_forecast_learning=1 --log-forecast lab/research/p2_capacity/forecast_audit_36h_log.jsonl --tag b36log
