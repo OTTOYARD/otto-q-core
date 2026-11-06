@@ -243,13 +243,14 @@ def realized(day: dict) -> dict:
 
 
 def solve(day: dict, objective: str, seconds: float, owner: str | None = None, fix: str | None = None,
-          caps: dict | None = None, engine_order: bool = False) -> dict:
+          caps: dict | None = None, engine_order: bool = False, dump: str | None = None) -> dict:
     """One clairvoyant solve. fix = 'post' or 'bay' holds that lane's jobs at their realized start (the regret split)."""
     Hd = int(math.ceil(day["horizon"]))      # the day's own end: both sides count minutes only up to it
     H = Hd + 24 * 60                          # the schedule may run past it, as the real day's cars did
     m = cp_model.CpModel()
     lanes = defaultdict(list)            # lane -> [(interval, demand)]
     visit_vars = []
+    job_vars = []                        # (visit, job, start var) for --dump-schedule
     for v in day["visits"]:
         jobs = day["jobs"].get(v["visit_id"], [])
         arr = int(math.floor(float(v["arr"])))
@@ -266,6 +267,7 @@ def solve(day: dict, objective: str, seconds: float, owner: str | None = None, f
             ivs.append(iv)
             ends.append(e)
             lanes[j["lane"]].append(iv)
+            job_vars.append((v, j, s))
             if j["lane"] == "post":
                 plug_starts.append(s)
         if len(ivs) > 1:
@@ -344,6 +346,14 @@ def solve(day: dict, objective: str, seconds: float, owner: str | None = None, f
            "seconds": round(time.time() - t0, 1)}
     if st in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         res["best"] = s.ObjectiveValue()
+        if dump:   # each job: the realized start and the solved one, minutes from the day's start
+            with open(dump, "w") as f:
+                for v, j, sv in job_vars:
+                    f.write(json.dumps({"visit": v["visit_id"], "owner": v["owner"], "arr": float(v["arr"]),
+                                        "due": (float(v["due"]) if v["due"] is not None else None),
+                                        "archetype": v.get("archetype"), "lane": j["lane"], "dur": j["dur"],
+                                        "real_start": j["start"], "solved_start": s.Value(sv),
+                                        "censored": j["censored"]}) + "\n")
         res["bound"] = s.BestObjectiveBound()
         per = defaultdict(lambda: defaultdict(float))
         for v, door, ot, past, out_at in visit_vars:
@@ -372,6 +382,7 @@ def main() -> None:
     ap.add_argument("--post-occupancy", action="store_true",
                     help="a charge holds its post from the car's arrival on it to its leaving it (SESSIONS_OCC_SQL), not the session only")
     ap.add_argument("--objectives", default="door,on_time,wait", help="comma-separated: door, on_time, wait")
+    ap.add_argument("--dump-schedule", help="write the first door solve's job starts (real and solved), one JSON a line")
     ap.add_argument("--out", default=os.path.join(HERE, "bound_ops.jsonl"))
     a = ap.parse_args()
     global NUM_WORKERS
@@ -383,8 +394,11 @@ def main() -> None:
            "horizon_min": day["horizon"], "units": day["units"], "faults": len(day["faults"]),
            "visits": len(day["visits"]), "jobs": sum(len(j) for j in day["jobs"].values()),
            "realized": real, "solves": []}
+    dumped = False
     for obj in [x.strip() for x in a.objectives.split(",") if x.strip()]:
-        out["solves"].append(solve(day, obj, a.seconds, engine_order=a.engine_order))
+        out["solves"].append(solve(day, obj, a.seconds, engine_order=a.engine_order,
+                                   dump=(a.dump_schedule if obj == "door" and not dumped else None)))
+        dumped = dumped or obj == "door"
     if a.split:
         for fix in ("bay", "post"):
             out["solves"].append(solve(day, "door", a.seconds, fix=fix, engine_order=a.engine_order))
