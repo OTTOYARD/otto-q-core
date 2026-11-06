@@ -216,3 +216,41 @@ brackets. What moved:
 Nothing in the engine reads these figures: the error was the research wing's, in two readers, and it was found tracing
 why short charges seemed to wait as long as long ones (they did not; much of their "wait" was the drive). The same
 error was in the perfect-day model (`lab/research/p2_perfect_day/`), which let work start at the call.
+
+### What it takes to serve 150-250 cars comfortably (build-outs on whole days, 2026-11-06, read 07:47 UTC)
+
+The depot as built is 2 service bays and 30 fast-charger posts. `capacity_day.py --add-stall` now adds posts as well as
+bays: a post is copied with its own charger, and the site's DC and service limits rise by the chargers' rating (rule 13:
+the limit is what is installed). Whole normal days (24 hours from 6 AM CT), seed 171717, every row a single reading;
+waits from the gate (G522), arrivals from 3 hours after the start to 1 hour before the end (`buildout_table.py`):
+
+| site (service bays / posts) | fleet, seed | visits served | visits an hour | within the contract wait, from the gate | wait p50 / p95 from the gate | 1-7 PM out at work (asked) | service bays busy | posts busy | the wall named most (of 48) |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| 2 / 30 | 116, 171717 | 435 | 19.8 | 99% | 0.0 / 20.0 min | 68% (87%) | 74.4% | 47.9% | service_bay 37, wash_bay 9 |
+| 2 / 30 | 150, 171717 | 466 | 22.3 | 72% | 10.0 / 90.0 min | 69% (87%) | 73.5% | 57.6% | service_bay 27, posts 13 |
+| 3 / 30 | 150, 171717 | 488 | 23.1 | 62% | 15.0 / 95.0 min | 67% (87%) | 64.7% | 57.8% | posts 21, service_bay 18 |
+| 3 / 40 | 150, 171717 | 556 | 26.2 | 98% | 0.0 / 20.0 min | 69% (87%) | 64.2% | 43.9% | wash_bay 22, service_bay 21 |
+| 2 / 30 | 200, 171717 | 464 | 22.7 | 43% | 92.5 / 295.0 min | 59% (87%) | 93.4% | 71.7% | service_bay 37, posts 11 |
+| 3 / 30 | 200, 171717 | 474 | 23.1 | 43% | 110.0 / 275.0 min | 63% (87%) | 85.0% | 72.7% | posts 24, service_bay 18 |
+| 3 / 40 | 200, 171717 | 613 | 29.8 | 69% | 10.0 / 90.0 min | 66% (87%) | 88.9% | 61.4% | service_bay 24, wash_bay 17 |
+| 4 / 40 | 200, 171717 | 589 | 28.4 | 67% | 15.0 / 90.0 min | 69% (87%) | 76.6% | 61.1% | wash_bay 30, service_bay 11 |
+| 3 / 50 | 200, 171717 | 665 | 31.9 | 97% | 0.0 / 20.0 min | 67% (87%) | 83.7% | 49.2% | wash_bay 26, service_bay 21 |
+| 4 / 50 | 200, 171717 | 690 | 33.2 | 99% | 0.0 / 15.0 min | 67% (87%) | 78.5% | 49.4% | wash_bay 37, service_bay 10 |
+| 4 / 50 | 250, 171717 | 702 | 34.0 | 98% | 0.0 / 25.0 min | 71% (87%) | 86.3% | 57.6% | wash_bay 25, service_bay 22 |
+
+- **Posts and service bays have to grow together.** A third service bay alone moves the wall to the posts and buys little
+  (150 cars: 466 to 488 visits served, and the charge wait gets worse). Ten more posts with it change everything: at 150
+  cars, 3 bays and 40 posts serve 556 visits a day with 98% of the cars charging inside the contract wait (median wait 0,
+  95th percentile 20 minutes), as comfortable as 116 cars are today.
+- **200 cars comfortably: 3-4 service bays and 50 posts.** 3 bays and 40 posts take 200 cars to 69% inside the wait; 50
+  posts take them to 97% (3 bays, 665 visits a day) or 99% (4 bays, 690). A fourth bay without the posts does nothing
+  (4/40: 67%, 589 visits).
+- **250 cars on 4 bays and 50 posts** still charge 98% inside the wait (702 visits a day, the 95th percentile 25 minutes),
+  with the service bays 86% busy: the next wall after the posts and bays is the **three wash bays**, which the constraint
+  board names most at 200 and 250 cars once the posts and bays are built out.
+- **The afternoon share of the fleet out at work barely moves (66-71%)**, against the work side's ask of 87%. With waits
+  near zero the cars in the depot in the afternoon (about 45-50 at 150 cars) are the cars charging to 100% (rule 9): past
+  the depot's own capacity, uptime is set by how long a full charge takes, not by the depot's size. At 200 cars on the
+  depot as built it was 59%: there the queue cost uptime.
+- One seed, one day each: where the curve moves, not a range. Wash bays and the posts' power budget are the next
+  questions (the site limits rose with the posts here; a real build-out pays for that service upgrade).
