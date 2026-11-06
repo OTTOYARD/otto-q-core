@@ -23,20 +23,15 @@ import argparse
 import datetime as dt
 import json
 import os
+import sys
 from collections import defaultdict
 
-import psycopg
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # run with -I: the sibling module
+from ev_drawn import drawn  # noqa: E402  the replica's EV series, or its committed copy (ev_drawn.jsonl)
 
-HOST, PORT = os.environ.get("LAB_HOST", "/var/tmp"), int(os.environ.get("LAB_PORT", "55433"))
 HERE = os.path.dirname(os.path.abspath(__file__))
-TWIN = "11111111-1111-1111-1111-111111111111"
 
 
-def drawn(db: str, run: str) -> dict:
-    with psycopg.connect(host=HOST, port=PORT, user="postgres", dbname=db) as c:
-        rows = c.execute("""SELECT timestamp, COALESCE(total_ev_charging_kw, 0) FROM site_energy_snapshots
-                             WHERE sim_run_id = %s AND depot_id = %s ORDER BY timestamp""", (run, TWIN)).fetchall()
-    return {t: float(kw) for t, kw in rows}
 
 
 def main() -> None:
@@ -49,7 +44,7 @@ def main() -> None:
     for r in rows:
         by_day[(r["db"], r["run"])].append(r)
     for (db, run), rs in by_day.items():
-        ev = drawn(db, run)
+        ev = dict(drawn(db, run))
         times = sorted(ev)
         terms = ("known", "active", "queue", "persist", "ev", "alt")
         err = {t: defaultdict(list) for t in terms}

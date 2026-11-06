@@ -22,24 +22,20 @@ import datetime as dt
 import json
 import math
 import os
+import sys
 from collections import defaultdict
 from zoneinfo import ZoneInfo
 
 import numpy as np
-import psycopg
 
-HOST, PORT = os.environ.get("LAB_HOST", "/var/tmp"), int(os.environ.get("LAB_PORT", "55433"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # run with -I: the sibling module
+from ev_drawn import drawn  # noqa: E402  the replica's EV series, or its committed copy (ev_drawn.jsonl)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
-TWIN = "11111111-1111-1111-1111-111111111111"
 CT = ZoneInfo("America/Chicago")
 AHEAD = 8
 
 
-def drawn(db: str, run: str) -> list[tuple[dt.datetime, float]]:
-    with psycopg.connect(host=HOST, port=PORT, user="postgres", dbname=db) as c:
-        return [(t, float(kw)) for t, kw in c.execute(
-            """SELECT timestamp, COALESCE(total_ev_charging_kw, 0) FROM site_energy_snapshots
-                WHERE sim_run_id = %s AND depot_id = %s ORDER BY timestamp""", (run, TWIN)).fetchall()]
 
 
 def examples(rows: list[dict], ev: list[tuple[dt.datetime, float]]) -> list[dict]:
@@ -83,6 +79,10 @@ def main() -> None:
     ap.add_argument("--quantile", type=float,
                     help="save an upper forecast: each half hour's mean plus this quantile of the training days' misses "
                          "(2026-11-06: a mean forecast's smooth peaks let the planner charge into a peak it did not see)")
+    ap.add_argument("--offset-from", choices=("fit", "cv"), default="fit",
+                    help="the misses the quantile is read from: the fit's own residuals on its training days ('fit', the "
+                         "first upper forecasts), or each training day's misses when it was left out of the fit ('cv': "
+                         "out of sample, as the forecast will miss on a day it never saw)")
     a = ap.parse_args()
     days = defaultdict(list)
     for line in open(a.audit):
@@ -103,10 +103,22 @@ def main() -> None:
             P = a.lam * np.eye(Z.shape[1])
             P[0, 0] = 0.0
             w = np.linalg.solve(Z.T @ Z + P, Z.T @ y)
-            off = float(np.quantile(y - Z @ w, a.quantile)) if a.quantile is not None else 0.0
+            off = 0.0
+            if a.quantile is not None and a.offset_from == "cv":
+                res = []
+                for out_day in keep:      # each training day's misses with that day left out of the fit
+                    tr_i = [e for d, ex in keep.items() if d != out_day for e in ex if e["h"] == h]
+                    te_i = [e for e in keep[out_day] if e["h"] == h]
+                    if tr_i and te_i:
+                        f = ridge(np.array([e["x"] for e in tr_i]), np.array([e["y"] for e in tr_i]), a.lam)
+                        res.extend((np.array([e["y"] for e in te_i]) - f(np.array([e["x"] for e in te_i]))).tolist())
+                off = float(np.quantile(res, a.quantile))
+            elif a.quantile is not None:
+                off = float(np.quantile(y - Z @ w, a.quantile))
             model["per_half_hour"].append({"h": h, "n": len(tr), "mu": mu.tolist(), "sd": sd.tolist(), "w": w.tolist(),
                                            "offset_kw": off})
         model["quantile"] = a.quantile
+        model["offset_from"] = a.offset_from if a.quantile is not None else None
         with open(a.save, "w") as f:
             json.dump(model, f)
         print(f"saved {a.save}: fit on {len(keep)} days ({', '.join(d.removeprefix('ottoq_cap_') for d in model['days'])})")

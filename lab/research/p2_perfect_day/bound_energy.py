@@ -64,6 +64,9 @@ def main() -> None:
                          "form is a ratchet a linear program cannot hold exactly, and is measured by the lab's what-if "
                          "days instead. 0: none (the earlier results)")
     ap.add_argument("--dr-window", default="14,20", help="the call window in local hours (the plan's defaults)")
+    ap.add_argument("--no-ladder", action="store_true",
+                    help="skip the rolling-forecast ladder (720 solves): the bill as the day ran it, no battery and "
+                         "perfect foresight only, which is all a what-if day's row needs")
     a = ap.parse_args()
     conn = psycopg.connect(host=HOST, port=PORT, user="postgres", dbname=a.db)
     run = a.run or conn.execute("SELECT sim_run_id::text FROM ottoq_sim_runs WHERE run_by = 'ab_harness' "
@@ -119,9 +122,14 @@ def main() -> None:
 
     def bill(grid: list[float], discharge_kwh: float) -> dict:
         energy = sum(max(g, 0) * rate[i] * dts[i] for i, g in enumerate(grid))
-        peak30 = max(sum(grid[i:i + win]) / len(grid[i:i + win]) for i in range(0, n - win + 1)) if n >= win else max(grid)
+        means = [sum(grid[i:i + win]) / len(grid[i:i + win]) for i in range(0, n - win + 1)] if n >= win else [max(grid)]
+        i_pk = max(range(len(means)), key=lambda i: means[i])
+        peak30 = means[i_pk]
         demand = d_rate / amort * max(peak30 - billed_before, 0)
-        return {"energy_usd": round(energy, 2), "peak30_kw": round(peak30, 1), "demand_usd": round(demand, 2),
+        # the half hour that set the peak, by its last snapshot (local time): which part of the day the bill paid for
+        at = ts[min(i_pk + win - 1, n - 1)].astimezone(ZoneInfo("America/Chicago")).strftime("%H:%M")
+        return {"energy_usd": round(energy, 2), "peak30_kw": round(peak30, 1), "peak30_ends_ct": at,
+                "demand_usd": round(demand, 2),
                 "wear_usd": round(wear * discharge_kwh, 2), "total_usd": round(energy + demand + wear * discharge_kwh, 2)}
 
     real = bill(real_grid, sum(max(o, 0) * dts[i] for i, o in enumerate(real_out)))
@@ -203,7 +211,8 @@ def main() -> None:
         return b_
 
     ladder = {}
-    for label, h in (("persistence_only", 0.0), ("next_1h", 1.0), ("next_2h", 2.0), ("next_4h", 4.0), ("whole_day", None)):
+    for label, h in (() if a.no_ladder else
+                     (("persistence_only", 0.0), ("next_1h", 1.0), ("next_2h", 2.0), ("next_4h", 4.0), ("whole_day", None))):
         ladder[label] = rolling(h if h else 1.0 / (2 * win)) if h is not None else rolling(None)
     # a typical day's shape as the forecast: another lab day's load before the battery, step by step
     if a.forecast_db:

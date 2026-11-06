@@ -354,7 +354,7 @@ def main() -> None:
         resources = [dict(zip(cols, r)) for r in cur.fetchall()]
     conn.commit()
     conn.close()
-    out = {"db": db, "run": run, "scenario": a.scenario, "seed": a.seed, "fleet": a.fleet, "grown": grown,
+    out = {"db": db, "run": run, "template": TEMPLATE, "scenario": a.scenario, "seed": a.seed, "fleet": a.fleet, "grown": grown,
            "dials": dials, "tag": a.tag, "added_stalls": added, "lab_sql": patches,
            "battery_lp": ({"shape": os.path.basename(a.battery_lp), "dr_kwh": a.battery_lp_dr_kwh, "plans": lp.plans,
                            "blend": a.battery_lp_blend, "learned": a.battery_lp_learned,
