@@ -653,6 +653,11 @@ more days and fleet sizes are running (`lab/research/p2_capacity/`).*
 bound (35%). The room is real and smaller than first published; the owner and lane figures above are the first model's
 and are re-solved on the corrected one when the lab's cores are free (`lab/research/p2_perfect_day/README.md`).*
 
+*Re-solved 11:38 PM CT on 2026-11-05 on the corrected model (two workers): best found 22% better at 116 cars and 19% at 150 (bound 33%
+and 35%); no owner worse still costs nothing; each owner on its own 29-42% better; due cars ready by their due time 38 to
+46 of 93 and 18 to 35 of 89. The lane split cannot be read on the corrected model (holding either lane at the kernel's
+starts is infeasible), so Phase 4's first target rests on the post-idle measure: at the posts the gain is ordering.*
+
 *Status 2026-11-05 (5:29 PM CT), the battery on a second day (seed 424242): planning on a typical day's shape (the other
 lab day's load) closes 67-77% of the gap to perfect foresight on both days, and on the second day the day plan did not
 lower the peak at all: the battery started 25% full, the plan holds a 600 kWh demand-response reserve from the first

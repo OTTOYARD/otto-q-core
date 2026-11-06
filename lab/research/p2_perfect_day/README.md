@@ -51,7 +51,22 @@ schedule can be more than a third better (33-35%). The first model's reading tha
 depot fills is withdrawn: found, it fell from 17.6% at 116 cars to 13.4% at 150, while the bound held at a third; one
 worker for 120 s is a weak search on the larger day, so neither says yet how the room moves with the fleet. What the first model said about owners (holding each to no
 worse cost the best day almost nothing) and about where the gap sits (the charging posts' share is the larger) is
-re-solved on the corrected model when the lab's cores are free; until then the tables below are the first model's.
+re-solved on the corrected model below; the tables after it are the first model's.
+
+Re-solved on the corrected model, engine order, two workers, 120 s a solve (read 2026-11-06 05:35 UTC, `bound_ops.jsonl`):
+
+| corrected model | 116 cars, seed 171717 | 150 cars, seed 171717 |
+|---|---:|---:|
+| minutes to ready: real / best found / proven bound | 24,332 / 18,991 (-22%) / 16,188 (-33%) | 29,100 / 23,506 (-19%) / 18,935 (-35%) |
+| the same with no owner worse than the real day | 18,966 / 16,185 | 23,483 / 18,935 |
+| due cars ready by their due time, real / best | 38 / 46 of 93 | 18 / 35 of 89 |
+| minutes past the contract wait, real / best on its own / bound | 3,365 / 1,199 / 159 | 4,290 / 2,220 / 34 |
+| each owner's own best (others free): Tesla / Waymo / Zoox | -33% / -29% / -40% | -32% / -32% / -42% |
+
+Holding every owner to no worse still costs nothing, so that reading of the first model stands. Its lane split does not
+carry over: holding either lane at the kernel's own starts, with each charge's real time on its post, is infeasible (the
+real starts and the longer post times together overrun the posts at moments the session lengths hid), so which lane
+carries more of the gap is not read on the corrected model; the post-idle measure says the posts' share is ordering.
 And on the posts the gain is the order in which cars get one, not posts left idle: a working post almost never stood
 free while a car waited (`lab/research/p2_capacity/post_idle_while_waiting.sql`).
 
