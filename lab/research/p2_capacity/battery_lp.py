@@ -36,9 +36,16 @@ def load_shape(path: str) -> list[float]:
 
 class BatteryLP:
     def __init__(self, conn, run: str, step_min: float, ticks: int, shape: list[float], dr_kwh: float = 600.0,
-                 dr_window: tuple[float, float] = (14.0, 20.0), wear: float = 0.02, amort: float = 30.0):
+                 dr_window: tuple[float, float] = (14.0, 20.0), wear: float = 0.02, amort: float = 30.0,
+                 guard: bool = True):
         self.conn, self.run, self.step_h, self.n = conn, run, step_min / 60.0, ticks
         self.shape, self.dr_kwh, self.dr_window, self.wear, self.amort = shape, dr_kwh, dr_window, wear, amort
+        # the two guards the first lab day showed it needs (2026-11-06): planned to the edge of the peak already billed
+        # on a forecast 250-400 kW low at midday, it charged into every half hour it thought had room and the billed peak
+        # ratcheted from 1,128 to 1,457 kW. So (a) the next 30 minutes are never forecast under what the depot drew last
+        # (a forecast is a shape, not a promise), and (b) a half hour wholly in the future is planned to stay a margin under
+        # the plan's peak, max(100 kW, 10% of the peak already billed), the margin the day plan keeps under its level.
+        self.guard = guard
         b = conn.execute("""SELECT capacity_kwh, max_charge_kw, max_discharge_kw, roundtrip_efficiency_pct,
                                    COALESCE(soc_min_floor_pct, 10), COALESCE(soc_max_ceiling_pct, 90)
                               FROM ottoq_bess_units WHERE depot_id = %s ORDER BY bess_id LIMIT 1""", (TWIN,)).fetchone()
@@ -87,6 +94,8 @@ class BatteryLP:
         # the forecast, the current step included: the engine dispatches after this tick's sessions start, which this
         # plan (made before the tick, as an outside service's would be) cannot see; the shape knows the day's surges
         fc = [self.shape[k + j] if k + j < len(self.shape) else last_pre for j in range(m)]
+        if self.guard:
+            fc = [max(x, last_pre) if j < self.win else x for j, x in enumerate(fc)]
         s = pywraplp.Solver.CreateSolver("GLOP")
         ch = [s.NumVar(0, self.pc, "") for _ in range(m)]
         dis = [s.NumVar(0, self.pd, "") for _ in range(m)]
@@ -101,11 +110,12 @@ class BatteryLP:
             r = self._reserve(k + j)
             if j > 0 and r > 0:
                 s.Add(e[j] >= min(self.hi, self.lo + r / self.eff))
+        sunk = max((sum(grid_hist[i:i + self.win]) / self.win for i in range(0, k - self.win + 1)), default=0.0)
+        margin = max(100.0, 0.10 * sunk) if self.guard else 0.0
         for i0 in range(max(0, k - self.win + 1), self.n - self.win + 1):  # every 30-minute window not wholly past
             past = sum(grid_hist[i] for i in range(i0, min(k, i0 + self.win)))
             fut = [g[i - k] for i in range(max(i0, k), i0 + self.win)]
-            s.Add(p30 >= (past + sum(fut)) * (1.0 / self.win))
-        sunk = max((sum(grid_hist[i:i + self.win]) / self.win for i in range(0, k - self.win + 1)), default=0.0)
+            s.Add(p30 - (margin if i0 >= k else 0.0) >= (past + sum(fut)) * (1.0 / self.win))
         s.Add(p30 >= sunk)
         s.Minimize(sum(self.rate[k + j] * g[j] * self.step_h for j in range(m))
                    + (self.d_rate / self.amort) * p30
