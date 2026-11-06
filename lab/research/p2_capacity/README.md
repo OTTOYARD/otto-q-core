@@ -120,3 +120,14 @@ owner's own cars charges first those whose charge is their way out), against the
 the contract wait against 93%, gate to leaving 70 minutes at the median either way (read 2026-11-06 04:31 UTC). The owners'
 rows move further (Waymo 103 cars left against 95, Zoox 71 against 74), but a change re-draws the day after the first
 returns, so one day each cannot separate the key from the draw: no case to change the setting on this.
+
+### A lab day commits after every tick (2026-11-06)
+
+Until now a lab day ran in one transaction with a savepoint a tick, and its late ticks slowed as the day's row versions
+and subtransactions piled up: a 24-hour 150-car day took 9,252 s, while the same engine's tick at that day's end, in a
+fresh transaction, took 474 ms. `capacity_day.py` now commits after the set-up and after every tick, as production does
+(`--one-transaction` keeps the old mode). Checked before any other day used it: normal_day, 116 cars, seed 424242, run
+both ways, gives the same four fingerprints (`day_fingerprint.sql`: energy commands `580be767`, snapshots `bd8fc12d`,
+sessions `c33289e1`, visits `c9e50316`) in 414 s against 1,080 s, beside three other running days (read 2026-11-06
+04:38 UTC). A container restart still redoes the whole day: the replica is cloned anew and the results file is written at
+the end.

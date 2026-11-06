@@ -109,10 +109,12 @@ def main() -> None:
                     help="the demand-response reserve the linear program holds from 2 PM (the day plan's 600)")
     ap.add_argument("--battery-lp-no-guard", action="store_true",
                     help="plan to the edge of the billed peak on the shape alone (the first cut, which ratcheted it)")
-    ap.add_argument("--commit-each-tick", action="store_true",
-                    help="commit after the set-up and after every tick, as production does (no row versions or "
-                         "subtransactions pile up inside one day-long transaction, which is what makes a lab day's "
-                         "late ticks slow); a restart still redoes the whole day, since the replica is cloned anew")
+    ap.add_argument("--one-transaction", action="store_true",
+                    help="run the whole day in one transaction, a savepoint a tick (the mode before 2026-11-06): its row "
+                         "versions and subtransactions pile up and its late ticks slow. By default a day commits after "
+                         "the set-up and after every tick, as production does; on normal_day 116 cars seed 424242 both "
+                         "modes give the same four fingerprints (day_fingerprint.sql), in 414 s against 1,080 s")
+    ap.add_argument("--commit-each-tick", action="store_true", help="the default; kept so older job lists still parse")
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--out", default=os.path.join(HERE, "results.jsonl"))
     a = ap.parse_args()
@@ -187,7 +189,8 @@ def main() -> None:
         patches[os.path.basename(f)] = hashlib.md5(body.encode()).hexdigest()
     t0 = time.time()
     walls, err, ticks = [], None, 0
-    if a.commit_each_tick:   # the set-up, the run and every what-if land before the first tick
+    commit_mode = not a.one_transaction
+    if commit_mode:   # the set-up, the run and every what-if land before the first tick
         conn.commit()
     for k in range(a.ticks):
         st = conn.execute("SELECT status, tick_count, sim_clock_current FROM ottoq_sim_runs WHERE sim_run_id = %s",
@@ -196,7 +199,7 @@ def main() -> None:
             break
         if lp is not None:
             lp.plan_now(k)
-        if a.commit_each_tick:
+        if commit_mode:
             try:
                 conn.execute("SELECT count(*) FROM public.ottoq_sim_advance_tick(%s)", (run,))
                 conn.commit()
@@ -247,7 +250,7 @@ def main() -> None:
            "battery_lp": ({"shape": os.path.basename(a.battery_lp), "dr_kwh": a.battery_lp_dr_kwh, "plans": lp.plans,
                            "guard": lp.guard}
                           if lp is not None else None),
-           "ticks": ticks, "commit_each_tick": a.commit_each_tick, "step_min": a.step, "sim_start": a.sim_start, "wall_s": wall_s, "clone_s": round(clone_s, 1),
+           "ticks": ticks, "commit_each_tick": commit_mode, "step_min": a.step, "sim_start": a.sim_start, "wall_s": wall_s, "clone_s": round(clone_s, 1),
            "error": err, "scorecard": score, "owners": owners, "resources": resources, "walls": walls}
     with open(a.out, "a") as f:
         f.write(json.dumps(out, default=str) + "\n")
