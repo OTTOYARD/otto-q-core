@@ -59,7 +59,10 @@ curve. More seeds and whole days are running.
 | fleet out at work / asked for by the work side (9 AM-5 PM) | 75.6% / 85.8% | 76.4% / 85.7% | 71.6% / 85.8% |
 
 From 150 to 200 cars the depot let out 10 more cars in the day and held 45 more at 6 PM; the two service bays ran 96%
-busy, and a third of the cars arriving in the day waited past the contract for a charger, though the posts were 77% busy
-(why cars wait for a post that is free a quarter of the time is not yet read). Whether a third service bay moves the wall
-is the next lab day
+busy, and a third of the cars arriving in the day waited past the contract for a charger. The posts' 77% is a day's
+average of a different thing: read hour by hour on the 200-car day, the posts were charging 75-89% of every hour, and
+charger faults took a further 9.4% of post time (2,024 post-minutes in 19 faults; 13.1% at 116 cars and 7.9% at 150, from
+each faulted session to its repair), so what is left is the minutes between one car leaving a post and the next plugging
+in. At midday (11 AM-2 PM arrivals, 26-34 an hour) the posts are full too, and that is when the waits come (a mean of 33-79
+minutes). Whether a third service bay moves the wall is the next lab day
 (`normal_day_200_171717_svc3`); the whole-day runs read the same curve past the start-up wave.
