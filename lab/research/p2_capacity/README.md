@@ -59,6 +59,7 @@ curve. More seeds and whole days are running.
 | fleet out at work / asked for by the work side (9 AM-5 PM) | 75.6% / 85.8% | 76.4% / 85.7% | 71.6% / 85.8% |
 
 From 150 to 200 cars the depot let out 10 more cars in the day and held 45 more at 6 PM; the two service bays ran 96%
-busy, and a third of the cars arriving in the day waited past the contract for a charger, though the posts were 77% busy:
-cars wait on posts held by cars waiting for a bay. Whether a third service bay moves the wall is the next lab day
+busy, and a third of the cars arriving in the day waited past the contract for a charger, though the posts were 77% busy
+(why cars wait for a post that is free a quarter of the time is not yet read). Whether a third service bay moves the wall
+is the next lab day
 (`normal_day_200_171717_svc3`); the whole-day runs read the same curve past the start-up wave.
