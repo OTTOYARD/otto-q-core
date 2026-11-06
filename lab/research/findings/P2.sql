@@ -229,30 +229,34 @@ INSERT INTO public.ottoq_research_findings
 VALUES
   ('p2-capacity-curve', 'P2', 'P2.1', 'measurement', 'measured',
    'The twin depot comfortably serves about 116 cars; at 150 it saturates near 22 visits an hour, and the two service bays are the wall',
-   'Whole lab days (24 hours from 6 AM) at the twin depot as built, 30 fast-charger posts, 2 service bays and 3 wash bays, two '
-   'seeds a size, on production''s engine. At 116 cars the depot takes 18-20 visits an hour and 78-91% of the cars that '
-   'charge do so within the 30-minute contract wait (median wait 5-15 minutes). At 150 cars it takes 20-22 an hour and only '
-   '62-64% charge within the wait (the slowest 5% wait 1.5-2.5 hours); at 200 cars 22-23 an hour and 37-39%, with a median '
-   'wait over 1.5 hours. More cars still put more to work in the afternoon, about 77 at 116, 98 at 150 and 115 at 200, '
-   'against the work side''s ask of 87% of the fleet, so each car added past 116 adds less. The wall the engine''s own '
-   'constraint board names most is the two service bays (93% busy over the whole day at 200 cars); the posts are full at '
-   'the afternoon peak and lose time to charger faults. On the busy-day stress scenario (trouble codes at 7 times the rate) '
-   'the bays fail at today''s 116 cars: by noon 96 charged cars wait for maintenance or calibration, which no car leaves '
-   'without. Levers, none of them on a vehicle: a third service bay lets 22 more cars out of the day at 150 cars (+5%) and 10 '
-   'at 200 (+2%) and moves the wall to the posts, so the next 50 cars need posts as well as bays; fewer charger faults; '
-   'better ordering of who gets a post. Two seeds a size: where the curve bends, not a range.',
+   'Corrected 2026-11-06: the contract''s queue wait now runs from the gate. A visit opens when its car is called home, and '
+   'the first version counted the drive home (7-10 minutes a visit) as queueing. Whole lab days (24 hours from 6 AM) at the '
+   'twin depot as built, 30 fast-charger posts, 2 service bays and 3 wash bays, two seeds a size, on production''s engine. '
+   'At 116 cars the depot takes 18-20 visits an hour and 91-99% of the cars that charge do so within the 30-minute contract '
+   'wait (median wait under 3 minutes). At 150 cars it takes 20-22 an hour and 70-72% charge within the wait (the slowest 5% '
+   'wait 1.5-2.3 hours); at 200 cars 22-23 an hour and 40-43%, with a median wait of 1.5-1.7 hours. (From the call home, '
+   'the first version: 78-91%, 62-64%, 37-39%.) More cars still put more to work in the afternoon, about 77 at 116, 98 at '
+   '150 and 115 at 200, against the work side''s ask of 87% of the fleet, so each car added past 116 adds less. The wall '
+   'the engine''s own constraint board names most is the two service bays (93% busy over the whole day at 200 cars); the '
+   'posts are full at the afternoon peak and lose time to charger faults. On the busy-day stress scenario (trouble codes at '
+   '7 times the rate) the bays fail at today''s 116 cars: by noon 96 charged cars wait for maintenance or calibration, '
+   'which no car leaves without. Levers, none of them on a vehicle: a third service bay lets 22 more cars out of the day at '
+   '150 cars (+5%) and 10 at 200 (+2%) and moves the wall to the posts, so the next 50 cars need posts as well as bays; '
+   'fewer charger faults; better ordering of who gets a post. Two seeds a size: where the curve bends, not a range.',
    '{"depot": "twin as built: 30 dcfc posts, 2 service bays, 3 wash bays", "days": "normal_day, 24 h from 6 AM CT, arrivals 9 AM-5 AM",
+     "wait_measured_from": "the car''s first arrival at the gate after its call home (corrected 2026-11-06 06:12 UTC)",
      "by_fleet": {
-       "116": {"seeds": [171717, 424242], "visits_per_hour": [19.8, 18.3], "within_contract_wait_pct": [91, 78], "wait_p50_min": [5, 15], "wait_p95_min": [35, 60],
-               "afternoon_out_pct": [68, 65], "service_bays_busy_pct": [74, 60], "posts_busy_pct": [48, 48]},
-       "150": {"seeds": [171717, 424242], "visits_per_hour": [22.3, 19.8], "within_contract_wait_pct": [62, 64], "wait_p50_min": [20, 20], "wait_p95_min": [95, 151],
-               "afternoon_out_pct": [69, 61], "service_bays_busy_pct": [74, 80], "posts_busy_pct": [58, 55]},
-       "200": {"seeds": [171717, 424242], "visits_per_hour": [22.7, 22.4], "within_contract_wait_pct": [39, 37], "wait_p50_min": [98, 110], "wait_p95_min": [310, 330],
-               "afternoon_out_pct": [59, 56], "service_bays_busy_pct": [93, 93], "posts_busy_pct": [72, 67]}},
-     "afternoon_asked_pct": 87, "third_service_bay_seed_171717": {"150": {"cars_left": [466, 488], "within_contract_wait_pct": [62, 56], "wall": ["service_bay", "posts"]}, "200": {"cars_left": [464, 474], "within_contract_wait_pct": [39, 40], "wall": ["service_bay", "posts"]}}, "busy_day_116": {"cars_inside_at_noon_waiting_for_bays": 96, "owing_mechanical_pm": 71, "owing_sensor_calibration": 37,
+       "116": {"seeds": [171717, 424242], "visits_per_hour": [19.8, 18.3], "within_contract_wait_pct": [99, 91], "wait_p50_min": [0, 2.5], "wait_p95_min": [20, 45],
+               "afternoon_out_pct": [68, 65], "service_bays_busy_pct": [74, 60], "posts_busy_pct": [48, 48], "drive_home_mean_min": [9.1, 9.8]},
+       "150": {"seeds": [171717, 424242], "visits_per_hour": [22.3, 19.8], "within_contract_wait_pct": [72, 70], "wait_p50_min": [10, 10], "wait_p95_min": [90, 140],
+               "afternoon_out_pct": [69, 61], "service_bays_busy_pct": [74, 80], "posts_busy_pct": [58, 55], "drive_home_mean_min": [8.7, 8.7]},
+       "200": {"seeds": [171717, 424242], "visits_per_hour": [22.7, 22.4], "within_contract_wait_pct": [43, 40], "wait_p50_min": [92.5, 102.5], "wait_p95_min": [295, 317.8],
+               "afternoon_out_pct": [59, 56], "service_bays_busy_pct": [93, 93], "posts_busy_pct": [72, 67], "drive_home_mean_min": [7.5, 7.5]}},
+     "first_reading_from_the_call_within_contract_wait_pct": {"116": [91, 78], "150": [62, 64], "200": [39, 37]},
+     "afternoon_asked_pct": 87, "third_service_bay_seed_171717": {"150": {"cars_left": [466, 488], "within_contract_wait_pct": [72, 62], "wall": ["service_bay", "posts"]}, "200": {"cars_left": [464, 474], "within_contract_wait_pct": [43, 43], "wall": ["service_bay", "posts"]}}, "busy_day_116": {"cars_inside_at_noon_waiting_for_bays": 96, "owing_mechanical_pm": 71, "owing_sensor_calibration": 37,
      "in_depot_at_6pm": 111}, "phantom_visits_left_out": "G520"}',
-   'otto-q-core lab/research/p2_capacity/README.md (the capacity curve on whole days), results.jsonl, steady_state.py, uptime_by_hour.sql',
-   '{}', '2026-11-06 05:31:34+00')
+   'otto-q-core lab/research/p2_capacity/README.md (the capacity curve on whole days; the queue wait runs from the gate), steady_state.jsonl, steady_state.py, uptime_by_hour.sql',
+   '{}', '2026-11-06 06:12:09+00')
 ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
