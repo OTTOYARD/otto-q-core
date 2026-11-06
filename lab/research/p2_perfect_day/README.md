@@ -249,6 +249,20 @@ lifts a half hour above the billed peak (0600). So `battery_lp.py` now keeps the
 never forecast under what the depot drew last, and a half hour wholly in the future is planned to stay
 max(100 kW, 10% of the billed peak) under the plan's peak. The guarded runs are tag `lp2`.
 
+| at the base day's end state | first day (71% full at 6 AM) | second day (25% full) |
+|---|---:|---:|
+| the day plan as it runs | $1,382 (1,160 kW) | $1,543 (1,475 kW) |
+| the day plan, both reserves off (`dr0res0`) | $1,295 (1,032 kW) | $1,301 (1,132 kW) |
+| **the LP in the loop, guarded (`lp2`), the reserve held from 2 PM** | **$1,237 (914 kW)** | **$1,286 (1,103 kW)** |
+| perfect foresight | $1,085 (735 kW) | $1,098 (850 kW) |
+
+**Guarded, the planner beats both on both days** (read 2026-11-06 01:49 and 02:01 UTC): $145 and $257 under the day
+plan as it runs, $58 and $16 under the day plan with both reserves off, while it holds the 600 kWh call reserve from 2 PM
+that the reserves-off plan gives up; 49% and 58% of the gap to perfect foresight closed. Every car-facing line is
+identical to the base day but one: on the second day's `lp2` the scorecard reads `left_with_needed_work_open` 0 against 1,
+because that replica was cloned after 0796 (G514's scorecard fix) reached the lab template; no car's day moved. Two days,
+one forecast each way (each day planned on the other's shape): a reading, not a range.
+
 The proposed fix keeps the reserve and needs it by the window: the plan may spend it before 2 PM when it can refill it by
 then, and the floor hedges the plan's own forecast error, not the surge it is planning for. It is built behind a dial and
 tested in the lab on a day with a demand-response call before anyone switches it on, so a call never slows a car.
