@@ -196,11 +196,15 @@ which on `57188f55` above is when CP-SAT's proposals started to be enacted.
    from the first minute of the day (no call came), while its floor rises at every surge (G517). Needed only from 2 PM, that
    reserve costs nothing in hindsight on either day. So the build is, in order: (a) the demand-response reserve needed by
    its window, and a floor that hedges the plan's own forecast error rather than the surge it plans for (G517, sized in the
-   lab first, and tested on a day with a call so a call never slows a car); (b) a forecast of the depot's own
-   charging load across the day, from what the engine already learns (the dispatch curve, the return model, the charge
-   clock, the line) and refit overnight from each day's real load (rule 10 allows production to update its estimates
-   overnight), in place of the plan's persistence floor (0435 §4.1 names it as the next step), measured against the bound in
-   the lab. The language model's part is around the plan: each evening it reads tomorrow's known inputs (the fleet's
+   lab first, and tested on a day with a call so a call never slows a car; on the second day both reserves off took the
+   bill from $1,543 to $1,301 with every car's day identical); (b) a planner that plans the battery's refill along with
+   its discharge, so it dares spend into the 6 AM surge (the rolling linear program in
+   `lab/research/p2_perfect_day/bound_energy.py`, held to the reserve from 2 PM), because given a typical day's shape the
+   day plan as it runs moved nothing (the surge sets the billed peak before the rest-of-day forecast can matter); and (c)
+   inside that planner, a forecast of the depot's own charging load across the day, from what the engine already learns
+   (the dispatch curve, the return model, the charge clock, the line) and refit overnight from each day's real load (rule
+   10 allows production to update its estimates overnight), worth $431 on the first day to that planner against holding
+   the load flat. The language model's part is around the plan: each evening it reads tomorrow's known inputs (the fleet's
    schedule, the weather, a demand-response notice, a charger out of service) and proposes an adjustment to the day's
    shape, which the plan takes only as a forecast and disposes of like any other (it keeps the battery's limits and never
    touches a car's charge); an energy brief for the operators; and the exception desk when a demand-response call or a

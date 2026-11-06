@@ -146,8 +146,10 @@ per five minutes, so the shape is a rough forecast, not a copy.
   was holding a reserve for a demand-response call that never came.
 - Every plan above ends the day at least as full as the real battery did (2,702 kWh on the first day, 1,508 on the
   second); the no-battery bill does not pay for the energy the real battery stored, so it is slightly flattered.
-- Two days, one forecast each way: a reading, not a range. The build it points to is a learned forecast of the depot's own
-  charging load across the day, in the day plan's hands (0435 §4.1 names its persistence floor as the next step).
+- Two days, one forecast each way: a reading, not a range. These rolling plans are linear programs that plan the
+  battery's refill along with its discharge; the twin's day plan does not (it decides each recharge on its own). So the
+  forecast's worth here is the forecast's worth to such a planner, and the next section measures what the same shape is
+  worth to the day plan as it runs: nothing, on these days.
 
 ### G517: two reserves keep a battery under about half full out of the morning surge
 
@@ -193,8 +195,32 @@ given at the base day's end state (the difference valued at the plan's own repla
   holds the battery ($1 at the same end state); the reserve off saves $88; both off save $242 and take the peak from 1,475
   to 1,132 kW, 54% of the gap to perfect foresight ($242 of $445). No demand-response call came, so on this day both
   off is what "the reserve needed only from 2 PM" would have done, with nothing to refill against.
-- The rest of the gap ($203) is the plan's forecast and its algorithm; the forecast what-ifs (`shape`, `shape_dr0res0`)
-  measure how much of it a typical day's shape recovers with the plan as it runs.
+- The rest of the gap ($203) is the plan's forecast and its algorithm, and the forecast what-if says which: see below.
+
+### The day plan given a typical day's shape moves nothing (2026-11-06 00:30 UTC = 6:30 PM CT on 11-05)
+
+The same two days re-run with the day plan's EV forecast floored at the other day's EV charging, half hour by half hour
+(`make_shape_whatif.py`, tags `shape` and `shape_dr0res0`; every car-facing line identical again):
+
+| | half-hour peak | bill at the base day's end state |
+|---|---:|---:|
+| first day, the day plan as it runs | 1,160 kW | $1,382 |
+| first day, the day plan with a typical day's shape | 1,159 kW | $1,382 |
+| second day, both reserves off | 1,132 kW | $1,301 |
+| second day, both reserves off, with a typical day's shape | 1,132 kW | $1,301 |
+
+The shape took effect (the plan's forecast peak at 10 AM rose from 339 to 1,052 kW on the first day) and changed no
+action. On both days the billed half hour is the 6 AM start-up surge, and it is set before the rest of the day's forecast
+can matter: after it, the forecast peak sits under the peak already billed, so the plan's level and every charge and
+discharge stay as they were. What decides the bill is how deep the battery may go into that first surge, which is the two
+reserves, and whether the plan dares spend into it knowing it can refill later, which a linear program over the day does
+and the day plan does not.
+
+So the order of the battery's build is: the reserves first (G517, measured with the plan as it runs), then a planner
+that plans its own refill (the rolling linear program in `bound_energy.py`, held to the 600 kWh reserve from 2 PM), and
+a forecast of the day's shape inside that planner, where it is worth something (on the first day the same planner went
+from $1,583 with the load held flat to $1,152 with the shape). The first day's reserves are being measured the same way
+(`dr0res0` on seed 171717).
 
 The proposed fix keeps the reserve and needs it by the window: the plan may spend it before 2 PM when it can refill it by
 then, and the floor hedges the plan's own forecast error, not the surge it is planning for. It is built behind a dial and
