@@ -102,6 +102,11 @@ def main() -> None:
     ap.add_argument("--lab-sql", action="append", default=[],
                     help="a SQL file run on this day's replica before its first tick (a what-if change to the engine, "
                          "for this lab day only), recorded with its md5")
+    ap.add_argument("--battery-lp", metavar="SHAPE_JSON",
+                    help="plan the battery as a linear program over the rest of the day, every tick, on this forecast "
+                         "shape (make_load_shape.py), and have the engine follow it (energy_mpc_follow = 1): battery_lp.py")
+    ap.add_argument("--battery-lp-dr-kwh", type=float, default=600.0,
+                    help="the demand-response reserve the linear program holds from 2 PM (the day plan's 600)")
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--out", default=os.path.join(HERE, "results.jsonl"))
     a = ap.parse_args()
@@ -158,6 +163,16 @@ def main() -> None:
                         VALUES ('run', %s, %s, %s, 'lab_capacity_variation')
                         ON CONFLICT (scope_type, scope_id, param_key) DO UPDATE
                           SET param_value = EXCLUDED.param_value, updated_by = EXCLUDED.updated_by""", (run, k, float(v)))
+    lp = None
+    if a.battery_lp:         # the battery planned as a linear program, followed through the MPC bridge (battery_lp.py)
+        sys.path.insert(0, HERE)
+        from battery_lp import BatteryLP, load_shape  # noqa: E402
+        conn.execute("""INSERT INTO ottoq_policy_params (scope_type, scope_id, param_key, param_value, updated_by)
+                        VALUES ('run', %s, 'energy_mpc_follow', 1, 'lab_capacity_variation')
+                        ON CONFLICT (scope_type, scope_id, param_key) DO UPDATE
+                          SET param_value = EXCLUDED.param_value, updated_by = EXCLUDED.updated_by""", (run,))
+        dials["energy_mpc_follow"] = 1.0
+        lp = BatteryLP(conn, run, a.step, a.ticks, load_shape(a.battery_lp), dr_kwh=a.battery_lp_dr_kwh)
     patches = {}
     for f in a.lab_sql:      # a what-if change to the engine, on this replica only
         body = open(f).read()
@@ -170,6 +185,8 @@ def main() -> None:
                           (run,)).fetchone()
         if st[0] != "running":
             break
+        if lp is not None:
+            lp.plan_now(k)
         conn.execute("SAVEPOINT t")
         try:
             conn.execute("SELECT count(*) FROM public.ottoq_sim_advance_tick(%s)", (run,))
@@ -208,6 +225,8 @@ def main() -> None:
     conn.close()
     out = {"db": db, "run": run, "scenario": a.scenario, "seed": a.seed, "fleet": a.fleet, "grown": grown,
            "dials": dials, "tag": a.tag, "added_stalls": added, "lab_sql": patches,
+           "battery_lp": ({"shape": os.path.basename(a.battery_lp), "dr_kwh": a.battery_lp_dr_kwh, "plans": lp.plans}
+                          if lp is not None else None),
            "ticks": ticks, "step_min": a.step, "sim_start": a.sim_start, "wall_s": wall_s, "clone_s": round(clone_s, 1),
            "error": err, "scorecard": score, "owners": owners, "resources": resources, "walls": walls}
     with open(a.out, "a") as f:
