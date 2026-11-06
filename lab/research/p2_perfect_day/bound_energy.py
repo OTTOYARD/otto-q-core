@@ -64,6 +64,10 @@ def main() -> None:
                          "form is a ratchet a linear program cannot hold exactly, and is measured by the lab's what-if "
                          "days instead. 0: none (the earlier results)")
     ap.add_argument("--dr-window", default="14,20", help="the call window in local hours (the plan's defaults)")
+    ap.add_argument("--window-start-h", type=float,
+                    help="bill only the snapshots after this many hours from the run's start, the battery taken as it stood "
+                         "then (a long lab day billed over its last 24 hours, so the 6 AM start-up, the whole fleet at the "
+                         "depot at once, is not what the bill pays for)")
     ap.add_argument("--no-ladder", action="store_true",
                     help="skip the rolling-forecast ladder (720 solves): the bill as the day ran it, no battery and "
                          "perfect foresight only, which is all a what-if day's row needs")
@@ -92,6 +96,12 @@ def main() -> None:
     cap, pc, pd, rte, floor_pct, ceil_pct = (float(x) for x in b)
     eff = math.sqrt(rte if rte <= 1 else rte / 100.0)         # per direction (0435 §1(d): the column is a fraction)
     lo_e, hi_e = cap * floor_pct / 100.0, cap * ceil_pct / 100.0
+    if a.window_start_h is not None:      # the window: its snapshots, and the battery as it stood at its start
+        import datetime as _dt
+        tw = t0 + _dt.timedelta(hours=a.window_start_h)
+        rows = [r for r in rows if r[0] > tw]
+        before = [x for x in soc if x[0] <= tw]
+        soc = (before[-1:] if before else []) + [x for x in soc if x[0] > tw]
     e0 = cap * float(soc[0][1]) / 100.0 if soc else cap * 0.5
     e_end = cap * float(soc[-1][1]) / 100.0 if soc else e0
     ts = [r[0] for r in rows]
@@ -232,6 +242,7 @@ def main() -> None:
         ladder["typical_day_shape"]["forecast_from"] = a.forecast_db
         ladder["next_1h_then_shape"] = rolling(1.0, shape)
     out = {"db": a.db, "run": run, "steps": n, "step_h": round(sum(dts) / n, 4), "status": int(st),
+           "window_start_h": a.window_start_h,
            "battery": {"capacity_kwh": cap, "max_kw": pd, "rte": rte, "soc_start_kwh": round(e0, 1),
                        "soc_end_kwh": round(e_end, 1)},
            "billed_before_kw": billed_before, "demand_usd_kw_month": float(d_rate), "demand_season": d_season,

@@ -1,0 +1,11 @@
+# The battery planner in steady state (2026-11-06; LAB ONLY; LAB_DB=ottoq_lab_0801): 36-hour days, 6 AM day 1 to 6 PM day 2,
+# billed over the last 24 hours (6 PM to 6 PM: the evening, the night's refill, the next morning's surge and the day), so the
+# lab day's 6 AM start (the whole fleet at the depot at once) is not what the bill pays for. The day plan's billing period
+# starts there too (bess_plan_bill_from_min = 720, a lab value above the dial's catalogued 0-240: the reader does not
+# clamp). First the base days, the day plan as it runs, its forecast logged every tick.
+normal_day_116_171717_b36|--fleet 116 --scenario normal_day --seed 171717 --ticks 432 --dial bess_plan_bill_from_min=720 --log-forecast lab/research/p2_capacity/forecast_audit_36h.jsonl --tag b36
+normal_day_116_424242_b36|--fleet 116 --scenario normal_day --seed 424242 --ticks 432 --dial bess_plan_bill_from_min=720 --log-forecast lab/research/p2_capacity/forecast_audit_36h.jsonl --tag b36
+normal_day_116_616161_b36|--fleet 116 --scenario normal_day --seed 616161 --ticks 432 --dial bess_plan_bill_from_min=720 --log-forecast lab/research/p2_capacity/forecast_audit_36h.jsonl --tag b36
+normal_day_116_818181_b36|--fleet 116 --scenario normal_day --seed 818181 --ticks 432 --dial bess_plan_bill_from_min=720 --log-forecast lab/research/p2_capacity/forecast_audit_36h.jsonl --tag b36
+normal_day_116_919191_b36|--fleet 116 --scenario normal_day --seed 919191 --ticks 432 --dial bess_plan_bill_from_min=720 --log-forecast lab/research/p2_capacity/forecast_audit_36h.jsonl --tag b36
+normal_day_116_373737_b36|--fleet 116 --scenario normal_day --seed 373737 --ticks 432 --dial bess_plan_bill_from_min=720 --log-forecast lab/research/p2_capacity/forecast_audit_36h.jsonl --tag b36

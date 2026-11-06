@@ -38,7 +38,8 @@ def load_shape(path: str) -> list[float]:
 class BatteryLP:
     def __init__(self, conn, run: str, step_min: float, ticks: int, shape: list[float], dr_kwh: float = 600.0,
                  dr_window: tuple[float, float] = (14.0, 20.0), wear: float = 0.02, amort: float = 30.0,
-                 guard: bool = True, blend: bool = False, learned: str | None = None, band_hh: int | None = None):
+                 guard: bool = True, blend: bool = False, learned: str | None = None, band_hh: int | None = None,
+                 bill_from_min: float = 0.0):
         self.conn, self.run, self.step_h, self.n = conn, run, step_min / 60.0, ticks
         self.shape, self.dr_kwh, self.dr_window, self.wear, self.amort = shape, dr_kwh, dr_window, wear, amort
         # the two guards the first lab day showed it needs (2026-11-06): planned to the edge of the peak already billed
@@ -61,6 +62,10 @@ class BatteryLP:
         # mean beyond: on seed 424242 the band on every half hour made the plan save energy for afternoon peaks that
         # never came and sit out the 6:15 AM surge (q95: no discharge into 1,840 kW; the mean: 1,186 kW)
         self.band_hh = band_hh
+        # bill_from_min (2026-11-06): a second billing period from this many minutes after the run's start, each period
+        # paying for its own highest half hour, as the day plan's ratchet does at bess_plan_bill_from_min (a long lab day
+        # billed from 6 PM day 1, so neither plan treats the 6 AM start-up's peak as already paid for the next day)
+        self.bill_from = int(round(bill_from_min / step_min)) if bill_from_min > 0 else 0
         if learned:
             with open(learned) as fh:
                 self.learned = json.load(fh)
@@ -173,7 +178,6 @@ class BatteryLP:
         e = [s.NumVar(self.lo, self.hi, "") for _ in range(m + 1)]
         g = [s.NumVar(0, s.infinity(), "") for _ in range(m)]
         sp = [s.NumVar(0, s.infinity(), "") for _ in range(m)]          # solar the site cannot use (no export credit)
-        p30 = s.NumVar(0, s.infinity(), "")
         s.Add(e[0] == e0)
         for j in range(m):
             s.Add(e[j + 1] == e[j] + (self.eff * ch[j] - dis[j] / self.eff) * self.step_h)
@@ -181,15 +185,27 @@ class BatteryLP:
             r = self._reserve(k + j)
             if j > 0 and r > 0:
                 s.Add(e[j] >= min(self.hi, self.lo + r / self.eff))
-        sunk = max((sum(grid_hist[i:i + self.win]) / self.win for i in range(0, k - self.win + 1)), default=0.0)
-        margin = max(100.0, 0.10 * sunk) if self.guard else 0.0
-        for i0 in range(max(0, k - self.win + 1), self.n - self.win + 1):  # every 30-minute window not wholly past
-            past = sum(grid_hist[i] for i in range(i0, min(k, i0 + self.win)))
-            fut = [g[i - k] for i in range(max(i0, k), i0 + self.win)]
-            s.Add(p30 - (margin if i0 >= k else 0.0) >= (past + sum(fut)) * (1.0 / self.win))
-        s.Add(p30 >= sunk)
+        # each billing period pays for its own highest 30-minute window (a window is the period its start is in);
+        # a period wholly past is paid and no step left can move it
+        bf = self.bill_from
+        periods = [(0, bf), (bf, self.n)] if 0 < bf < self.n else [(0, self.n)]
+        p30s, p30 = [], None
+        for lo, hi in periods:
+            if hi <= k:
+                continue
+            p = s.NumVar(0, s.infinity(), "")
+            sunk = max((sum(grid_hist[i:i + self.win]) / self.win for i in range(lo, min(k, hi) - self.win + 1)),
+                       default=0.0)
+            margin = max(100.0, 0.10 * sunk) if self.guard else 0.0
+            for i0 in range(max(lo, k - self.win + 1), hi - self.win + 1):  # every window of the period not wholly past
+                past = sum(grid_hist[i] for i in range(i0, min(k, i0 + self.win)))
+                fut = [g[i - k] for i in range(max(i0, k), i0 + self.win)]
+                s.Add(p - (margin if i0 >= k else 0.0) >= (past + sum(fut)) * (1.0 / self.win))
+            s.Add(p >= sunk)
+            p30s.append(p)
+        p30 = p30s[-1]                                    # the period the plan's last steps are billed in (reported)
         s.Minimize(sum(self.rate[k + j] * g[j] * self.step_h for j in range(m))
-                   + (self.d_rate / self.amort) * p30
+                   + (self.d_rate / self.amort) * sum(p30s)
                    + self.wear * sum(dis[j] * self.step_h for j in range(m))
                    - self.c_rep * e[m])
         st = s.Solve()

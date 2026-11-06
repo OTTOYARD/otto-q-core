@@ -15,12 +15,14 @@ The quantile is then chosen as a planner would have to choose it, without the da
 forecast with the lowest mean bill over the OTHER seeds (leave one seed out), and its bill on this seed.
 
 Usage: /var/tmp/ottoq_lab_venv/bin/python -I lab/research/p2_capacity/planner_table.py SEED [SEED ...]
+       [--base b801] [--arms p801shape,p801mean,...] [--window HOURS] [--fleet 116]
+       (--window: the bills bound_energy.py --window-start-h HOURS wrote, a long day billed from that hour on)
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
-import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ENERGY = os.path.join(HERE, "..", "p2_perfect_day", "bound_energy.jsonl")
@@ -50,14 +52,30 @@ def strip_ids(x):
     return x
 
 
+FLEET = 116
+
+
 def db(seed: str, tag: str) -> str:
-    return f"ottoq_cap_normal_day_116_{seed}_{tag}"
+    return f"ottoq_cap_normal_day_{FLEET}_{seed}_{tag}"
 
 
 def main() -> None:
-    seeds = sys.argv[1:]
-    energy = latest(ENERGY, lambda d: d["db"], lambda d: not d.get("dr_reserve"))
-    energy_res = latest(ENERGY, lambda d: d["db"], lambda d: bool(d.get("dr_reserve")))
+    global BASE_TAG, ARMS, LEARNED, FLEET
+    ap = argparse.ArgumentParser()
+    ap.add_argument("seeds", nargs="+")
+    ap.add_argument("--base", default=BASE_TAG)
+    ap.add_argument("--arms", help="comma-separated planner tags (the first is the copied shape the others are set against)")
+    ap.add_argument("--window", type=float, help="the window's start in hours (bound_energy.py --window-start-h)")
+    ap.add_argument("--fleet", type=int, default=FLEET)
+    a = ap.parse_args()
+    seeds, BASE_TAG, FLEET = a.seeds, a.base, a.fleet
+    if a.arms:
+        labels = dict(ARMS)
+        ARMS = [(t, labels.get(t, t)) for t in a.arms.split(",")]
+        LEARNED = [t for t, _ in ARMS[1:]]
+    win = (lambda d: d.get("window_start_h") == a.window) if a.window is not None else (lambda d: d.get("window_start_h") is None)
+    energy = latest(ENERGY, lambda d: d["db"], lambda d: not d.get("dr_reserve") and win(d))
+    energy_res = latest(ENERGY, lambda d: d["db"], lambda d: bool(d.get("dr_reserve")) and win(d))
     days = latest(DAYS, lambda d: d["db"])
     rows = {}
     for s in seeds:
@@ -110,11 +128,11 @@ def main() -> None:
         save = [r["base"] - (r["base"] if tag == "base" else r["arms"][tag]["usd"]) for r in clean.values()]
         beat_b = sum(1 for x in save if x > 0.005)
         beat_s = sum(1 for r in clean.values()
-                     if tag != "base" and r["arms"][tag]["usd"] < r["arms"]["p801shape"]["usd"] - 0.005)
+                     if tag != "base" and r["arms"][tag]["usd"] < r["arms"][ARMS[0][0]]["usd"] - 0.005)
         gaps = [(r["base"] - (r["pf_res"] if r["pf_res"] is not None else r["pf"])) for r in clean.values()]
         share = sum(save) / sum(gaps) if sum(gaps) > 0 else float("nan")
         print(f"{lab} | {sum(bills) / n:.2f} | {sum(save) / n:+.2f} | {beat_b} of {n} | "
-              f"{'' if tag in ('base', 'p801shape') else f'{beat_s} of {n}'} | {share:.0%}")
+              f"{'' if tag in ('base', ARMS[0][0]) else f'{beat_s} of {n}'} | {share:.0%}")
     # the quantile chosen without the day it is graded on
     print("\nthe forecast chosen on the other seeds' bills (leave one seed out), and its bill on the seed left out")
     picks, saves, vs_shape = {}, [], []
@@ -125,9 +143,9 @@ def main() -> None:
         best = min(LEARNED, key=lambda t: sum(clean[o]["arms"][t]["usd"] for o in others) / len(others))
         picks[s] = best
         saves.append(r["base"] - r["arms"][best]["usd"])
-        vs_shape.append(r["arms"]["p801shape"]["usd"] - r["arms"][best]["usd"])
+        vs_shape.append(r["arms"][ARMS[0][0]]["usd"] - r["arms"][best]["usd"])
         print(f"{s}: chose {best}, {r['arms'][best]['usd']:.2f} against the day plan's {r['base']:.2f} "
-              f"({r['base'] - r['arms'][best]['usd']:+.2f}) and the shape's {r['arms']['p801shape']['usd']:.2f}")
+              f"({r['base'] - r['arms'][best]['usd']:+.2f}) and the shape's {r['arms'][ARMS[0][0]]['usd']:.2f}")
     if saves:
         print(f"chosen leave-one-seed-out: mean saving on the day plan {sum(saves) / len(saves):+.2f} USD a day "
               f"({sum(1 for x in saves if x > 0.005)} of {len(saves)} seeds), on the shape "
