@@ -247,7 +247,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0797 — GENERATED, not a log
+## Index, 0134–0798 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0559, 0560, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0603, 0604, 0605, 0606, 0607, 0608, 0609, 0610, 0611, 0612, 0613, 0614, 0615, 0616, 0617, 0618, 0619, 0620, 0621, 0622, 0623, 0624, 0625, 0626, 0627, 0628, 0629, 0630, 0631, 0632, 0633, 0634, 0635, 0636, 0637, 0638, 0639, 0640, 0641, 0642, 0643, 0644, 0647, 0648, 0649, 0650, 0651, 0652, 0653, 0654, 0655, 0656, 0657, 0658, 0659, 0690, 0691, 0692, 0693, 0694, 0695, 0696, 0698, 0699, 0714, 0738, 0749, 0755, 0759, 0760, 0761, 0762, 0763, 0764, 0765, 0766, 0767, 0768, 0769, 0780, 0781, 0782, 0783, 0784, 0785, 0792, 0793, 0794, 0795, 0796, 0797 — which are indexed below as well as logged above; the log row is
@@ -871,7 +871,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0795](db/migrations/0795_the_agents_charge_order_becomes_a_background_challenger_and_the_agent_wakes_for_exceptions.sql) | `20261105213348` | yes — ledger | **The agent's charge order becomes a background challenger: checked and graded as before, never standing; and |
 | [0796](db/migrations/0796_the_scorecard_does_not_count_a_service_done_on_a_second_try_as_left_open.sql) | `20261106012557` | yes — ledger | **The throughput scorecard does not count a service that was done on a second try as work left open at |
 | [0797](db/migrations/0797_the_battery_holds_its_call_reserve_only_as_the_window_nears_and_its_floor_can_stop_rising_at_a_surge.sql) | `20261106025354` | yes — ledger | **The battery holds its demand-response reserve only as the call window nears, and its floor can stop rising at |
+| [0798](db/migrations/0798_the_arm_is_offered_a_car_again_after_the_ticks_completions_and_a_car_off_its_post_is_let_go_at_once.sql) | `PENDING` | no — pending | **The post's arm is offered a charging car again after the tick's completions, and a routine whose car has left |
 
-605 migrations indexed.
+606 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

@@ -836,7 +836,8 @@ repo_manifest(version, name, file) AS (
     ('20261105210912'::text, 'the_end_state_fingerprint_sets_aside_the_leg_id_the_cleaning_arm_mints'::text, '0794_the_end_state_fingerprint_sets_aside_the_leg_id_the_cleaning_arm_mints.sql'::text),
     ('20261105213348'::text, 'the_agents_charge_order_becomes_a_background_challenger_and_the_agent_wakes_for_exceptions'::text, '0795_the_agents_charge_order_becomes_a_background_challenger_and_the_agent_wakes_for_exceptions.sql'::text),
     ('20261106012557'::text, 'the_scorecard_does_not_count_a_service_done_on_a_second_try_as_left_open'::text, '0796_the_scorecard_does_not_count_a_service_done_on_a_second_try_as_left_open.sql'::text),
-    ('20261106025354'::text, 'the_battery_holds_its_call_reserve_only_as_the_window_nears_and_its_floor_can_stop_rising_at_a_surge'::text, '0797_the_battery_holds_its_call_reserve_only_as_the_window_nears_and_its_floor_can_stop_rising_at_a_surge.sql'::text)
+    ('20261106025354'::text, 'the_battery_holds_its_call_reserve_only_as_the_window_nears_and_its_floor_can_stop_rising_at_a_surge'::text, '0797_the_battery_holds_its_call_reserve_only_as_the_window_nears_and_its_floor_can_stop_rising_at_a_surge.sql'::text),
+    ('PENDING'::text, 'the_arm_is_offered_a_car_again_after_the_ticks_completions_and_a_car_off_its_post_is_let_go_at_once'::text, '0798_the_arm_is_offered_a_car_again_after_the_ticks_completions_and_a_car_off_its_post_is_let_go_at_once.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
