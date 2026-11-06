@@ -79,6 +79,30 @@ transition rate, and P2's first published metrics named it by mistake: the dolla
 applies the first-block rate to the whole peak; NES bills the kW above 1,000 at $21.78, about $8.60 a day more at a
 1,679 kW peak, for every policy whose peak is over 1,000 kW.
 
+### At 150 cars (one day, seed 171717; solved 2026-11-05 23:45-23:56 UTC = 5:45-5:56 PM CT)
+
+normal_day at 150 cars (`ottoq_cap_normal_day_150_171717`, 324 visits, 20 charger faults), the engine's own job order,
+CP-SAT 120 s per solve on 2 workers beside four running lab days (so "best found" is weaker than at 116 cars, where it
+had 4 workers on a quieter machine; the bound is still a bound).
+
+| minutes from arrival to ready | real day | best found | proven bound |
+|---|---:|---:|---:|
+| all cars, the engine's own job order | 29,100 | 20,993 (-28%) | 17,505 (-40%) |
+| the same, and no owner worse than the real day | 29,100 | 20,950 | 17,505 |
+
+| owner, minutes to ready | real day | that owner's own best (others free) |
+|---|---:|---:|
+| Tesla Robotaxi TN (160 visits) | 12,430 | 7,630 (-39%) |
+| Waymo Nashville (97 visits) | 11,090 | 7,129 (-36%) |
+| Zoox Southeast (67 visits) | 5,580 | 2,918 (-48%) |
+
+- The gap holds its size as the depot fills: 28% found at 150 cars against 30% at 116 (engine order), and the bound is
+  40% under the real day against 37%. Holding every owner to no worse still costs almost nothing (20,950 against 20,993).
+- Due times: at most 39 of the 89 cars with a due time can be ready by it (18 were). Minutes past the 30-minute contract
+  wait: 4,290 on the real day, 1,459 found on that measure alone.
+- The fleet was grown by cloning the twin's own cars round-robin, so the owner mix at 150 cars is not the 116-car mix
+  (Tesla's cars carry 160 of the 324 visits): per-owner figures compare within a day, not across fleet sizes.
+
 ### A typical day's shape is most of the battery's prize (two lab days; the last solve written 2026-11-05 5:22 PM CT)
 
 A second lab day, normal_day at 116 cars with seed 424242 (`ottoq_cap_normal_day_116_424242`, run `663d217a`), gives each
