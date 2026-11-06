@@ -210,3 +210,37 @@ ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
   run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
+
+-- The capacity curve on whole days (2026-11-06). Evidence: lab/research/p2_capacity/README.md, results.jsonl.
+INSERT INTO public.ottoq_research_findings
+  (slug, phase, item, kind, status, title, summary, metrics, evidence, run_ids, measured_at)
+VALUES
+  ('p2-capacity-curve', 'P2', 'P2.1', 'measurement', 'measured',
+   'The twin depot comfortably serves about 116 cars; at 150 it saturates near 22 visits an hour, and the two service bays are the wall',
+   'Whole lab days (24 hours from 6 AM) at the twin depot as built, 30 fast-charger posts, 2 service bays and 3 wash bays, two '
+   'seeds a size, on production''s engine. At 116 cars the depot takes 18-20 visits an hour and 78-91% of the cars that '
+   'charge do so within the 30-minute contract wait (median wait 5-15 minutes). At 150 cars it takes 20-22 an hour and only '
+   '62-64% charge within the wait (the slowest 5% wait 1.5-2.5 hours); at 200 cars 22-23 an hour and 37-39%, with a median '
+   'wait over 1.5 hours. More cars still put more to work in the afternoon, about 77 at 116, 98 at 150 and 115 at 200, '
+   'against the work side''s ask of 87% of the fleet, so each car added past 116 adds less. The wall the engine''s own '
+   'constraint board names most is the two service bays (93% busy over the whole day at 200 cars); the posts are full at '
+   'the afternoon peak and lose time to charger faults. On the busy-day stress scenario (trouble codes at 7 times the rate) '
+   'the bays fail at today''s 116 cars: by noon 96 charged cars wait for maintenance or calibration, which no car leaves '
+   'without. Levers, none of them on a vehicle: a third service bay, fewer charger faults, better ordering of who gets a '
+   'post. Two seeds a size: where the curve bends, not a range.',
+   '{"depot": "twin as built: 30 dcfc posts, 2 service bays, 3 wash bays", "days": "normal_day, 24 h from 6 AM CT, arrivals 9 AM-5 AM",
+     "by_fleet": {
+       "116": {"seeds": [171717, 424242], "visits_per_hour": [19.8, 18.3], "within_contract_wait_pct": [91, 78], "wait_p50_min": [5, 15], "wait_p95_min": [35, 60],
+               "afternoon_out_pct": [68, 65], "service_bays_busy_pct": [74, 60], "posts_busy_pct": [48, 48]},
+       "150": {"seeds": [171717, 424242], "visits_per_hour": [22.3, 19.8], "within_contract_wait_pct": [62, 64], "wait_p50_min": [20, 20], "wait_p95_min": [95, 151],
+               "afternoon_out_pct": [69, 61], "service_bays_busy_pct": [74, 80], "posts_busy_pct": [58, 55]},
+       "200": {"seeds": [171717, 424242], "visits_per_hour": [22.7, 22.4], "within_contract_wait_pct": [39, 37], "wait_p50_min": [98, 110], "wait_p95_min": [310, 330],
+               "afternoon_out_pct": [59, 56], "service_bays_busy_pct": [93, 93], "posts_busy_pct": [72, 67]}},
+     "afternoon_asked_pct": 87, "busy_day_116": {"cars_inside_at_noon_waiting_for_bays": 96, "owing_mechanical_pm": 71, "owing_sensor_calibration": 37,
+     "in_depot_at_6pm": 111}, "phantom_visits_left_out": "G520"}',
+   'otto-q-core lab/research/p2_capacity/README.md (the capacity curve on whole days), results.jsonl, steady_state.py, uptime_by_hour.sql',
+   '{}', '2026-11-06 05:17:03+00')
+ON CONFLICT (depot_id, slug) DO UPDATE SET
+  phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
+  title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
+  run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
