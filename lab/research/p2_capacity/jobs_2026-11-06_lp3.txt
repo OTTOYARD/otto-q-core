@@ -1,0 +1,8 @@
+# The battery planner (battery_lp.py, guarded) on a held-out seed, two ways (2026-11-06; LAB ONLY; ottoq_lab as it stands):
+# lp3shape forecasts on another day's load shape (seed 171717), as lp2 did; lp3learn forecasts the next four hours' EV
+# charging with a model fitted on the other audited days (forecast_learn.py --save --exclude-seed <this seed>), the shape
+# beyond. Bases: normal_day_116_424242_fcbase and normal_day_116_515151_fcaudit (the day plan as it runs).
+normal_day_116_424242_lp3shape|--fleet 116 --scenario normal_day --seed 424242 --battery-lp lab/research/p2_capacity/load_shape_normal_day_116_171717.json --tag lp3shape
+normal_day_116_424242_lp3learn|--fleet 116 --scenario normal_day --seed 424242 --battery-lp lab/research/p2_capacity/load_shape_normal_day_116_171717.json --battery-lp-learned lab/research/p2_capacity/forecast_model_ex424242.json --tag lp3learn
+normal_day_116_515151_lp3shape|--fleet 116 --scenario normal_day --seed 515151 --battery-lp lab/research/p2_capacity/load_shape_normal_day_116_171717.json --tag lp3shape
+normal_day_116_515151_lp3learn|--fleet 116 --scenario normal_day --seed 515151 --battery-lp lab/research/p2_capacity/load_shape_normal_day_116_171717.json --battery-lp-learned lab/research/p2_capacity/forecast_model_ex515151.json --tag lp3learn
