@@ -398,6 +398,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_bess_forecast_refit(p_depot_id uuid, p_q
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO 'twin', 'ottoq', 'public', 'extensions'
+ SET client_min_messages TO 'warning'
 AS $function$
 /* 0803: fit the battery's learned load forecast from the depot's logged ticks (ottoq_bess_forecast_log) and write one row
    of ottoq_bess_forecast_models. The examples: every logged tick and each half hour h ahead (0-7); the target the mean EV

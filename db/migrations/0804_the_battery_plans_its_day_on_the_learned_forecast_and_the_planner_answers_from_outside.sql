@@ -58,7 +58,10 @@
 --       every bess_planner_every_ticks ticks the orchestrator fires the next plan from the plan it just solved, inside its
 --       own block (a failure is a warning, never a stopped tick). The battery follows a landed plan only where
 --       energy_mpc_follow is on too, under 0799's rules, inside its own limits; otherwise the day plan decides, as it does
---       until the first plan lands and whenever the planner is late.
+--       until the first plan lands and whenever the planner is late. A plan is followed at the step its clock is in, so a
+--       plan that lands a tick or two late is followed from its later steps; one older than energy_mpc_max_plan_age_steps
+--       steps (0799, 3 at the default: 15 minutes of 5-minute steps) is not. A fast demo whose ticks outrun the edge
+--       function's round trip would leave the day plan deciding; the ledger's latency says when to raise that dial.
 --   (e) Five dials, all a person's (rule 10), none agent-writable: bess_planner_enabled (0..1, 0), bess_planner_every_ticks
 --       (1..12, 1), bess_planner_horizon_h (2..48, 36), bess_planner_step_min (1..30, 5; a divisor of 30 or 5 is used) and
 --       bess_planner_beyond (0..1, 0).
@@ -387,7 +390,9 @@ BEGIN
          predicted_peak_kw = CASE WHEN v_err IS NULL THEN round(v_peak, 1) END,
          solver = COALESCE(p_response->>'solver', solver), status = COALESCE(p_response->>'status', 'error'),
          latency_ms = p_latency_ms, plan_state = v_state,
-         detail = COALESCE(detail, '{}'::jsonb) || jsonb_build_object(
+         -- the request is the row's until it is answered; after, its md5 stands for it (a request is some 20 kB a tick)
+         detail = (COALESCE(detail, '{}'::jsonb) - 'request') || jsonb_build_object(
+           'request_md5', md5((detail->'request')::text),
            'landed_at', clock_timestamp(), 'http_status', p_http_status, 'error', v_err,
            'objective_usd', p_response->'objective_usd', 'solve_ms', p_response->'solve_ms', 'peak_kw', p_response->'peak_kw')
    WHERE id = p.id;

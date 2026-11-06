@@ -95,12 +95,32 @@ fails, and whenever a demand-response call is live.
 PENDING: the six seeds through the production chain (`p36e2e`), and the comparison of what the planner reads beyond the
 forecast's four hours.
 
-## 6. Next
+## 6. B2: the battery grades itself in hindsight (0805, pending)
 
-- **B2: the battery grades itself in hindsight, every night.** The same planner run on the day's realized load is
-  perfect foresight. Set beside the realized bill and the no-battery bill, it gives a daily capture share: how much of what
-  could have been saved was saved, and which half hour cost the most. A measurement for people (rule 10). It is also what
-  an agent's nightly battery review would read.
+Each local day a run's battery ran is graded once the day is over. 0805 does this hourly, behind
+`bess_hindsight_enabled`. The planner run on the day's realized load is perfect foresight. Set beside the realized bill and
+the no-battery bill, every one priced at the realized end charge, it gives:
+
+- **capture share** = (no battery − realized) / (no battery − perfect foresight): how much of what could have been saved
+  was saved;
+- **left on the table** = realized − perfect foresight;
+- the half hours that set each peak.
+
+Each row is kept whole in `ottoq_bess_hindsight` (evidence), so it outlives the demo-run purge of the snapshots it was built
+from. `ottoq_bess_hindsight_board` is the one line a day a person or an agent reads.
+
+Lab check: on the same window the grade bills exactly as the research lab's `bound_energy.py` ($1,539.61 realized,
+$1,497.50 no battery). Two lab days were graded end to end: 52.8% captured with $211.74 left on the first; −1.6% with
+$473.70 left on the second.
+
+## 7. Next
+
+- **The agent's part.** Production's agent wakes for exceptions (0795). A battery exception is the realized EV draw
+  running above the learned forecast's upper band for an hour, a planner failing or late, or a day graded below its usual
+  capture share. On such an exception, the agent would read the hindsight board and the forecast's grades, explain to a
+  person what happened, and propose (never apply, rule 10) a change for a person to approve. One example is the planner
+  reading the learned day's 80th percentile on a day the depot runs hot.
+- **OTTO-Command.** A read-only battery tool ("how did the battery do yesterday?") answering from the board.
 - **Publish the followed plan.** When the battery follows the planner, the site's forward schedule (`ottoq_publish_day_plan`,
   0442) should carry the planner's plan rather than none.
 - **Monthly billing.** The lab bills a day for its own peak. The tariff bills the month's highest half hour, and the request
