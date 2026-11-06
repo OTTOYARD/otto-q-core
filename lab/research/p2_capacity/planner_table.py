@@ -68,7 +68,11 @@ def main() -> None:
         b_end = energy[b]["battery"]["soc_end_kwh"]
         b_sc = days[b]["scorecard"]
         r = {"base": energy[b]["real_plan"]["total_usd"], "base_peak": energy[b]["real_plan"]["peak30_kw"],
-             "none": energy[b]["no_battery"]["total_usd"], "pf": energy[b]["perfect_foresight"]["total_usd"],
+             "base_at": energy[b]["real_plan"].get("peak30_ends_ct", "?"),
+             "start": energy[b]["battery"]["soc_start_kwh"], "end": b_end,
+             # no battery at the day plan's end-of-day charge: the stored energy the plan bought, at its replacement cost
+             "none": energy[b]["no_battery"]["total_usd"] + (b_end - energy[b]["battery"]["soc_start_kwh"]) * RATE_STORED,
+             "pf": energy[b]["perfect_foresight"]["total_usd"],
              "pf_res": energy_res[b]["perfect_foresight"]["total_usd"] if b in energy_res else None, "arms": {}}
         for tag, _ in ARMS:
             d = db(s, tag)
@@ -78,17 +82,18 @@ def main() -> None:
             adj = e["real_plan"]["total_usd"] - (e["battery"]["soc_end_kwh"] - b_end) * RATE_STORED
             same = all(strip_ids(days[d]["scorecard"].get(k)) == strip_ids(b_sc.get(k)) for k in CAR_KEYS)
             r["arms"][tag] = {"usd": round(adj, 2), "peak": e["real_plan"]["peak30_kw"], "same": same,
-                              "end": e["battery"]["soc_end_kwh"]}
+                              "end": e["battery"]["soc_end_kwh"], "at": e["real_plan"].get("peak30_ends_ct", "?")}
         rows[s] = r
 
-    print("bill at the base day's battery end state, USD (half-hour peak kW); * = the cars differ from the base day's")
+    print("bill at the base day's battery end state, USD (half-hour peak kW, the half hour's end CT); no battery at the "
+          "same end-of-day charge; * = the cars differ from the base day's")
     head = ["seed", "day plan", "no battery"] + [lab for _, lab in ARMS] + ["perfect foresight", "PF with the reserve"]
     print(" | ".join(head))
     for s, r in rows.items():
-        cells = [s, f"{r['base']:.2f} ({r['base_peak']:.0f})", f"{r['none']:.2f}"]
+        cells = [s, f"{r['base']:.2f} ({r['base_peak']:.0f}, {r['base_at']})", f"{r['none']:.2f}"]
         for tag, _ in ARMS:
             a = r["arms"].get(tag)
-            cells.append("" if a is None else f"{a['usd']:.2f} ({a['peak']:.0f}){'' if a['same'] else ' *'}")
+            cells.append("" if a is None else f"{a['usd']:.2f} ({a['peak']:.0f}, {a['at']}){'' if a['same'] else ' *'}")
         cells += [f"{r['pf']:.2f}", "" if r["pf_res"] is None else f"{r['pf_res']:.2f}"]
         print(" | ".join(cells))
 
