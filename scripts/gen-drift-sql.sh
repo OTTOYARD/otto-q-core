@@ -99,13 +99,18 @@ else
 fi
 block+="$END"
 
-# Splice it in, replacing everything between the markers inclusive.
+# Splice it in, replacing everything between the markers inclusive. The block goes through a file, not the
+# environment: one environment string is capped at 128 KiB (MAX_ARG_STRLEN), and the block passed that at 616
+# migrations (2026-11-06, "awk: Argument list too long").
 tmp="$(mktemp)"
-BLOCK="$block" awk -v b="$BEGIN" -v e="$END" '
-  index($0, b) == 1 { print ENVIRON["BLOCK"]; skipping = 1; next }
+blockfile="$(mktemp)"
+printf '%s\n' "$block" > "$blockfile"
+awk -v b="$BEGIN" -v e="$END" -v bf="$blockfile" '
+  index($0, b) == 1 { while ((getline line < bf) > 0) print line; close(bf); skipping = 1; next }
   index($0, e) == 1 { skipping = 0; next }
   !skipping { print }
 ' "$TARGET" > "$tmp"
+rm -f "$blockfile"
 
 if ! grep -q -- "$BEGIN" "$tmp"; then
   rm -f "$tmp"
