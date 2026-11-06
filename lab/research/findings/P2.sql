@@ -312,3 +312,48 @@ ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
   run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
+
+-- E8, the battery planned on a learned forecast, ten seeds with every car the same (2026-11-06). Evidence:
+-- lab/research/p2_capacity/planner_0801_lab_2026-11-06.md, planner_table.py, forecast_learn.py --offset-from cv.
+-- Published 2026-11-06 09:38:50 UTC.
+INSERT INTO public.ottoq_research_findings
+  (slug, phase, item, kind, status, title, summary, metrics, evidence, run_ids, measured_at)
+VALUES
+  ('p2-battery-planner-ten-seeds', 'P2', 'E8', 'measurement', 'measured',
+   'A battery planned on a learned forecast with its 80th-percentile band saves $129 a day on the twin''s day plan, on all eight clean lab seeds',
+   'On ten lab days at the twin depot (a normal day, 116 cars, 12 hours from 6 AM, one per seed), the battery was planned '
+   'five more ways and re-planned every five minutes: a linear program over the rest of the day, holding the 600 kWh call '
+   'reserve, followed through the MPC bridge, on a forecast of the depot''s load. With 0801 in the lab a seed''s cars '
+   'reproduce, so every plan was set against the day plan car for car; on eight seeds every car''s day was identical (on '
+   'the other two a 2:25 PM demand-response call let the battery move cars, so they are left out). Each bill is at the day '
+   'plan''s end-of-day charge. The day plan averaged $1,440 a day and perfect foresight $1,182. Planned on a copy of '
+   'another day''s load the battery saved $86 a day; on a learned forecast of the next four hours (fitted without the day '
+   'it plans, 3-12 times closer than the day plan''s own forecast) also $86. On that forecast plus the 80th percentile of '
+   'the misses it makes on days it never saw, it saved $129 a day, on all eight seeds: half the day plan''s gap to perfect '
+   'foresight. Chosen without the day it is graded on, the same band saves $122. A peak-shaving battery needs to know how '
+   'high the next half hours could go, not their average. What is left is mostly the battery''s charge at 6 AM, which a '
+   '12-hour day cannot plan; whole days with the overnight refill are next. Production''s optimizer already takes a '
+   'forecast and a band; the request production sends it carries neither. Lab days, one scenario: a reading of the '
+   'method on the twin, not a forecast of production''s bill.',
+   '{"scenario": "normal_day", "fleet": 116, "hours": 12, "lab_template": "ottoq_lab_0801 (production''s engine through 0797, with 0801)",
+     "seeds": [171717, 424242, 515151, 616161, 717171, 818181, 919191, 282828, 373737, 464646],
+     "clean_seeds": [171717, 424242, 515151, 616161, 818181, 919191, 373737, 464646],
+     "left_out": {"717171": "a 2:25 PM demand-response call, cap 534 kW", "282828": "the same call, cap 230 kW"},
+     "mean_bill_usd": {"day_plan": 1439.85, "another_days_shape": 1354.24, "learned_mean": 1353.47, "mean_plus_q80": 1310.77,
+                       "mean_plus_q90": 1316.70, "mean_plus_q95": 1333.48, "perfect_foresight": 1181.83},
+     "saving_on_day_plan_usd": {"another_days_shape": 85.61, "learned_mean": 86.38, "mean_plus_q80": 129.08,
+                                "mean_plus_q90": 123.15, "mean_plus_q95": 106.37},
+     "seeds_beating_day_plan": {"another_days_shape": 8, "learned_mean": 7, "mean_plus_q80": 8, "mean_plus_q90": 7, "mean_plus_q95": 7},
+     "share_of_gap_to_perfect_foresight_closed": {"another_days_shape": 0.33, "learned_mean": 0.33, "mean_plus_q80": 0.50,
+                                                 "mean_plus_q90": 0.48, "mean_plus_q95": 0.41},
+     "chosen_leave_one_seed_out": {"q80": 7, "q90": 1, "saving_on_day_plan_usd": 122.14, "saving_on_shape_usd": 36.52},
+     "forecast": {"model": "ridge per half hour ahead on the day plan''s own terms and the hour, fitted on the other seeds'' days",
+                  "mae_kw_learned": "105-152", "mae_kw_day_plan_rule": "334-1279",
+                  "band_coverage_out_of_sample": {"q80": 0.802, "q90": 0.900, "q95": 0.949}},
+     "billing": "each day pays its own highest 30-minute average at 21.40 USD/kW-month over 30 days, TOU energy, 0.02 USD/kWh wear; every bill at the base day''s end-of-day charge (0.070 USD/kWh)"}',
+   'otto-q-core lab/research/p2_capacity/planner_0801_lab_2026-11-06.md, results.jsonl (tags b801, p801*), lab/research/p2_perfect_day/bound_energy.jsonl',
+   '{}', '2026-11-06 09:35:17+00')
+ON CONFLICT (depot_id, slug) DO UPDATE SET
+  phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
+  title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
+  run_ids = EXCLUDED.run_ids, measured_at = EXCLUDED.measured_at, updated_at = now();
