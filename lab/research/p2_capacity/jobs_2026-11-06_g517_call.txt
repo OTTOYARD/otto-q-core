@@ -1,0 +1,4 @@
+# 0797's safety test with the call actually fired (whatif_forced_dr_call.sql: dr_event_cascade's 400 kW reduction at 2 PM),
+# the battery 25% full at 6 AM; dials off and on. LAB_DB=ottoq_lab_0797.
+dr_event_cascade_116_171717_g517def_call|--fleet 116 --scenario dr_event_cascade --seed 171717 --lab-sql lab/research/p2_capacity/whatif_forced_dr_call.sql --tag g517def_call
+dr_event_cascade_116_171717_g517on_call|--fleet 116 --scenario dr_event_cascade --seed 171717 --dial bess_plan_dr_reserve_lead_h=3 --dial bess_reserve_uncertainty_weight=0 --lab-sql lab/research/p2_capacity/whatif_forced_dr_call.sql --tag g517on_call
