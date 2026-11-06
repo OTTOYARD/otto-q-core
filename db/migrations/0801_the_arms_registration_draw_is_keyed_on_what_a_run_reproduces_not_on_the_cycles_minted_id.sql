@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261106174327
 -- migration-name:    the_arms_registration_draw_is_keyed_on_what_a_run_reproduces_not_on_the_cycles_minted_id
 --
 -- 0801  **The robotic arm's registration draw is keyed on what a run reproduces, not on the cycle's minted id.** (G525)
@@ -163,3 +163,15 @@ VALUES ('0801_the_arms_registration_draw_is_keyed_on_what_a_run_reproduces_not_o
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-06 at 17:43:27 UTC (11:43 AM CT), ledger 20261106174327, through apply_migration, on Chase's word
+--   ("Yes, just keep building", read 2026-11-06 by 13:20 UTC, in reply to the report that asked to approve 0798-0802
+--   and gave the go-ahead for the battery planner), each apply confirmed by Chase at the connector's prompt (he opened
+--   it at "Okay I have supabase open in a tab. Now what?"). Nothing live, the function at the md5 P1 names, adbc96a5,
+--   and 30 marked fast-charger posts and 116 cars at the twin depot for V2 (read 17:42:34 UTC). The text sent was this
+--   file before its version line and this footer were set: 9,986 characters (10,646 bytes), md5 5b57d228, equal to the
+--   ledger's statements[1] read back. P0, P1, the anchor, V1, V2 and V3 passed inside the apply. Read back at 17:43:34
+--   UTC: md5(prosrc) of twin.ottoq_arm_registration_check 3e2bfb19, the body the lab ran; no probe cycle left in
+--   twin.arm_cycles; the lineage row TRUE/TRUE at 17:43:27 (rule 12: testing is off, so nothing acts on either flag).
+--   On at the twin depot from the next demo run. The lab template ottoq_lab took the same text and ledger row at 17:57
+--   UTC.

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261106174023
 -- migration-name:    plan_follow_yields_to_a_live_grid_call_and_follows_a_plan_only_while_it_is_fresh
 --
 -- 0799  **The battery's plan-follow mode yields to a live demand-response call, and follows an outside plan only while it
@@ -186,3 +186,15 @@ VALUES ('0799_plan_follow_yields_to_a_live_grid_call_and_follows_a_plan_only_whi
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-06 at 17:40:23 UTC (11:40 AM CT), ledger 20261106174023, through apply_migration, on Chase's word
+--   ("Yes, just keep building", read 2026-11-06 by 13:20 UTC, in reply to the report that asked to approve 0798-0802
+--   and gave the go-ahead for the battery planner), each apply confirmed by Chase at the connector's prompt (he opened
+--   it at "Okay I have supabase open in a tab. Now what?"). Nothing live (no run running, in flight 0) and the
+--   orchestrator at the md5 P1 names, 8f425cda (read 17:39:40 UTC). The text sent was this file before its version line
+--   and this footer were set: 11,518 characters (12,388 bytes), md5 2272affb, equal to the ledger's statements[1] read
+--   back. P0, P1, P2, the anchors, V1, V2 and V3 passed inside the apply. Read back at 17:40:29 UTC: md5(prosrc) of
+--   public.ottoq_energy_orchestrate db31a8c6, the body ottoq_lab_0799 ran; the dial energy_mpc_max_plan_age_steps
+--   catalogued (3, 1..48, not agent-writable) and set nowhere; one '0799_pre' snapshot; the lineage row FALSE/FALSE at
+--   17:40:23. Plan-follow stays off at the twin depot (energy_mpc_follow 0, §5). The lab template ottoq_lab took the
+--   same text and ledger row at 17:57 UTC.

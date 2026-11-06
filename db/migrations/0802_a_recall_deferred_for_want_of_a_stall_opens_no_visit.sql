@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261106174427
 -- migration-name:    a_recall_deferred_for_want_of_a_stall_opens_no_visit
 --
 -- 0802  **A recall that is deferred for want of a stall opens no visit.** (G520)
@@ -204,3 +204,14 @@ VALUES ('0802_a_recall_deferred_for_want_of_a_stall_opens_no_visit', true, true,
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-06 at 17:44:27 UTC (11:44 AM CT), ledger 20261106174427, through apply_migration, on Chase's word
+--   ("Yes, just keep building", read 2026-11-06 by 13:20 UTC, in reply to the report that asked to approve 0798-0802
+--   and gave the go-ahead for the battery planner), each apply confirmed by Chase at the connector's prompt (he opened
+--   it at "Okay I have supabase open in a tab. Now what?"). Nothing live, the function at the md5 P1 names, 7017c172,
+--   116 twin cars with no open visit and no stall at the probe depot (read 17:43:43 UTC). The text sent was this file
+--   before its version line and this footer were set: 12,206 characters (12,868 bytes), md5 a481ee79, equal to the
+--   ledger's statements[1] read back. P0, P1, the anchors, V1, V2 and V3 passed inside the apply. Read back at 17:44:33
+--   UTC: md5(prosrc) of ottoq.ottoq_book_appointment ed54d6d4, the body the lab ran; no visit left by the probe and
+--   none open; the lineage row TRUE/TRUE at 17:44:27 (rule 12: testing is off). On at the twin depot from the next demo
+--   run. The lab template ottoq_lab took the same text and ledger row at 17:57 UTC.

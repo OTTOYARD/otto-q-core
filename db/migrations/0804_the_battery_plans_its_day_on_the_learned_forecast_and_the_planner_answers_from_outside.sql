@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261106175051
 -- migration-name:    the_battery_plans_its_day_on_the_learned_forecast_and_the_planner_answers_from_outside
 --
 -- 0804  **The battery plans its day on the learned forecast, and the planner answers from outside.** (B1, the production
@@ -636,3 +636,18 @@ VALUES ('0804_the_battery_plans_its_day_on_the_learned_forecast_and_the_planner_
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-06 at 17:50:51 UTC (11:50 AM CT), ledger 20261106175051, through apply_migration, on Chase's word
+--   ("Yes, just keep building", read 2026-11-06 by 13:20 UTC, in reply to the report that asked to approve 0798-0802
+--   and gave the go-ahead for the battery planner), each apply confirmed by Chase at the connector's prompt (he opened
+--   it at "Okay I have supabase open in a tab. Now what?"). Nothing live; 0799 and 0803 applied and the orchestrator at
+--   the md5 P1 names, 5d607e3c (read 17:47:59 UTC). The text sent was this file before its version line and this footer
+--   were set: 46,252 characters (48,173 bytes), md5 1c68022b, equal to the ledger's statements[1] read back. P0, P1,
+--   the anchor, V1, V2 and V3 passed inside the apply; V2 had the twin's latest run to probe (edf611ad, operator_demo,
+--   completed; the day plan solves at its clock, read 17:58:31 UTC). Read back at 17:51:01 UTC: md5(prosrc) of the
+--   orchestrator 5ae3ea63, the body ottoq_lab_0804 ran; the five dials catalogued (enabled 0, every_ticks 1, horizon_h
+--   36, step_min 5, beyond 0), none agent-writable; no bess_planner plan, no ledger row and an empty pg_net queue (the
+--   probe's plans, landings and request rolled back with it); the lineage row FALSE/FALSE at 17:50:51. Off at the twin
+--   depot: the edge function ottoq-battery-planner is not deployed and ottoq-intelligence #21 is not merged, and no
+--   model is usable yet (docs/BATTERY_PLANNER.md §4). The lab template ottoq_lab took the same text and ledger row at
+--   17:57 UTC (V2 skipped there: the template holds no run).

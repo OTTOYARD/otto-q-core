@@ -56,9 +56,9 @@ solvers run. So production needs the forecast in the database, the solver in the
 
 | piece | where | state |
 |---|---|---|
-| 0799: plan-follow yields to a live grid call; follows a plan only while it is fresh | otto-q-core `db/migrations/0799_…` | **pending** (lab-tested) |
-| 0803: the per-tick forecast log, the nightly refit, the forecast reader | otto-q-core `db/migrations/0803_…` | **pending** (lab-tested) |
-| 0804: the planner's request, fire and landing; the orchestrator's hook | otto-q-core `db/migrations/0804_…` | **pending** (lab-tested) |
+| 0799: plan-follow yields to a live grid call; follows a plan only while it is fresh | otto-q-core `db/migrations/0799_…` | **applied** 2026-11-06 17:40:23 UTC (ledger `20261106174023`) |
+| 0803: the per-tick forecast log, the nightly refit, the forecast reader | otto-q-core `db/migrations/0803_…` | **applied** 17:47:49 UTC (`20261106174749`); the log **on** at the twin depot since 17:54:09 UTC |
+| 0804: the planner's request, fire and landing; the orchestrator's hook | otto-q-core `db/migrations/0804_…` | **applied** 17:50:51 UTC (`20261106175051`); its dials off |
 | `ottoq-battery-planner` edge function | otto-q-core `edge-functions/ottoq-battery-planner/` | **not deployed** |
 | `POST /optimize/battery-plan` | ottoq-intelligence PR #21 (`claude/battery-planner`) | **draft PR** |
 
@@ -75,12 +75,13 @@ solvers run. So production needs the forecast in the database, the solver in the
 
 ## 4. Switching it on (each step a person's)
 
-1. Apply 0799, then 0803, then 0804. Each checks for the one before it.
+1. ~~Apply 0799, then 0803, then 0804.~~ **Done** 2026-11-06, 11:40-11:50 AM CT, each on Chase's confirmation at the connector's prompt.
 2. Merge ottoq-intelligence #21 and run its deploy workflow. `/health` lists `battery_planner`.
 3. Deploy `ottoq-battery-planner` with verify_jwt on. It reads the service's address from `ottoq_service_endpoints` and the
    token secret `ottoq-cpsat-propose` already uses.
-4. Turn on `bess_forecast_learning` = 1 at the twin depot. From then on every demo run logs its ticks. The nightly refit
-   writes a usable model once it has 3 local days with 200 examples at every half hour ahead.
+4. ~~Turn on `bess_forecast_learning` = 1 at the twin depot.~~ **Done** at 17:54:09 UTC (11:54 AM CT) under "Chase (delegated
+   to Claude Code: 0803)". From then on every demo run logs its ticks. The nightly refit (5:26 AM CT) writes a usable model
+   once it has 3 local days with 200 examples at every half hour ahead.
 5. Once a usable model exists (`SELECT public.ottoq_bess_forecast_model('11111111-…')` is not null), turn on
    `bess_planner_enabled` = 1 and `energy_mpc_follow` = 1 at the twin depot.
 6. Check one demo run:
@@ -124,7 +125,7 @@ a local copy of the service and landed the answer. The battery followed it on 99
 
 Two of the four could cost more than no battery.
 
-## 6. B2: the battery grades itself in hindsight (0805, pending)
+## 6. B2: the battery grades itself in hindsight (0805, applied 2026-11-06 17:53:21 UTC; its dial off)
 
 Each local day a run's battery ran is graded once the day is over. 0805 does this hourly, behind
 `bess_hindsight_enabled`. The planner run on the day's realized load is perfect foresight. Set beside the realized bill and
@@ -137,6 +138,11 @@ the no-battery bill, every one priced at the realized end charge, it gives:
 
 Each row is kept whole in `ottoq_bess_hindsight` (evidence), so it outlives the demo-run purge of the snapshots it was built
 from. `ottoq_bess_hindsight_board` is the one line a day a person or an agent reads.
+
+**Not yet safe on a fast-ticking demo run (G527, read on production's data 2026-11-06 17:58 UTC).** The latest twin run,
+edf611ad, ticked about every 12 sim-seconds: its 74 snapshots span 14.6 sim-minutes, the segment rounds its step to 0
+minutes and its demand window to one snapshot, and the slice is billed at a full day's demand rate. The lab's days tick
+every 5 minutes and never showed it. `bess_hindsight_enabled` stays off until the fix (0806) is applied.
 
 Lab check: on the same window the grade bills exactly as the research lab's `bound_energy.py` ($1,539.61 realized,
 $1,497.50 no battery). Two lab days were graded end to end: 52.8% captured with $211.74 left on the first; −1.6% with

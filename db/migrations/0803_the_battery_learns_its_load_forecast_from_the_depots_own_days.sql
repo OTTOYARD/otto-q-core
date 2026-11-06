@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261106174749
 -- migration-name:    the_battery_learns_its_load_forecast_from_the_depots_own_days
 --
 -- 0803  **The battery learns its load forecast from the depot's own days.** (B1, the production battery planner's first
@@ -823,3 +823,20 @@ VALUES ('0803_the_battery_learns_its_load_forecast_from_the_depots_own_days', fa
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-06 at 17:47:49 UTC (11:47 AM CT), ledger 20261106174749, through apply_migration, on Chase's word
+--   ("Yes, just keep building", read 2026-11-06 by 13:20 UTC, in reply to the report that asked to approve 0798-0802
+--   and gave the go-ahead for the battery planner), each apply confirmed by Chase at the connector's prompt (he opened
+--   it at "Okay I have supabase open in a tab. Now what?"). Nothing live, and the orchestrator 0799's, db31a8c6 (read
+--   17:40:29 UTC). The text sent was this file before its version line and this footer were set: 53,290 characters
+--   (55,661 bytes), md5 8979d59d, equal to the ledger's statements[1] read back. P0, P1, the anchor, V1, V2, V3 and V4
+--   passed inside the apply. Read back at 17:47:59 UTC: md5(prosrc) of the orchestrator 5d607e3c (V4's body on 0799's);
+--   the cron job ottoq-learn-bess-forecast-nightly as job 802, 26 11 * * *, active; the dial bess_forecast_learning
+--   catalogued (0, 0..1, not agent-writable); both tables empty (V3's synthetic rows rolled back); the lineage row
+--   FALSE/FALSE at 17:47:49. SWITCHED ON at the twin depot at 17:54:09 UTC (11:54 AM CT) by ottoq_policy_set('depot',
+--   twin depot, 'bess_forecast_learning', 1, 'Chase (delegated to Claude Code: 0803)'): receipt ok, applied 1,
+--   unclamped, no run live; the latest twin run (edf611ad) reads 1 (17:54:35 UTC). Every demo run logs its ticks from
+--   its first tick; the nightly refit writes a row once the log holds an example (a tick with 6 snapshots in a half hour
+--   ahead of it) and a usable model once it has 3 local days with 200 examples at every half hour ahead. Not yet seen in a demo run (rule 12): none has started since. The lab
+--   template ottoq_lab took the same text and ledger row at 17:57 UTC (its V3 synthetic refit usable, 4 folds, 6,696
+--   examples, largest out-of-sample miss 3.8 kW) and the dial at 17:57:49 UTC.

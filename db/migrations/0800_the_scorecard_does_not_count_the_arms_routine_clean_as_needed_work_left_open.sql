@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261106174158
 -- migration-name:    the_scorecard_does_not_count_the_arms_routine_clean_as_needed_work_left_open
 --
 -- 0800  **The throughput scorecard does not count the post's arm's routine clean as needed work left open at departure.**
@@ -156,3 +156,14 @@ VALUES ('0800_the_scorecard_does_not_count_the_arms_routine_clean_as_needed_work
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-06 at 17:41:58 UTC (11:41 AM CT), ledger 20261106174158, through apply_migration, on Chase's word
+--   ("Yes, just keep building", read 2026-11-06 by 13:20 UTC, in reply to the report that asked to approve 0798-0802
+--   and gave the go-ahead for the battery planner), each apply confirmed by Chase at the connector's prompt (he opened
+--   it at "Okay I have supabase open in a tab. Now what?"). Nothing live, and the function at the md5 P1 names,
+--   81757b43 (read 17:40:49 UTC, with 358 runs holding visits for V2 to compare; one pass of the function over all of
+--   them took 6.1 s). The text sent was this file before its version line and this footer were set: 9,418 characters
+--   (10,082 bytes), md5 1d080556, equal to the ledger's statements[1] read back. P0, P1, the anchor, V1, V2 and V3
+--   passed inside the apply. Read back at 17:42:18 UTC: md5(prosrc) of public.ottoq_visit_outcomes 6f53b127, the body
+--   the lab ran; one '0800_pre' snapshot; the lineage row FALSE/FALSE at 17:41:58. A reporting fix, on as applied. The
+--   lab template ottoq_lab took the same text and ledger row at 17:57 UTC.

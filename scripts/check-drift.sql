@@ -838,13 +838,13 @@ repo_manifest(version, name, file) AS (
     ('20261106012557'::text, 'the_scorecard_does_not_count_a_service_done_on_a_second_try_as_left_open'::text, '0796_the_scorecard_does_not_count_a_service_done_on_a_second_try_as_left_open.sql'::text),
     ('20261106025354'::text, 'the_battery_holds_its_call_reserve_only_as_the_window_nears_and_its_floor_can_stop_rising_at_a_surge'::text, '0797_the_battery_holds_its_call_reserve_only_as_the_window_nears_and_its_floor_can_stop_rising_at_a_surge.sql'::text),
     ('20261106132144'::text, 'the_arm_is_offered_a_car_again_after_the_ticks_completions_and_a_car_off_its_post_is_let_go_at_once'::text, '0798_the_arm_is_offered_a_car_again_after_the_ticks_completions_and_a_car_off_its_post_is_let_go_at_once.sql'::text),
-    ('PENDING'::text, 'plan_follow_yields_to_a_live_grid_call_and_follows_a_plan_only_while_it_is_fresh'::text, '0799_plan_follow_yields_to_a_live_grid_call_and_follows_a_plan_only_while_it_is_fresh.sql'::text),
-    ('PENDING'::text, 'the_scorecard_does_not_count_the_arms_routine_clean_as_needed_work_left_open'::text, '0800_the_scorecard_does_not_count_the_arms_routine_clean_as_needed_work_left_open.sql'::text),
-    ('PENDING'::text, 'the_arms_registration_draw_is_keyed_on_what_a_run_reproduces_not_on_the_cycles_minted_id'::text, '0801_the_arms_registration_draw_is_keyed_on_what_a_run_reproduces_not_on_the_cycles_minted_id.sql'::text),
-    ('PENDING'::text, 'a_recall_deferred_for_want_of_a_stall_opens_no_visit'::text, '0802_a_recall_deferred_for_want_of_a_stall_opens_no_visit.sql'::text),
-    ('PENDING'::text, 'the_battery_learns_its_load_forecast_from_the_depots_own_days'::text, '0803_the_battery_learns_its_load_forecast_from_the_depots_own_days.sql'::text),
-    ('PENDING'::text, 'the_battery_plans_its_day_on_the_learned_forecast_and_the_planner_answers_from_outside'::text, '0804_the_battery_plans_its_day_on_the_learned_forecast_and_the_planner_answers_from_outside.sql'::text),
-    ('PENDING'::text, 'the_battery_grades_its_day_against_perfect_foresight'::text, '0805_the_battery_grades_its_day_against_perfect_foresight.sql'::text)
+    ('20261106174023'::text, 'plan_follow_yields_to_a_live_grid_call_and_follows_a_plan_only_while_it_is_fresh'::text, '0799_plan_follow_yields_to_a_live_grid_call_and_follows_a_plan_only_while_it_is_fresh.sql'::text),
+    ('20261106174158'::text, 'the_scorecard_does_not_count_the_arms_routine_clean_as_needed_work_left_open'::text, '0800_the_scorecard_does_not_count_the_arms_routine_clean_as_needed_work_left_open.sql'::text),
+    ('20261106174327'::text, 'the_arms_registration_draw_is_keyed_on_what_a_run_reproduces_not_on_the_cycles_minted_id'::text, '0801_the_arms_registration_draw_is_keyed_on_what_a_run_reproduces_not_on_the_cycles_minted_id.sql'::text),
+    ('20261106174427'::text, 'a_recall_deferred_for_want_of_a_stall_opens_no_visit'::text, '0802_a_recall_deferred_for_want_of_a_stall_opens_no_visit.sql'::text),
+    ('20261106174749'::text, 'the_battery_learns_its_load_forecast_from_the_depots_own_days'::text, '0803_the_battery_learns_its_load_forecast_from_the_depots_own_days.sql'::text),
+    ('20261106175051'::text, 'the_battery_plans_its_day_on_the_learned_forecast_and_the_planner_answers_from_outside'::text, '0804_the_battery_plans_its_day_on_the_learned_forecast_and_the_planner_answers_from_outside.sql'::text),
+    ('20261106175321'::text, 'the_battery_grades_its_day_against_perfect_foresight'::text, '0805_the_battery_grades_its_day_against_perfect_foresight.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

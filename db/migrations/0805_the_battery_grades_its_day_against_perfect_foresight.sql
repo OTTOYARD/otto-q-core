@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261106175321
 -- migration-name:    the_battery_grades_its_day_against_perfect_foresight
 --
 -- 0805  **The battery grades each day it ran against perfect foresight.** (B2, the battery's hindsight; the measurement an
@@ -570,3 +570,19 @@ VALUES ('0805_the_battery_grades_its_day_against_perfect_foresight', false, fals
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-06 at 17:53:21 UTC (11:53 AM CT), ledger 20261106175321, through apply_migration, on Chase's word
+--   ("Yes, just keep building", read 2026-11-06 by 13:20 UTC, in reply to the report that asked to approve 0798-0802
+--   and gave the go-ahead for the battery planner), each apply confirmed by Chase at the connector's prompt (he opened
+--   it at "Okay I have supabase open in a tab. Now what?"). Nothing live. The text sent was this file before its
+--   version line and this footer were set: 39,010 characters (41,228 bytes), md5 dc1cb633, equal to the ledger's
+--   statements[1] read back. P0, P1 and V1 passed inside the apply; V1 had the twin's latest run with a day of 24
+--   snapshots or more to probe (edf611ad, 2026-11-04, 74 snapshots). Read back at 17:53:41 UTC: the cron job
+--   ottoq-bess-hindsight-sweep as job 803, 17 * * * *, active; the dial bess_hindsight_enabled catalogued (0, 0..1, not
+--   agent-writable); no grade, no ledger row and an empty pg_net queue; the lineage row FALSE/FALSE at 17:53:21. Off at
+--   the twin depot until the edge function is deployed. AND A DEFECT FOUND ON PRODUCTION'S DATA AFTER THE APPLY (G527,
+--   read 17:58:31 UTC): edf611ad ticked about every 12 sim-seconds, so its 74 snapshots span 14.6 sim-minutes; the
+--   segment rounds the mean step to 0 minutes, its demand window to one snapshot, and bills the slice at a full day's
+--   demand rate (realized $622.25, no battery $833.32). The lab's days tick every 5 minutes and never showed it. The
+--   dial stays off until the fix (0806) is applied. The lab template ottoq_lab took the same text and ledger row at
+--   17:57 UTC (V1 skipped there: the template holds no run).
