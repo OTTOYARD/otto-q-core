@@ -109,6 +109,10 @@ def main() -> None:
                     help="the demand-response reserve the linear program holds from 2 PM (the day plan's 600)")
     ap.add_argument("--battery-lp-no-guard", action="store_true",
                     help="plan to the edge of the billed peak on the shape alone (the first cut, which ratcheted it)")
+    ap.add_argument("--commit-each-tick", action="store_true",
+                    help="commit after the set-up and after every tick, as production does (no row versions or "
+                         "subtransactions pile up inside one day-long transaction, which is what makes a lab day's "
+                         "late ticks slow); a restart still redoes the whole day, since the replica is cloned anew")
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--out", default=os.path.join(HERE, "results.jsonl"))
     a = ap.parse_args()
@@ -183,6 +187,8 @@ def main() -> None:
         patches[os.path.basename(f)] = hashlib.md5(body.encode()).hexdigest()
     t0 = time.time()
     walls, err, ticks = [], None, 0
+    if a.commit_each_tick:   # the set-up, the run and every what-if land before the first tick
+        conn.commit()
     for k in range(a.ticks):
         st = conn.execute("SELECT status, tick_count, sim_clock_current FROM ottoq_sim_runs WHERE sim_run_id = %s",
                           (run,)).fetchone()
@@ -190,15 +196,25 @@ def main() -> None:
             break
         if lp is not None:
             lp.plan_now(k)
-        conn.execute("SAVEPOINT t")
-        try:
-            conn.execute("SELECT count(*) FROM public.ottoq_sim_advance_tick(%s)", (run,))
-            conn.execute("RELEASE SAVEPOINT t")
-            ticks += 1
-        except psycopg.Error as e:
-            conn.execute("ROLLBACK TO SAVEPOINT t")
-            err = {"tick": st[1] + 1, "error": str(e)[:400]}
-            break
+        if a.commit_each_tick:
+            try:
+                conn.execute("SELECT count(*) FROM public.ottoq_sim_advance_tick(%s)", (run,))
+                conn.commit()
+                ticks += 1
+            except psycopg.Error as e:
+                conn.rollback()
+                err = {"tick": st[1] + 1, "error": str(e)[:400]}
+                break
+        else:
+            conn.execute("SAVEPOINT t")
+            try:
+                conn.execute("SELECT count(*) FROM public.ottoq_sim_advance_tick(%s)", (run,))
+                conn.execute("RELEASE SAVEPOINT t")
+                ticks += 1
+            except psycopg.Error as e:
+                conn.execute("ROLLBACK TO SAVEPOINT t")
+                err = {"tick": st[1] + 1, "error": str(e)[:400]}
+                break
         if (k + 1) % 12 == 0:
             print(f"tick {k + 1}/{a.ticks} at {time.time() - t0:.0f} s", flush=True)
         if (k + 1) % a.sample_every == 0:
@@ -231,7 +247,7 @@ def main() -> None:
            "battery_lp": ({"shape": os.path.basename(a.battery_lp), "dr_kwh": a.battery_lp_dr_kwh, "plans": lp.plans,
                            "guard": lp.guard}
                           if lp is not None else None),
-           "ticks": ticks, "step_min": a.step, "sim_start": a.sim_start, "wall_s": wall_s, "clone_s": round(clone_s, 1),
+           "ticks": ticks, "commit_each_tick": a.commit_each_tick, "step_min": a.step, "sim_start": a.sim_start, "wall_s": wall_s, "clone_s": round(clone_s, 1),
            "error": err, "scorecard": score, "owners": owners, "resources": resources, "walls": walls}
     with open(a.out, "a") as f:
         f.write(json.dumps(out, default=str) + "\n")
