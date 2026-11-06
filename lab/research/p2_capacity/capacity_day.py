@@ -51,11 +51,11 @@ WITH o AS (SELECT * FROM public.ottoq_visit_outcomes(%(run)s)),
               -- ottoq_charge_wait_min, starts there). wait_* below keep the first measure, from the call; wait_gate_*
               -- and over_contract_wait_gate are the contract's. A car in the depot when its visit opened is at the gate.
               COALESCE((SELECT min(e.sim_clock_at) FROM ottoq_events e
-                         WHERE e.entity_id = o.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                         WHERE e.entity_type = 'vehicle' AND e.entity_id = o.vehicle_id AND e.event_type = 'vehicle.state_changed'
                            AND COALESCE(e.payload->>'to', e.payload->'diff'->'current_state'->>'to') = 'arrived_at_gate'
                            AND e.sim_clock_at >= o.arrived_at AND (o.departed_at IS NULL OR e.sim_clock_at <= o.departed_at)),
                        CASE WHEN (SELECT COALESCE(e.payload->>'to', e.payload->'diff'->'current_state'->>'to')
-                                    FROM ottoq_events e WHERE e.entity_id = o.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                                    FROM ottoq_events e WHERE e.entity_type = 'vehicle' AND e.entity_id = o.vehicle_id AND e.event_type = 'vehicle.state_changed'
                                      AND e.sim_clock_at <= o.arrived_at AND (e.payload ? 'to' OR e.payload->'diff' ? 'current_state')
                                    ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1)
                                  NOT IN ('deployed', 'en_route_to_depot', 'en_route_to_deployment', 'offline', 'tow_requested')
@@ -331,6 +331,15 @@ def main() -> None:
     wall_s = round(time.time() - t0, 1)
     lo, hi = one("SELECT sim_clock_start FROM ottoq_sim_runs WHERE sim_run_id = %s", (run,)), \
         one("SELECT sim_clock_current FROM ottoq_sim_runs WHERE sim_run_id = %s", (run,))
+    # 2026-11-06: the planner's statistics before the day's readers. A day's tables are written from a template's tiny
+    # ones and autovacuum may not have analyzed them yet when the last tick commits; planned on those statistics the
+    # owners' readers ran over eight minutes on a 24-hour day, against 0.6 s once analyzed
+    if commit_mode:
+        conn.commit()
+        conn.autocommit = True
+        for tbl in ("ottoq_events", "ottoq_visit_needs", "ocpp_sessions", "ottoq_stall_bookings", "ottoq_vehicle_dispatches"):
+            conn.execute(f"ANALYZE {tbl}")
+        conn.autocommit = False
     score = one("SELECT public.ottoq_throughput_scorecard(%s)", (run,))
     cols = None
     with conn.cursor() as cur:

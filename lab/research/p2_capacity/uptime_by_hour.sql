@@ -7,7 +7,7 @@ o0 AS (SELECT x.* FROM r, public.ottoq_visit_outcomes(r.run) x),
 o AS (SELECT o0.* FROM o0  -- G520: a visit the twin opened while its car was still out at work, which never departed,
        -- is not a visit (the car came home later, on a visit of its own); counted, it doubles the car and takes its later charge
        WHERE NOT (o0.departed_at IS NULL AND (SELECT COALESCE(e.payload->>'to', e.payload->'diff'->'current_state'->>'to')
-                    FROM ottoq_events e WHERE e.entity_id = o0.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                    FROM ottoq_events e WHERE e.entity_type = 'vehicle' AND e.entity_id = o0.vehicle_id AND e.event_type = 'vehicle.state_changed'
                      AND e.sim_clock_at <= o0.arrived_at AND (e.payload ? 'to' OR e.payload->'diff' ? 'current_state')
                    ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) IN ('deployed', 'en_route_to_deployment'))),
 fleet AS (SELECT count(*)::numeric AS n FROM vehicles WHERE home_depot_id = '11111111-1111-1111-1111-111111111111' AND category = 'autonomous'),

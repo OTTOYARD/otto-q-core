@@ -41,7 +41,7 @@ o0 AS (SELECT x.* FROM r, public.ottoq_visit_outcomes(r.run) x),
 o AS (SELECT o0.* FROM o0  -- G520: a visit the twin opened while its car was still out at work, which never departed,
        -- is not a visit (the car came home later, on a visit of its own); counted, it doubles the car and takes its later charge
        WHERE NOT (o0.departed_at IS NULL AND (SELECT COALESCE(e.payload->>'to', e.payload->'diff'->'current_state'->>'to')
-                    FROM ottoq_events e WHERE e.entity_id = o0.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                    FROM ottoq_events e WHERE e.entity_type = 'vehicle' AND e.entity_id = o0.vehicle_id AND e.event_type = 'vehicle.state_changed'
                      AND e.sim_clock_at <= o0.arrived_at AND (e.payload ? 'to' OR e.payload->'diff' ? 'current_state')
                    ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) IN ('deployed', 'en_route_to_deployment'))),
 sla AS (SELECT DISTINCT ON (s.fleet_operator_id) s.fleet_operator_id, s.max_queue_wait_minutes
@@ -56,11 +56,11 @@ w AS (SELECT o.*, fo.name AS owner, sla.max_queue_wait_minutes AS contract_wait,
              -- ottoq_charge_wait_min, which starts at the gate). The first arrival at the gate after the call and not
              -- after the car left; a car already in the depot when its visit opened is at the gate from the start.
              COALESCE((SELECT min(e.sim_clock_at) FROM ottoq_events e
-                        WHERE e.entity_id = o.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                        WHERE e.entity_type = 'vehicle' AND e.entity_id = o.vehicle_id AND e.event_type = 'vehicle.state_changed'
                           AND COALESCE(e.payload->>'to', e.payload->'diff'->'current_state'->>'to') = 'arrived_at_gate'
                           AND e.sim_clock_at >= o.arrived_at AND (o.departed_at IS NULL OR e.sim_clock_at <= o.departed_at)),
                       CASE WHEN (SELECT COALESCE(e.payload->>'to', e.payload->'diff'->'current_state'->>'to')
-                                   FROM ottoq_events e WHERE e.entity_id = o.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                                   FROM ottoq_events e WHERE e.entity_type = 'vehicle' AND e.entity_id = o.vehicle_id AND e.event_type = 'vehicle.state_changed'
                                     AND e.sim_clock_at <= o.arrived_at AND (e.payload ? 'to' OR e.payload->'diff' ? 'current_state')
                                   ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1)
                                 NOT IN ('deployed', 'en_route_to_depot', 'en_route_to_deployment', 'offline', 'tow_requested')
@@ -106,7 +106,7 @@ o0 AS (SELECT x.* FROM r, public.ottoq_visit_outcomes(r.run) x),
 o AS (SELECT o0.* FROM o0  -- G520: a visit the twin opened while its car was still out at work, which never departed,
        -- is not a visit (the car came home later, on a visit of its own); counted, it doubles the car and takes its later charge
        WHERE NOT (o0.departed_at IS NULL AND (SELECT COALESCE(e.payload->>'to', e.payload->'diff'->'current_state'->>'to')
-                    FROM ottoq_events e WHERE e.entity_id = o0.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                    FROM ottoq_events e WHERE e.entity_type = 'vehicle' AND e.entity_id = o0.vehicle_id AND e.event_type = 'vehicle.state_changed'
                      AND e.sim_clock_at <= o0.arrived_at AND (e.payload ? 'to' OR e.payload->'diff' ? 'current_state')
                    ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) IN ('deployed', 'en_route_to_deployment'))),
 fleet AS (SELECT count(*)::numeric AS n FROM vehicles
