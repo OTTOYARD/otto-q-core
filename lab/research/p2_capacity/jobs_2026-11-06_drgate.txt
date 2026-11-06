@@ -1,0 +1,6 @@
+# A demand-response call holds cars from chargers (2026-11-06; LAB ONLY; LAB_DB=ottoq_lab_0801). On two of ten 0801 base days
+# a 2:25 PM call (cap 534 kW on 717171, 230 kW on 282828) deferred 16 and 23 cars for 240 and 670 car-minutes while the
+# battery stood 88-91% full. The gate counts each charging car at a band of its charge (0727 measured it at a median 1.5x
+# the metered power); 0727's dial counts it at its charger's meter. The same two days with the dial on at run scope.
+normal_day_116_717171_metered|--fleet 116 --scenario normal_day --seed 717171 --dial site_cap_gate_metered=1 --tag metered
+normal_day_116_282828_metered|--fleet 116 --scenario normal_day --seed 282828 --dial site_cap_gate_metered=1 --tag metered

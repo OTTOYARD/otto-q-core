@@ -1,0 +1,15 @@
+# The 2:25 PM demand-response call forced on six seeds whose afternoons stayed under 32 C (whatif_force_dr_call.sql; 2026-11-06;
+# LAB ONLY; LAB_DB=ottoq_lab_0801), each with the charge gate as it runs (counting a charging car at a band of its charge)
+# and with 0727's dial counting it at its charger's meter (site_cap_gate_metered=1).
+normal_day_116_171717_drforce|--fleet 116 --scenario normal_day --seed 171717 --lab-sql lab/research/p2_capacity/whatif_force_dr_call.sql --tag drforce
+normal_day_116_171717_drforcemet|--fleet 116 --scenario normal_day --seed 171717 --lab-sql lab/research/p2_capacity/whatif_force_dr_call.sql --dial site_cap_gate_metered=1 --tag drforcemet
+normal_day_116_424242_drforce|--fleet 116 --scenario normal_day --seed 424242 --lab-sql lab/research/p2_capacity/whatif_force_dr_call.sql --tag drforce
+normal_day_116_424242_drforcemet|--fleet 116 --scenario normal_day --seed 424242 --lab-sql lab/research/p2_capacity/whatif_force_dr_call.sql --dial site_cap_gate_metered=1 --tag drforcemet
+normal_day_116_515151_drforce|--fleet 116 --scenario normal_day --seed 515151 --lab-sql lab/research/p2_capacity/whatif_force_dr_call.sql --tag drforce
+normal_day_116_515151_drforcemet|--fleet 116 --scenario normal_day --seed 515151 --lab-sql lab/research/p2_capacity/whatif_force_dr_call.sql --dial site_cap_gate_metered=1 --tag drforcemet
+normal_day_116_616161_drforce|--fleet 116 --scenario normal_day --seed 616161 --lab-sql lab/research/p2_capacity/whatif_force_dr_call.sql --tag drforce
+normal_day_116_616161_drforcemet|--fleet 116 --scenario normal_day --seed 616161 --lab-sql lab/research/p2_capacity/whatif_force_dr_call.sql --dial site_cap_gate_metered=1 --tag drforcemet
+normal_day_116_818181_drforce|--fleet 116 --scenario normal_day --seed 818181 --lab-sql lab/research/p2_capacity/whatif_force_dr_call.sql --tag drforce
+normal_day_116_818181_drforcemet|--fleet 116 --scenario normal_day --seed 818181 --lab-sql lab/research/p2_capacity/whatif_force_dr_call.sql --dial site_cap_gate_metered=1 --tag drforcemet
+normal_day_116_919191_drforce|--fleet 116 --scenario normal_day --seed 919191 --lab-sql lab/research/p2_capacity/whatif_force_dr_call.sql --tag drforce
+normal_day_116_919191_drforcemet|--fleet 116 --scenario normal_day --seed 919191 --lab-sql lab/research/p2_capacity/whatif_force_dr_call.sql --dial site_cap_gate_metered=1 --tag drforcemet
