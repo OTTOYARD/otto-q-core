@@ -845,8 +845,8 @@ repo_manifest(version, name, file) AS (
     ('20261106174749'::text, 'the_battery_learns_its_load_forecast_from_the_depots_own_days'::text, '0803_the_battery_learns_its_load_forecast_from_the_depots_own_days.sql'::text),
     ('20261106175051'::text, 'the_battery_plans_its_day_on_the_learned_forecast_and_the_planner_answers_from_outside'::text, '0804_the_battery_plans_its_day_on_the_learned_forecast_and_the_planner_answers_from_outside.sql'::text),
     ('20261106175321'::text, 'the_battery_grades_its_day_against_perfect_foresight'::text, '0805_the_battery_grades_its_day_against_perfect_foresight.sql'::text),
-    ('PENDING'::text, 'the_battery_planner_keeps_time_on_a_tick_shorter_than_its_step'::text, '0806_the_battery_planner_keeps_time_on_a_tick_shorter_than_its_step.sql'::text),
-    ('PENDING'::text, 'the_battery_grade_reads_its_day_in_five_minute_steps_whatever_the_tick'::text, '0807_the_battery_grade_reads_its_day_in_five_minute_steps_whatever_the_tick.sql'::text)
+    ('20261106183952'::text, 'the_battery_planner_keeps_time_on_a_tick_shorter_than_its_step'::text, '0806_the_battery_planner_keeps_time_on_a_tick_shorter_than_its_step.sql'::text),
+    ('20261106184139'::text, 'the_battery_grade_reads_its_day_in_five_minute_steps_whatever_the_tick'::text, '0807_the_battery_grade_reads_its_day_in_five_minute_steps_whatever_the_tick.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

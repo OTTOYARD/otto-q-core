@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261106183952
 -- migration-name:    the_battery_planner_keeps_time_on_a_tick_shorter_than_its_step
 --
 -- 0806  **The battery planner keeps time on a tick shorter than its step.** (G528; B1, the production battery planner)
@@ -295,3 +295,15 @@ VALUES ('0806_the_battery_planner_keeps_time_on_a_tick_shorter_than_its_step', f
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-06 at 18:39:52 UTC (12:39 PM CT), ledger 20261106183952, through apply_migration, on Chase's word
+--   ("Yes, just keep building", read 2026-11-06 by 13:20 UTC, the go-ahead for the battery planner), confirmed by Chase
+--   at the connector's prompt. Nothing live (no run running, in flight 0), the fire and the request at the md5s P1
+--   names (157cf1a4, adb6cee3) and the orchestrator 0804's (5ae3ea63), read 18:37:23 UTC. The text sent was this file
+--   before its version line and this footer were set: 20,086 characters, md5 23aed2c0, equal to the ledger's
+--   statements[1] read back. P0, P1, the anchors, V1, V2 (on edf611ad, the twin's latest run) and V3 passed inside the
+--   apply. Read back at 18:39:59 UTC: md5(prosrc) of the fire 7131ebaf and of the request 8b1a0f5c, the bodies
+--   ottoq_lab_0806m ran; two '0806_pre' snapshots; no bess_planner plan, no forecast model and an empty pg_net queue
+--   (the probe rolled back); the lineage row FALSE/FALSE at 18:39:52. The planner's dials stay off at the twin depot
+--   until #21 is deployed with the edge function and a model is usable. The lab template ottoq_lab took the same text
+--   and ledger row at 18:42 UTC.

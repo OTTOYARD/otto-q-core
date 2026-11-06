@@ -61,8 +61,8 @@ solvers run. So production needs the forecast in the database, the solver in the
 | 0804: the planner's request, fire and landing; the orchestrator's hook | otto-q-core `db/migrations/0804_…` | **applied** 17:50:51 UTC (`20261106175051`); its dials off |
 | `ottoq-battery-planner` edge function | otto-q-core `edge-functions/ottoq-battery-planner/` | **not deployed** |
 | `POST /optimize/battery-plan` | ottoq-intelligence PR #21 (`claude/battery-planner`) | **draft PR** |
-| 0806: a plan starts at the fire's clock; once per step of sim time (G528) | otto-q-core `db/migrations/0806_…` | **pending** |
-| 0807: the daily grade in 5-minute steps whatever the tick (G527) | otto-q-core `db/migrations/0807_…` | **pending** |
+| 0806: a plan starts at the fire's clock; once per step of sim time (G528) | otto-q-core `db/migrations/0806_…` | **applied** 18:39:52 UTC (`20261106183952`) |
+| 0807: the daily grade in 5-minute steps whatever the tick (G527) | otto-q-core `db/migrations/0807_…` | **applied** 18:41:39 UTC (`20261106184139`) |
 
 **Lab checks** (each in its migration's header or the PR):
 
@@ -78,7 +78,7 @@ solvers run. So production needs the forecast in the database, the solver in the
 ## 4. Switching it on (each step a person's)
 
 1. ~~Apply 0799, then 0803, then 0804.~~ **Done** 2026-11-06, 11:40-11:50 AM CT, each on Chase's confirmation at the connector's prompt.
-1b. Apply 0806 (G528: a plan starts at the fire's own clock, so a tick shorter than the plan's 5-minute step follows
+1b. ~~Apply 0806 and 0807~~ **Done** 2026-11-06, 12:39 and 12:41 PM CT. 0806 (G528: a plan starts at the fire's own clock, so a tick shorter than the plan's 5-minute step follows
    it; the planner asked once per step of sim time) and 0807 (G527: the daily grade reads its day in 5-minute steps).
    Production ticks every 2 minutes and 55 of 57 demo runs ticked under 5 sim-minutes, so without 0806 the battery
    never follows a plan there, and without 0807 a grade of a fast-ticking run means nothing. At a 5-minute tick neither
@@ -149,7 +149,7 @@ from. `ottoq_bess_hindsight_board` is the one line a day a person or an agent re
 **Not yet safe on a fast-ticking demo run (G527, read on production's data 2026-11-06 17:58 UTC).** The latest twin run,
 edf611ad, ticked about every 12 sim-seconds: its 74 snapshots span 14.6 sim-minutes, the segment rounds its step to 0
 minutes and its demand window to one snapshot, and the slice is billed at a full day's demand rate. The lab's days tick
-every 5 minutes and never showed it. `bess_hindsight_enabled` stays off until the fix (0806) is applied.
+every 5 minutes and never showed it. Fixed by 0807 (applied 18:41:39 UTC); `bess_hindsight_enabled` stays off until the edge function is deployed.
 
 Lab check: on the same window the grade bills exactly as the research lab's `bound_energy.py` ($1,539.61 realized,
 $1,497.50 no battery). Two lab days were graded end to end: 52.8% captured with $211.74 left on the first; −1.6% with

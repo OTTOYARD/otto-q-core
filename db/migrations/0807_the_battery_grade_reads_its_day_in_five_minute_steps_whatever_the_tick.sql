@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261106184139
 -- migration-name:    the_battery_grade_reads_its_day_in_five_minute_steps_whatever_the_tick
 --
 -- 0807  **The battery's daily grade reads its day in 5-minute steps, whatever the tick.** (G527; B2, the battery's
@@ -358,3 +358,14 @@ VALUES ('0807_the_battery_grade_reads_its_day_in_five_minute_steps_whatever_the_
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-06 at 18:41:39 UTC (12:41 PM CT), ledger 20261106184139, through apply_migration, on Chase's word
+--   ("Yes, just keep building", read 2026-11-06 by 13:20 UTC, the go-ahead for the battery planner), confirmed by Chase
+--   at the connector's prompt. Nothing live and the segment at the md5 P1 names, 0acfd7ce (read 18:37:23 UTC). The text
+--   sent was this file before its version line and this footer were set: 25,728 characters, md5 261a7d71, equal to the
+--   ledger's statements[1] read back. P0, P1, V1 and V2 (its synthetic days held by edf611ad, the twin's latest run)
+--   passed inside the apply. Read back at 18:41:48 UTC: md5(prosrc) of the segment fe69891a, the body the lab ran; one
+--   '0807_pre' snapshot; no synthetic snapshot or command left; edf611ad's 2026-11-04 (14.6 sim-minutes) is now not
+--   graded (the segment returns NULL); the lineage row FALSE/FALSE at 18:41:39. bess_hindsight_enabled stays off at the
+--   twin depot until the edge function is deployed. The lab template ottoq_lab took the same text and ledger row at
+--   18:42 UTC.
