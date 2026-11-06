@@ -70,16 +70,20 @@ INSERT INTO public.ottoq_research_findings
   (slug, phase, item, kind, status, title, summary, metrics, evidence, run_ids, measured_at)
 VALUES
   ('p2-battery-day-shape', 'P2', 'E5', 'measurement', 'measured',
-   'A rough idea of the day''s shape is most of the battery''s prize',
+   'A rough idea of the day''s shape is worth most of the battery''s prize, but only to a planner that plans its refill',
    'On two lab days (a normal day, 116 cars, 12 hours, two seeds), each day''s battery was planned on the other day''s '
    'charging load as its forecast, which was off by 217 kW on average, and re-planned every five minutes on what had '
    'actually happened. It came to $1,152 against the battery''s day plan''s $1,382 and perfect foresight''s $1,085 on the '
    'first day, and $1,243 against $1,543 and $1,098 on the second. Plans that see the next one to four hours exactly but '
    'assume the load then holds steady did worse on both days. Part of each gap is the day plan''s two reserves, which these '
    'plans do not hold (see the reserves finding); holding a 600 kWh demand-response reserve from 2 PM costs them $0 and $3. '
-   'The build this points to: a learned forecast of the depot''s own charging across the day, refit overnight, in the day '
-   'plan''s hands, with the AI proposing tomorrow''s adjustments from what is known (the fleet''s schedule, the weather, a '
-   'demand-response notice), which the plan takes only as a forecast. Two days: a reading, not a range.',
+   'These plans are linear programs that plan the battery''s refill along with its discharge. The twin''s day plan does '
+   'not, and given the same typical shape it moved nothing ($1,382 against $1,382; $1,301 against $1,301 on the second '
+   'day with both reserves off): the 6 AM start-up surge sets the billed half hour before the rest of the day''s forecast '
+   'can matter, and what decides the bill is how deep the battery may go into that surge. So the build is the reserves '
+   'first, then a planner that plans its own refill, then a learned forecast of the day''s shape inside it (worth $431 on '
+   'the first day to such a planner against holding the load flat), with the AI proposing tomorrow''s adjustments from '
+   'what is known, which the plan takes only as a forecast. Two days: a reading, not a range.',
    '{"scenario": "normal_day", "fleet": 116, "seeds": [171717, 424242], "hours": 12,
      "forecast": "the other lab day''s load before the battery, step by step", "forecast_mae_kw": 217.3,
      "day_1_seed_171717_usd": {"no_battery": 1698.86, "day_plan": 1382.34, "typical_day_shape": 1151.82,
@@ -88,8 +92,11 @@ VALUES
                                "next_1h_then_shape": 1207.46, "next_1h": 1378.06, "next_4h": 1313.10, "perfect": 1098.47},
      "with_600_kwh_dr_reserve_from_2pm_usd": {"day_1": {"typical_day_shape": 1151.82, "perfect": 1084.61},
                                              "day_2": {"typical_day_shape": 1245.99, "perfect": 1098.47}},
+     "day_plan_with_the_typical_shape_usd": {"day_1": 1382.20, "day_2_both_reserves_off": 1300.64,
+                                             "against": {"day_1": 1382.34, "day_2_both_reserves_off": 1301.28}},
      "billing": "each policy pays its own highest 30-minute average at 21.40 USD/kW-month (NES GSA-3 summer) over 30 days"}',
-   'otto-q-core lab/research/p2_perfect_day/bound_energy.jsonl, README.md', '{}', '2026-11-05 23:35:00+00')
+   'otto-q-core lab/research/p2_perfect_day/bound_energy.jsonl, README.md; lab/research/p2_capacity/ (tags shape, shape_dr0res0)',
+   '{}', '2026-11-06 00:30:00+00')
 ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
