@@ -41,6 +41,9 @@
 --       restore statements under '0701_pre' (1 function, 24 grants, 6 defaults).
 --   (7) the engine still signs: every SDR issued after the apply carries a signature (signed = issued; issued > 0 once
 --       any run has produced one since).
+--       READ 2026-11-07 12:21:56 UTC (6:21 AM CT): 1,991 issued since the apply, 1,991 signed, over 4 demo runs
+--       (3091816d, 5c19fd60, 73d71553 and the planner run a0001fd6), the oldest 06:23:02 UTC and the newest 12:21:47.
+--       Satisfied.
 --   (8) the API after the apply: no service_role request for any of the sixteen refused (401/403); a browser request
 --       for one, if any, refused. Run in the Supabase logs explorer over a window starting at the apply.
 --
