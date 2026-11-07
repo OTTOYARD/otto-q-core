@@ -847,7 +847,7 @@ repo_manifest(version, name, file) AS (
     ('20261106175321'::text, 'the_battery_grades_its_day_against_perfect_foresight'::text, '0805_the_battery_grades_its_day_against_perfect_foresight.sql'::text),
     ('20261106183952'::text, 'the_battery_planner_keeps_time_on_a_tick_shorter_than_its_step'::text, '0806_the_battery_planner_keeps_time_on_a_tick_shorter_than_its_step.sql'::text),
     ('20261106184139'::text, 'the_battery_grade_reads_its_day_in_five_minute_steps_whatever_the_tick'::text, '0807_the_battery_grade_reads_its_day_in_five_minute_steps_whatever_the_tick.sql'::text),
-    ('PENDING'::text, 'the_battery_forecast_is_usable_only_where_its_band_was_measured'::text, '0808_the_battery_forecast_is_usable_only_where_its_band_was_measured.sql'::text)
+    ('20261107054553'::text, 'the_battery_forecast_is_usable_only_where_its_band_was_measured'::text, '0808_the_battery_forecast_is_usable_only_where_its_band_was_measured.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

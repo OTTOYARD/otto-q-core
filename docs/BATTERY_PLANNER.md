@@ -97,7 +97,7 @@ solvers run. So production needs the forecast in the database, the solver in the
    once it has 3 local days with 200 examples at every half hour ahead. The first demo run, 640e4fab (2026-11-06,
    1:14-2:59 PM CT, 5.26 sim-hours), logged 1,249 rows for 1,249 ticks: one fold, reaching every half hour ahead (h = 7:
    478 examples).
-4b. Apply 0808 (G529) before the next demo runs. Without it, a half hour ahead that only one fold reached gets a band of
+4b. ~~Apply 0808 (G529) before the next demo runs.~~ **Done** 2026-11-07 at 05:45:53 UTC (11:45 PM CT on 11-06). Without it, a half hour ahead that only one fold reached gets a band of
    0 kW, and the model is still called usable. Two runs of an hour each would have produced exactly that model, and the
    models are append-only. With 0808, usable needs every half hour's band read from 3 folds' out-of-sample misses, so
    **each of the next two demo runs must run 4 sim-hours or more** (about 80 real minutes at the app's 3x; 640e4fab ran

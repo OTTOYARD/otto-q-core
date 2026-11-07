@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261107054553
 -- migration-name:    the_battery_forecast_is_usable_only_where_its_band_was_measured
 --
 -- 0808  **The battery's forecast is usable only where its band was measured.** (G529; B1, the production battery planner)
@@ -278,3 +278,13 @@ VALUES ('0808_the_battery_forecast_is_usable_only_where_its_band_was_measured', 
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-07 at 05:45:53 UTC (11:45 PM CT on 11-06), ledger 20261107054553, through apply_migration, on Chase's
+--   "send any supabase approvals for me now" (read 05:43 UTC), confirmed by Chase at the connector's prompt. Nothing live
+--   (no run running, in flight 0), the refit at the md5 P1 names (06e7c6cb), no forecast model at all, and 0803's
+--   lineage present, read 05:43:38 UTC. The text sent was this file before its version line and this footer were set:
+--   18,190 characters, md5 831c4290, equal to the ledger's statements[1] read back. P0, P1, V0 (the defect shown on
+--   production's own body), the anchors, V1, V2 and V3 passed inside the apply. Read back at 05:46:04 UTC: md5(prosrc) of
+--   the refit a142840c, the body the lab ran; one '0808_pre' snapshot; the lineage row FALSE/FALSE at 05:45:53; no
+--   forecast model, no synthetic log row and no temporary function left. The lab template ottoq_lab took the same text and
+--   ledger row at 05:48 UTC.
