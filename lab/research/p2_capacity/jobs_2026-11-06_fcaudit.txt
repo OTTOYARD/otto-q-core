@@ -1,0 +1,6 @@
+# The battery day plan's own forecast, graded (2026-11-06): every tick, ottoq_bess_day_plan's forecast arrays (a STABLE
+# read that changes nothing) appended to forecast_audit.jsonl, to set against what the depot then drew. Its known-session
+# term holds each charging car at its starting rate until its energy is in (ottoq_forecast_ev_known_kw loop 1); two ticks
+# into the 116-car day it read 4,706 kW for the next half hour against 2,431 kW drawn. LAB ONLY; ottoq_lab as it stands.
+normal_day_116_171717_fcaudit|--fleet 116 --scenario normal_day --seed 171717 --log-forecast lab/research/p2_capacity/forecast_audit.jsonl --tag fcaudit
+dr_event_cascade_116_171717_fcaudit_call|--fleet 116 --scenario dr_event_cascade --seed 171717 --lab-sql lab/research/p2_capacity/whatif_forced_dr_call.sql --log-forecast lab/research/p2_capacity/forecast_audit.jsonl --tag fcaudit_call

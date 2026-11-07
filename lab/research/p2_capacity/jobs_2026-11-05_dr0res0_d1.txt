@@ -1,0 +1,3 @@
+# G517 on the first day (the battery started 71% full): both reserves off, the plan otherwise as it runs. Its forecast
+# what-if (shape) moved nothing, because the 6 AM surge sets the day's billed peak before any forecast matters.
+normal_day_116_171717_dr0res0|--fleet 116 --scenario normal_day --seed 171717 --dial bess_plan_dr_reserve_kwh=0 --lab-sql lab/research/p2_capacity/whatif_reserve_no_surge_jump.sql --tag dr0res0

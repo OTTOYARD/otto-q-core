@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""A learned EV-load forecast for the battery, graded against the day plan's own (LAB ONLY; the research wing's E8 question:
+can OTTO-Q's overnight learning give the battery a better forecast than its hand-built rule?).
+
+Rule 10 lets production OTTO-Q update its estimates overnight from the day's real data, and never its rules: a forecast
+model refit each night is an estimate. This tests the idea on the lab's audited days (`capacity_day.py --log-forecast`):
+for every tick and each half hour ahead (h = 0..7), a ridge regression on what the day plan already computes at that tick
+(the cars on a charger now held at their starting rate, the cars coming home charged from their arrival, the post-aware
+queue, the last hour's draw, the building and the sun) and the hour of the day, predicting the EV charging the depot then
+drew over that half hour. Graded leave-one-day-out (fit on the other days, scored on the held-out day), against:
+  ev     the day plan's rule as it runs: max(known, queue, last hour)
+  alt    the same rule without the post-blind arrivals: max(on charger, queue, last hour) (whatif_dayplan_on_charger.sql)
+  queue  the post-aware queue term alone
+
+Only base days are used (days whose day plan ran unchanged: the known term in their log still holds the arrivals).
+Usage: /var/tmp/ottoq_lab_venv/bin/python -I lab/research/p2_capacity/forecast_learn.py [forecast_audit.jsonl] [--lam 10]
+"""
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import json
+import math
+import os
+import sys
+from collections import defaultdict
+from zoneinfo import ZoneInfo
+
+import numpy as np
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # run with -I: the sibling module
+from ev_drawn import drawn  # noqa: E402  the replica's EV series, or its committed copy (ev_drawn.jsonl)
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+CT = ZoneInfo("America/Chicago")
+AHEAD = 8
+
+
+
+
+def examples(rows: list[dict], ev: list[tuple[dt.datetime, float]]) -> list[dict]:
+    out = []
+    for r in rows:
+        clk = dt.datetime.fromisoformat(r["clock"])
+        known, queue = r.get("ev_known_kw") or [], r.get("ev_queue_kw") or []
+        active, rule = r.get("ev_active_kw") or [], r.get("ev_kw") or []
+        base, solar = r.get("base_kw") or [], r.get("solar_kw") or []
+        persist = float(r.get("ev_persist_kw") or 0)
+        for h in range(min(AHEAD, len(known), len(queue), len(rule), len(active))):
+            lo, hi = clk + dt.timedelta(minutes=30 * h), clk + dt.timedelta(minutes=30 * (h + 1))
+            got = [kw for t, kw in ev if lo < t <= hi]
+            if len(got) < 6:
+                continue
+            hr = (lo.astimezone(CT).hour + lo.astimezone(CT).minute / 60.0)
+            act, kn, q = float(active[h]), float(known[h]), float(queue[h])
+            out.append({"h": h, "y": sum(got) / len(got), "rule": float(rule[h]), "alt": max(act, q, persist), "queue": q,
+                        "x": [1.0, act, kn - act, q, persist, float(base[h]) if h < len(base) else 0.0,
+                              float(solar[h]) if h < len(solar) else 0.0,
+                              math.sin(2 * math.pi * hr / 24), math.cos(2 * math.pi * hr / 24),
+                              max(act, q, persist)]})
+    return out
+
+
+def ridge(X: np.ndarray, y: np.ndarray, lam: float) -> np.ndarray:
+    mu, sd = X[:, 1:].mean(0), X[:, 1:].std(0) + 1e-9         # standardise all but the intercept
+    Z = np.hstack([X[:, :1], (X[:, 1:] - mu) / sd])
+    P = lam * np.eye(Z.shape[1])
+    P[0, 0] = 0.0
+    w = np.linalg.solve(Z.T @ Z + P, Z.T @ y)
+    return lambda Xn: np.hstack([Xn[:, :1], (Xn[:, 1:] - mu) / sd]) @ w
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("audit", nargs="?", default=os.path.join(HERE, "forecast_audit.jsonl"))
+    ap.add_argument("--lam", type=float, default=10.0)
+    ap.add_argument("--save", help="fit on every day but --exclude-seed and write the model (per half hour ahead) here")
+    ap.add_argument("--exclude-seed", action="append", default=[], help="a seed whose days the saved model never sees")
+    ap.add_argument("--quantile", type=float,
+                    help="save an upper forecast: each half hour's mean plus this quantile of the training days' misses "
+                         "(2026-11-06: a mean forecast's smooth peaks let the planner charge into a peak it did not see)")
+    ap.add_argument("--offset-from", choices=("fit", "cv"), default="fit",
+                    help="the misses the quantile is read from: the fit's own residuals on its training days ('fit', the "
+                         "first upper forecasts), or each training day's misses when it was left out of the fit ('cv': "
+                         "out of sample, as the forecast will miss on a day it never saw)")
+    a = ap.parse_args()
+    days = defaultdict(list)
+    for line in open(a.audit):
+        if line.strip():
+            r = json.loads(line)
+            days[(r["db"], r["run"])].append(r)
+    data = {d: examples(rs, drawn(*d)) for d, rs in days.items()}
+    if a.save:   # the model the planner reads (battery_lp.py --learned): fit on the days of every other seed
+        keep = {d: ex for d, ex in data.items() if not any(f"_{sd}_" in d[0] or d[0].endswith(f"_{sd}") for sd in a.exclude_seed)}
+        model = {"lam": a.lam, "features": ["1", "on_charger", "arrivals", "queue", "last_hour", "base", "solar",
+                                            "sin_hour", "cos_hour", "rule_without_arrivals"],
+                 "days": sorted(d[0] for d in keep), "per_half_hour": []}
+        for h in range(AHEAD):
+            tr = [e for ex in keep.values() for e in ex if e["h"] == h]
+            X, y = np.array([e["x"] for e in tr]), np.array([e["y"] for e in tr])
+            mu, sd = X[:, 1:].mean(0), X[:, 1:].std(0) + 1e-9
+            Z = np.hstack([X[:, :1], (X[:, 1:] - mu) / sd])
+            P = a.lam * np.eye(Z.shape[1])
+            P[0, 0] = 0.0
+            w = np.linalg.solve(Z.T @ Z + P, Z.T @ y)
+            off = 0.0
+            if a.quantile is not None and a.offset_from == "cv":
+                res = []
+                for out_day in keep:      # each training day's misses with that day left out of the fit
+                    tr_i = [e for d, ex in keep.items() if d != out_day for e in ex if e["h"] == h]
+                    te_i = [e for e in keep[out_day] if e["h"] == h]
+                    if tr_i and te_i:
+                        f = ridge(np.array([e["x"] for e in tr_i]), np.array([e["y"] for e in tr_i]), a.lam)
+                        res.extend((np.array([e["y"] for e in te_i]) - f(np.array([e["x"] for e in te_i]))).tolist())
+                off = float(np.quantile(res, a.quantile))
+            elif a.quantile is not None:
+                off = float(np.quantile(y - Z @ w, a.quantile))
+            model["per_half_hour"].append({"h": h, "n": len(tr), "mu": mu.tolist(), "sd": sd.tolist(), "w": w.tolist(),
+                                           "offset_kw": off})
+        model["quantile"] = a.quantile
+        model["offset_from"] = a.offset_from if a.quantile is not None else None
+        with open(a.save, "w") as f:
+            json.dump(model, f)
+        print(f"saved {a.save}: fit on {len(keep)} days ({', '.join(d.removeprefix('ottoq_cap_') for d in model['days'])})")
+        return
+    print(f"{len(data)} days; leave-one-day-out ridge (lambda {a.lam}), per half hour ahead: mean absolute error, kW "
+          f"(bias in brackets)")
+    for held in data:
+        print(f"held out: {held[0].removeprefix('ottoq_cap_')} ({len(data[held])} examples)")
+        print("  ahead      day plan's rule      without arrivals         queue alone        learned")
+        for h in range(AHEAD):
+            tr = [e for d, ex in data.items() if d != held for e in ex if e["h"] == h]
+            te = [e for e in data[held] if e["h"] == h]
+            if not tr or not te:
+                continue
+            f = ridge(np.array([e["x"] for e in tr]), np.array([e["y"] for e in tr]), a.lam)
+            yhat = f(np.array([e["x"] for e in te]))
+            y = np.array([e["y"] for e in te])
+            cell = lambda p: f"{np.mean(np.abs(p - y)):6.0f} ({np.mean(p - y):+5.0f})"
+            print(f"  {30 * h:3d}-{30 * (h + 1):3d}   " + "   ".join(
+                cell(np.array([e[k] for e in te])) for k in ("rule", "alt", "queue")) + "   " + cell(yhat))
+
+
+if __name__ == "__main__":
+    main()

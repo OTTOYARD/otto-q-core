@@ -1,0 +1,23 @@
+# The lab days of 2026-11-05, in the order they matter (run_queue.sh skips the ones results.jsonl already holds).
+#
+# G517: what the battery's two reserves cost on the day they bound (seed 424242: the battery started 25% full)
+normal_day_116_424242_dr0|--fleet 116 --scenario normal_day --seed 424242 --dial bess_plan_dr_reserve_kwh=0 --tag dr0
+normal_day_116_424242_res0|--fleet 116 --scenario normal_day --seed 424242 --lab-sql lab/research/p2_capacity/whatif_reserve_no_surge_jump.sql --tag res0
+normal_day_116_424242_dr0res0|--fleet 116 --scenario normal_day --seed 424242 --dial bess_plan_dr_reserve_kwh=0 --lab-sql lab/research/p2_capacity/whatif_reserve_no_surge_jump.sql --tag dr0res0
+# the capacity curve, normal day, seed 171717 (116 and 150 done)
+normal_day_200_171717|--fleet 200 --scenario normal_day --seed 171717
+normal_day_250_171717|--fleet 250 --scenario normal_day --seed 171717
+# a second seed for the curve (116 done)
+normal_day_150_424242|--fleet 150 --scenario normal_day --seed 424242
+normal_day_200_424242|--fleet 200 --scenario normal_day --seed 424242
+# rule 14: the kernel's exit-first key (0781) off, owner by owner
+normal_day_116_171717_exit0|--fleet 116 --scenario normal_day --seed 171717 --dial charge_order_exit_first=0 --tag exit0
+normal_day_250_424242|--fleet 250 --scenario normal_day --seed 424242
+# G517 on the day the battery started 71% full
+normal_day_116_171717_dr0res0|--fleet 116 --scenario normal_day --seed 171717 --dial bess_plan_dr_reserve_kwh=0 --lab-sql lab/research/p2_capacity/whatif_reserve_no_surge_jump.sql --tag dr0res0
+# a busier day
+busy_day_116_171717|--fleet 116 --scenario busy_day --seed 171717
+busy_day_150_171717|--fleet 150 --scenario busy_day --seed 171717
+busy_day_200_171717|--fleet 200 --scenario busy_day --seed 171717
+# a third service bay where the depot is fuller
+normal_day_200_171717_svc3|--fleet 200 --scenario normal_day --seed 171717 --add-stall service_bay=1 --tag svc3

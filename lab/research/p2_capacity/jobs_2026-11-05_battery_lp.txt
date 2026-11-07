@@ -1,0 +1,5 @@
+# The battery planned as a linear program over the rest of the day, re-solved every tick on the other day's load shape,
+# followed by the engine through the MPC bridge (energy_mpc_follow = 1), with the rising floor fixed (G517's res0) and
+# the 600 kWh demand-response reserve held from 2 PM inside the plan. Compare with each day as run and with dr0res0.
+normal_day_116_424242_lp|--fleet 116 --scenario normal_day --seed 424242 --lab-sql lab/research/p2_capacity/whatif_reserve_no_surge_jump.sql --battery-lp lab/research/p2_capacity/load_shape_normal_day_116_171717.json --tag lp
+normal_day_116_171717_lp|--fleet 116 --scenario normal_day --seed 171717 --lab-sql lab/research/p2_capacity/whatif_reserve_no_surge_jump.sql --battery-lp lab/research/p2_capacity/load_shape_normal_day_116_424242.json --tag lp

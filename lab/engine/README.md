@@ -69,6 +69,8 @@ python3 -I lab/engine/lib/export_reference_data.py --export lab/engine/export/$(
 | outbound HTTP | none: neither the `http` extension nor `pg_net` is installed; `net.http_get/post/delete` return a fresh id and do nothing. So the agent's and the solvers' calls go nowhere, and a certification arm (cuOpt quiesced at run scope, 0152) runs the deterministic core alone, as in production. |
 | locale | database `ottoq_lab` is ICU `en-US` (collation version 153.121, the version production reports), `LC_COLLATE`/`LC_CTYPE` `en_US.UTF-8`, `extra_float_digits = 0`, `jit = off`, as production |
 | one deliberate difference | production's `statement_timeout` is 120 s; the lab keeps 0, because research runs are long transactions |
+| MultiXact and subtransaction caches | 64 MB offsets, 128 MB members, 64 MB subtransactions (PostgreSQL 17's defaults are 128 kB / 256 kB / 256 kB). A lab day is one transaction with a savepoint per tick, as the engine's sweep arm and pair are, so it makes MultiXacts; at the defaults five days at once spent about two thirds of their time waiting on these cluster-wide caches and slowed as their transactions grew (a 250-car day: 34 s a tick and rising, against 8.4 s for one 116-car day alone; 2026-11-05). Working memory only: no result changes. Set by `lib/lab_server.sh`, applied at a restart that never cuts a lab day short. |
+| after a container restart | the server and every lab day in flight are gone; the data directory survives. Start the server as `postgres` (`pg_ctl -D /var/tmp/ottoq_lab_pg17 -l /var/tmp/ottoq_lab_pg17/startup.log start`): it replays its WAL first (2026-11-05: about 80 s for 0.85 GB, during which `pg_ctl -w` gives up at 60 s while recovery carries on; watch `log/`). A day in flight is one transaction, so it rolls back whole and leaves nothing half-written; its replica database is left behind and is dropped by the next run of the same day. `research/p2_capacity/run_queue.sh` reruns a job list, skipping the days the results file already holds. |
 
 ## How the copy is made, and what it is not
 
@@ -100,6 +102,21 @@ A fork is a `SAVEPOINT` in an arm's transaction (`lib/lab_run.py`): run to tick 
 branch, digest it, `ROLLBACK TO SAVEPOINT`, run the next. Two things do not roll back: sequences (ids minted
 in a later branch are higher) and `gen_random_uuid()`. Thirteen atoms are blind to both; the end state is not,
 because it hashes the `robot_leg_id` 0764 mints into each cleaned visit's atoms (G510; `0794` is the fix,
-PENDING). Each branch sets `ottoq.sim_run_id` itself (the GUC hazard of `0329`/`0421`). A replica is
+in production and in this lab since 2026-11-05). Each branch sets `ottoq.sim_run_id` itself (the GUC hazard of `0329`/`0421`). A replica is
 `CREATE DATABASE … TEMPLATE ottoq_lab`, for running arms in parallel or forks longer than one transaction
 should hold.
+
+Running many lab days at once (`lab/research/p2_capacity/`): count a day's ticks from outside its transaction with
+`extensions.pg_stat_statements` (calls of `ottoq_sim_advance_tick` per database; statement statistics are recorded as
+each statement ends, not at commit), since nothing the day writes is visible until it commits. To queue work behind a
+running process, wait on its pid (`kill -0`), never on `pgrep -f <pattern>`: a waiter's own command line contains the
+pattern, so it waits on itself forever (2026-11-05).
+
+### The template's twin-depot dials follow production's (2026-11-06)
+
+`ottoq_lab` carries production's engine through 0797 (applied to the template at 03:01:10 UTC with its ledger row) and,
+from 05:52:46 UTC, production's two 0797 dials at the twin depot: `bess_plan_dr_reserve_lead_h` 3 and
+`bess_reserve_uncertainty_weight` 0, under the name production carries ("Chase (delegated to Claude Code: 0797)"), set
+once the overnight list that ran at 0797's defaults had finished. `energy_reserve_shave` (1) and `stall_cabin_robot` (2)
+match production's values. A lab day cloned from the template after 05:52 UTC runs the battery as the twin depot does.
+`ottoq_lab_0798` and `ottoq_lab_0799` are copies taken before that, each with one PENDING migration applied for its tests.

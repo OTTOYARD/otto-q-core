@@ -1,0 +1,7 @@
+# The four 200-car build-out days again (2026-11-06 07:21 UTC): their first runs finished all 288 ticks but the owners'
+# reader, planned on stale statistics, ran past ten minutes and was cancelled (the half-hourly walls live in the runner).
+# capacity_day.py now analyzes the day's tables before its readers, and the gate lookups name the entity type.
+normal_day_200_171717_24h_s3p40|--fleet 200 --scenario normal_day --seed 171717 --ticks 288 --add-stall service_bay=1 --add-stall dcfc=10 --tag 24h_s3p40
+normal_day_200_171717_24h_s4p40|--fleet 200 --scenario normal_day --seed 171717 --ticks 288 --add-stall service_bay=2 --add-stall dcfc=10 --tag 24h_s4p40
+normal_day_200_171717_24h_s4p50|--fleet 200 --scenario normal_day --seed 171717 --ticks 288 --add-stall service_bay=2 --add-stall dcfc=20 --tag 24h_s4p50
+normal_day_200_171717_24h_s3p50|--fleet 200 --scenario normal_day --seed 171717 --ticks 288 --add-stall service_bay=1 --add-stall dcfc=20 --tag 24h_s3p50

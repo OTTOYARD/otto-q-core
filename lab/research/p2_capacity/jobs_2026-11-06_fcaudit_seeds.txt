@@ -1,0 +1,7 @@
+# More audited days for the learned forecast (forecast_learn.py, 2026-11-06): normal_day at 116 cars on four fresh seeds,
+# the day plan unchanged, its forecast logged every tick (a read changes nothing). The two first audited days share seed
+# 171717 and their EV loads correlate at 0.964, so they cannot test a forecast against each other. LAB ONLY.
+normal_day_116_515151_fcaudit|--fleet 116 --scenario normal_day --seed 515151 --log-forecast lab/research/p2_capacity/forecast_audit.jsonl --tag fcaudit
+normal_day_116_616161_fcaudit|--fleet 116 --scenario normal_day --seed 616161 --log-forecast lab/research/p2_capacity/forecast_audit.jsonl --tag fcaudit
+normal_day_116_717171_fcaudit|--fleet 116 --scenario normal_day --seed 717171 --log-forecast lab/research/p2_capacity/forecast_audit.jsonl --tag fcaudit
+normal_day_116_818181_fcaudit|--fleet 116 --scenario normal_day --seed 818181 --log-forecast lab/research/p2_capacity/forecast_audit.jsonl --tag fcaudit

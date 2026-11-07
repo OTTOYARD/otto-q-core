@@ -1,0 +1,4 @@
+# The planner on the forced-call day with db/migrations/0799 (G519): plan-follow yields to the live call and follows a
+# plan only while it is fresh. Run with LAB_DB=ottoq_lab_0799 (a copy of the lab template with 0799 applied), against
+# dr_event_cascade_116_171717_lp2_call (the same day without 0799) and _g517on_call (0797 on, the day plan alone).
+dr_event_cascade_116_171717_lp2_call_0799|--fleet 116 --scenario dr_event_cascade --seed 171717 --dial bess_reserve_uncertainty_weight=0 --lab-sql lab/research/p2_capacity/whatif_forced_dr_call.sql --battery-lp lab/research/p2_capacity/load_shape_normal_day_116_424242.json --tag lp2_call_0799

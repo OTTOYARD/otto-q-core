@@ -1,0 +1,3 @@
+# The 200-car seed-171717 whole day again (2026-11-06): its 04:40 UTC restart failed at once, its replica still held by the
+# killed day's backend rolling back (DROP DATABASE: being accessed by other users).
+normal_day_200_171717_24h|--fleet 200 --scenario normal_day --seed 171717 --ticks 288 --tag 24h

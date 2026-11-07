@@ -83,6 +83,22 @@ fi
   && ! "${PSQL[@]}" -d postgres -Atc 'show shared_preload_libraries' | grep -q pg_cron \
   || { echo "refusing to build: a pg_cron scheduler is loaded on the lab server" >&2; exit 1; }
 
+# A lab day runs in ONE transaction with a savepoint per tick, as the engine's own sweep arm and determinism pair do, so
+# the rows it locks and then changes in later subtransactions make MultiXacts. Five such days at once spent about two
+# thirds of their time waiting on the cluster-wide MultiXact caches at PostgreSQL 17's defaults (128 kB of offsets,
+# 256 kB of members; sampled 2026-11-05: MultiXactOffsetSLRU, SlruRead, MultiXactMemberSLRU against CPU 21 of 60).
+# These caches are the server's own working memory and change no result. They take effect at a restart, so a lab day in
+# flight is never cut short here: the settings are written, and the restart happens when no lab day is running.
+if [ "$("${PSQL[@]}" -d postgres -Atc 'show multixact_offset_buffers')" != "64MB" ]; then
+  echo "== the lab server's MultiXact and subtransaction caches: 64 MB / 128 MB / 64 MB (at the next restart)"
+  "${PSQL[@]}" -d postgres -c "ALTER SYSTEM SET multixact_offset_buffers = '64MB'" \
+                           -c "ALTER SYSTEM SET multixact_member_buffers = '128MB'" \
+                           -c "ALTER SYSTEM SET subtransaction_buffers = '64MB'" >/dev/null
+  if [ "$("${PSQL[@]}" -d postgres -Atc "select count(*) from pg_stat_activity where datname like 'ottoq_%' and state <> 'idle'")" = 0 ]; then
+    as_pg "$PGBIN/pg_ctl" -D "$LAB_DATA" -l "$LAB_DATA/startup.log" -w restart -m fast >/dev/null
+  fi
+fi
+
 # ---- python driver ---------------------------------------------------------------
 if [ ! -x "$VENV/bin/python" ] || ! "$VENV/bin/python" -c 'import psycopg' 2>/dev/null; then
   echo "== venv $VENV (psycopg)"

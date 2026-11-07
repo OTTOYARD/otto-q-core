@@ -1,0 +1,8 @@
+# 0803's in-tick battery forecast log on the other five 36-hour base days (2026-11-06; LAB ONLY; LAB_DB=ottoq_lab_0803):
+# with 424242's b36log, the training set production's logger would write (the orchestrator logs mid-tick, before the
+# tick's site snapshot), for the planner's end-to-end lab test. Each must leave every car the b36 base day's.
+normal_day_116_171717_b36log|--fleet 116 --scenario normal_day --seed 171717 --ticks 432 --run-hours 36 --dial bess_plan_bill_from_min=720 --dial bess_forecast_learning=1 --tag b36log
+normal_day_116_616161_b36log|--fleet 116 --scenario normal_day --seed 616161 --ticks 432 --run-hours 36 --dial bess_plan_bill_from_min=720 --dial bess_forecast_learning=1 --tag b36log
+normal_day_116_818181_b36log|--fleet 116 --scenario normal_day --seed 818181 --ticks 432 --run-hours 36 --dial bess_plan_bill_from_min=720 --dial bess_forecast_learning=1 --tag b36log
+normal_day_116_919191_b36log|--fleet 116 --scenario normal_day --seed 919191 --ticks 432 --run-hours 36 --dial bess_plan_bill_from_min=720 --dial bess_forecast_learning=1 --tag b36log
+normal_day_116_373737_b36log|--fleet 116 --scenario normal_day --seed 373737 --ticks 432 --run-hours 36 --dial bess_plan_bill_from_min=720 --dial bess_forecast_learning=1 --tag b36log

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261105210912
 -- migration-name:    the_end_state_fingerprint_sets_aside_the_leg_id_the_cleaning_arm_mints
 --
 -- 0794  **The end-state fingerprint sets aside the itinerary-leg id the post's cleaning arm mints, so two identical arms
@@ -161,3 +161,12 @@ VALUES ('0794_the_end_state_fingerprint_sets_aside_the_leg_id_the_cleaning_arm_m
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-05 at 21:09:12 UTC (3:09 PM CT), ledger 20261105210912, through apply_migration, approved by Chase
+--   ("Okay I agree with you on all fronts. Begin building", 2026-11-05, on "ship 0794"). Nothing in flight and no run
+--   live or paused (read 21:08:08 UTC: the fingerprint's prosrc md5 90d490c2, 0764 in the lineage, 0794 not, no pair or
+--   runner in pg_stat_activity, every sim run completed). The text sent was this file before its version line and this
+--   footer were set: 10,585 bytes, md5 518c7be060e115489456fae5a7906c4b, equal to the ledger's statements[1] read back.
+--   Read back at 21:09:18 UTC: the fingerprint's prosrc md5 10901fb7081c02d1d38f71d7c3c8514d (definition e09c37f5), the
+--   0794_pre snapshot and the lineage row TRUE/FALSE present. The research lab, given the same file and ledger row,
+--   holds the identical body (prosrc 10901fb7, definition e09c37f5) and the same engine hash as production (7af6fcca).

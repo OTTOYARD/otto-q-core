@@ -1,0 +1,8 @@
+# The two 200-car whole days, restarted in commit mode at 04:40 UTC (they had run 1.7 and 0.4 hours in one transaction,
+# 192 and 108 of 288 ticks), then the overnight list's days not yet started (jobs_2026-11-06_overnight_rest.txt).
+normal_day_200_171717_24h|--fleet 200 --scenario normal_day --seed 171717 --ticks 288 --tag 24h
+normal_day_200_424242_24h|--fleet 200 --scenario normal_day --seed 424242 --ticks 288 --tag 24h
+normal_day_150_424242|--fleet 150 --scenario normal_day --seed 424242
+normal_day_200_424242|--fleet 200 --scenario normal_day --seed 424242
+busy_day_116_171717|--fleet 116 --scenario busy_day --seed 171717
+busy_day_150_171717|--fleet 150 --scenario busy_day --seed 171717

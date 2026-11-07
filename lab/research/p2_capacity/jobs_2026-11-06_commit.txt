@@ -1,0 +1,3 @@
+# Commit-each-tick validation (2026-11-06): the same day as ottoq_cap_normal_day_116_424242, committed after every tick as
+# production commits; it must reproduce that day's four fingerprints (day_fingerprint.sql) and take far less time.
+normal_day_116_424242_commit|--fleet 116 --scenario normal_day --seed 424242 --commit-each-tick --tag commit

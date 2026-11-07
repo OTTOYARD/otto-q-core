@@ -1,0 +1,8 @@
+door                         FEASIBLE  best 17154.0  bound 15307.0  (120.0 s)
+on_time                      OPTIMAL   best 48.0  bound 48.0  (0.1 s)
+wait                         FEASIBLE  best 839.0  bound 231.0  (120.0 s)
+door[Tesla Robotaxi TN]      OPTIMAL   best 4053.0  bound 4053.0  (0.1 s)
+door[Waymo Nashville]        FEASIBLE  best 7946.0  bound 7931.0  (120.0 s)
+door[Zoox Southeast]         OPTIMAL   best 3063.0  bound 3063.0  (0.1 s)
+door_no_owner_worse          FEASIBLE  best 17057.0  bound 15354.0  (120.9 s)
+realized: door 25650 min (to ready 24332) over 292 visits; on time 38/93 (ready by due 38); past contract 3365 min

@@ -1,0 +1,16 @@
+# The lab days of 2026-11-05, second list (after the container restart): the four days already running from the first
+# list (dr0, res0, dr0res0 at seed 424242 and 200 cars at 171717) are left out, the battery's forecast what-ifs moved up.
+normal_day_250_171717|--fleet 250 --scenario normal_day --seed 171717
+# the battery's day plan with a typical day's shape of EV charging (the other day's), the plan otherwise as it runs
+normal_day_116_171717_shape|--fleet 116 --scenario normal_day --seed 171717 --lab-sql lab/research/p2_capacity/whatif_ev_shape_normal_day_116_424242.sql --tag shape
+normal_day_150_424242|--fleet 150 --scenario normal_day --seed 424242
+# ... and on the day the reserves bound, with both reserves off, so the forecast can show
+normal_day_116_424242_shape_dr0res0|--fleet 116 --scenario normal_day --seed 424242 --dial bess_plan_dr_reserve_kwh=0 --lab-sql lab/research/p2_capacity/whatif_reserve_no_surge_jump.sql --lab-sql lab/research/p2_capacity/whatif_ev_shape_normal_day_116_171717.sql --tag shape_dr0res0
+normal_day_200_424242|--fleet 200 --scenario normal_day --seed 424242
+normal_day_116_171717_exit0|--fleet 116 --scenario normal_day --seed 171717 --dial charge_order_exit_first=0 --tag exit0
+normal_day_250_424242|--fleet 250 --scenario normal_day --seed 424242
+normal_day_116_171717_dr0res0|--fleet 116 --scenario normal_day --seed 171717 --dial bess_plan_dr_reserve_kwh=0 --lab-sql lab/research/p2_capacity/whatif_reserve_no_surge_jump.sql --tag dr0res0
+busy_day_116_171717|--fleet 116 --scenario busy_day --seed 171717
+busy_day_150_171717|--fleet 150 --scenario busy_day --seed 171717
+busy_day_200_171717|--fleet 200 --scenario busy_day --seed 171717
+normal_day_200_171717_svc3|--fleet 200 --scenario normal_day --seed 171717 --add-stall service_bay=1 --tag svc3

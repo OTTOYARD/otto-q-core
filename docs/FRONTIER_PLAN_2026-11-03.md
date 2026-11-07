@@ -512,6 +512,8 @@ can show each customer, for example: *"Waymo's cars were not made worse by this 
 
 ### E8. Agents at the edges
 
+*Status 2026-11-05 (3:34 PM CT): D5 decided by Chase ("Okay I agree with you on all fronts. Begin building"). `0795` makes the per-tick order a background challenger (checked, kept and graded, never standing) and the wake gate is on at the twin depot, so the agent is consulted on exceptions plus a 30-sim-minute check-in (`db/checks/0480`). Items 1-4 below are the build list.*
+
 **What.** Move the LLM agent from per-tick charge orders, where 2.6% are taken, to four jobs that need a language model:
 
 1. **Exceptions.** On a fault, an owner request or an E3 monitor alarm, it reads the situation and drafts a plan into
@@ -590,7 +592,7 @@ These run in parallel. None touches production. Building the Lab runs a few simu
    arm). Throughput: one depot-day in 173 s on one stream (20.8 depot-days an hour), 54.6 an hour on four
    replicas; a pair costs more than its two arms, because both share one transaction. Forks reproduce. The fidelity
    test found an engine defect instead of a lab one: on today's engine a pair fails the end-state atom on a minted id,
-   over 12 ticks and over a full depot-day (G510; `0794` PENDING passes both). A production run's digests could not
+   over 12 ticks and over a full depot-day (G510; `0794` passes both, and is in production since 2026-11-05 3:09 PM CT, Chase's approval). A production run's digests could not
    be compared: no pair has run on this engine. Report: `lab/engine/reports/e1_acceptance_2026-11-04.md`.*
 2. **E2 replay harness.**
    - Re-price the depot-level hindsight under a grid of prices, for the 323 graded decisions whose hindsight stores all
@@ -635,6 +637,48 @@ Run E5 on finished runs:
 - the regret split by decision type and by owner.
 
 The regret split ranks Phase 4's targets.
+
+*Status 2026-11-05 (4:21 PM CT): the clairvoyant bound is built and run on the research lab's first full day
+(`lab/research/p2_perfect_day/`, normal_day, 116 cars, 12 hours). Minutes from arrival to ready: 24,332 real, about 17,100
+best found in the engine's own job order, 15,307 proven bound; holding every owner to no worse than the real day still
+gives each owner 25-36% less (the gap is not a trade between owners). By lane, rescheduling the charging posts recovers more
+of it than the bays, so Phase 4's first target stays the charge-line key. The battery's half: perfect foresight $1,085
+against the day plan's $1,382 and no battery's $1,699 on the same day (each paying for its own peak; the older
+fixed-target rule cost $2,225). The penalty (information relaxation) is not built;
+more days and fleet sizes are running (`lab/research/p2_capacity/`).*
+
+*Correction 9:36 PM CT on 2026-11-05: that first model gave each charge its session's length on a post, and a car holds its post about
+5 minutes longer while the robot unplugs it (10% more post time). With the car's time on the post, solved like for like:
+116 cars 24,332 real, 20,055 best found (18% less), 16,185 bound (33%); 150 cars 29,100 real, 25,188 found (13%), 18,935
+bound (35%). The room is real and smaller than first published; the owner and lane figures above are the first model's
+and are re-solved on the corrected one when the lab's cores are free (`lab/research/p2_perfect_day/README.md`).*
+
+*Re-solved 11:38 PM CT on 2026-11-05 on the corrected model (two workers): best found 22% better at 116 cars and 19% at 150 (bound 33%
+and 35%); no owner worse still costs nothing; each owner on its own 29-42% better; due cars ready by their due time 38 to
+46 of 93 and 18 to 35 of 89. The lane split cannot be read on the corrected model (holding either lane at the kernel's
+starts is infeasible), so Phase 4's first target rests on the post-idle measure: at the posts the gain is ordering.*
+
+*Corrected again 12:47 AM CT on 2026-11-06 (G522): the model let work start at the car's call home (a visit opens while the
+car drives, 10 minutes on average), dropped service-bay work for trouble codes that no task names (184 of 980 minutes at
+116 cars), closed a visit 3 minutes after its last job where a lab tick takes 5, and let the solver serve an owner's
+immediate dispatch later than the kernel did (rule 9). Corrected, immediates kept first: best found 9.7% better at 116
+cars and 7.2% at 150 (bound 18% and 21%); past the lab day's 6 AM start-up the kernel is within 6.6% of the best day
+found at both sizes. The 22% / 19% and a-third readings are withdrawn. The charge line's tie at the boot was rehearsed and
+decides no seat, so Phase 4's charge-line target is not built; the room left is small, and the capacity curve's levers
+(the service bays, the posts, charger faults) are larger. The same error had understated the capacity curve: from the
+gate, 91-99% of cars charge within the contract wait at 116 cars, 70-72% at 150, 40-43% at 200.*
+
+*Status 2026-11-05 (5:29 PM CT), the battery on a second day (seed 424242): planning on a typical day's shape (the other
+lab day's load) closes 67-77% of the gap to perfect foresight on both days, and on the second day the day plan did not
+lower the peak at all: the battery started 25% full, the plan holds a 600 kWh demand-response reserve from the first
+minute of the day (no call came; needed only from 2 PM it costs nothing in hindsight), and its floor rises at every surge
+(G517). The battery's build order is in `docs/AGENT_ARCHITECTURE.md` (where the agent earns its place, item 1).*
+
+*Status 9:02 PM CT on 2026-11-05: the first step of that order is in production. 0797 holds the call reserve from 3 hours before the
+window and lets the floor stop rising at every surge; switched on at the twin depot at 8:57 PM CT on 2026-11-05 after
+three lab gates (at its defaults it reproduces a day exactly; on, the two lab days bill $1,301 and $1,295; on a day with
+a 2 PM call every car is the same and the battery meets the call 85.5% full instead of 74.9%). Next in the order: the
+planner that plans its own refill (`lab/research/p2_capacity/battery_lp.py`, proven in the lab loop).*
 
 ### Phase 4: the inventor. Needs D3.
 

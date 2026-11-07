@@ -1,0 +1,19 @@
+  side  |                                                                                     rule9                                                                                     
+--------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ before | {"departures": 253, "left_below_target": 0, "atoms_cleared_by_triage": 13, "done_atoms_without_a_time": 0, "left_with_needed_work_open": 1, "charge_unknown_at_departure": 0}
+
+psql:db/migrations/0796_the_scorecard_does_not_count_a_service_done_on_a_second_try_as_left_open.sql:144: NOTICE:  0796 V2: run d6955d8e-2998-425e-9cd0-2f06fa452310: 1 visits no longer read work left open
+psql:db/migrations/0796_the_scorecard_does_not_count_a_service_done_on_a_second_try_as_left_open.sql:144: NOTICE:  0796 V2: 1 runs compared
+ side  |                                                                                     rule9                                                                                     
+-------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ after | {"departures": 253, "left_below_target": 0, "atoms_cleared_by_triage": 13, "done_atoms_without_a_time": 0, "left_with_needed_work_open": 0, "charge_unknown_at_departure": 0}
+
+== rows that differ, before against after (only the open count of the one visit may move)
+               visit_id               | open_before | open_after | rest_equal 
+--------------------------------------+-------------+------------+------------
+ f4af4ba7-1a37-4d26-9c98-cc2ab09fde59 |           1 |          0 | t
+
+ visits | identical 
+--------+-----------
+    292 |       291
+

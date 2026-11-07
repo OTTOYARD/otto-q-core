@@ -1,0 +1,11 @@
+# The overnight list (2026-11-06), after the 0797 tests: the whole days still to run, the second seed of the 12-hour
+# stress test, rule 14's exit-first key, a busier day. Days already in results.jsonl or running are left out.
+normal_day_116_424242_24h|--fleet 116 --scenario normal_day --seed 424242 --ticks 288 --tag 24h
+normal_day_200_171717_24h|--fleet 200 --scenario normal_day --seed 171717 --ticks 288 --tag 24h
+normal_day_150_424242_24h|--fleet 150 --scenario normal_day --seed 424242 --ticks 288 --tag 24h
+normal_day_116_171717_exit0|--fleet 116 --scenario normal_day --seed 171717 --dial charge_order_exit_first=0 --tag exit0
+normal_day_200_424242_24h|--fleet 200 --scenario normal_day --seed 424242 --ticks 288 --tag 24h
+normal_day_150_424242|--fleet 150 --scenario normal_day --seed 424242
+normal_day_200_424242|--fleet 200 --scenario normal_day --seed 424242
+busy_day_116_171717|--fleet 116 --scenario busy_day --seed 171717
+busy_day_150_171717|--fleet 150 --scenario busy_day --seed 171717

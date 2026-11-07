@@ -1,0 +1,7 @@
+# G516 whole (2026-11-06): db/migrations/0798 (both halves of the cabin-clean fix: the routine of a car that left its
+# post is cancelled before the starter, and the routine is offered again after the completion step), applied to a copy
+# of the lab template. Run with LAB_DB=ottoq_lab_0798 (the stall_cabin_robot dial is 2 at the twin, as in production).
+# Against the base days already in results.jsonl (same seeds, the template before 0798; 0796 and 0797 at their defaults
+# change no car's day).
+normal_day_150_171717_g516ab|--fleet 150 --scenario normal_day --seed 171717 --tag 0798
+normal_day_116_171717_g516ab|--fleet 116 --scenario normal_day --seed 171717 --tag 0798

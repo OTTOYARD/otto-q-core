@@ -1,0 +1,5 @@
+# G525's fix (db/migrations/0801, the arm's registration draw keyed on the car, the post, the cycle's direction and its
+# sim start) on a copy of the lab template: the same seed twice, which must now agree plug by plug. Run with
+# LAB_DB=ottoq_lab_0801 (2026-11-06; LAB ONLY).
+normal_day_116_424242_g525a|--fleet 116 --scenario normal_day --seed 424242 --tag g525a
+normal_day_116_424242_g525b|--fleet 116 --scenario normal_day --seed 424242 --tag g525b
