@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261107060329
 -- migration-name:    a_signed_in_user_cannot_call_the_black_box_export_functions
 --
 -- 0720  **A signed-in user can no longer call the two Black Box export functions through /rest/v1/rpc; the same user
@@ -33,6 +33,14 @@
 --   the deployed v7 (index.ts:32,42 before #243) and #243's handler (_shared/run_blackbox.ts:150,160) both call
 --   ottoq_run_blackbox_meta with a client built from SUPABASE_SERVICE_ROLE_KEY, which is the service_role this file
 --   keeps. Neither calls ottoq_run_blackbox.
+--
+-- ══ §0a CHASE'S GO-AHEAD, AND THE RE-READ ON LIVE BEFORE THE APPLY ═══════════════════════════════════════════════
+--
+--   Chase, 2026-11-06, read by 11:53 PM CT: "Review the three security fixes and send them. Go execute everything needed- line by line without my input."
+--   Re-read 2026-11-07 05:54:39 UTC (11:54 PM CT on 11-06), by plain SELECTs: every P1 premise as written. No 0720 lineage
+--   row or '0720_pre' snapshot; both md5s 4f96d37e... and 06ec6069...; both postgres-owned SECURITY DEFINER with ACL
+--   {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}; no function names either; no dependent; the
+--   probe id is no run's. The API logs, 2026-11-06 05:56 to 2026-11-07 05:56 UTC: no /rest/v1/rpc request names either.
 --
 -- ══ §1 WHY ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -354,3 +362,11 @@ VALUES ('0720_a_signed_in_user_cannot_call_the_black_box_export_functions', fals
   now());
 
 COMMIT;
+
+-- APPLIED 2026-11-07 at 06:03:29 UTC (12:03 AM CT), ledger 20261107060329, through apply_migration, on Chase's go-ahead
+--   (§0a), confirmed by Chase at the connector's prompt, after 0701. Nothing live (read 05:59:01 UTC). The text sent was this
+--   file before its version line and this footer were set: 27,225 characters, md5 fe6bab26, equal to the ledger's
+--   statements[1] read back. P0, P1, P2 and V1-V3 passed inside the apply. Read back at 06:03:37 UTC: both ACLs
+--   {postgres=X/postgres,service_role=X/postgres}; both definitions unchanged (4f96d37e, 06ec6069); four '0720_pre' rows
+--   (2 functions, 2 grants); the lineage row FALSE/FALSE. The table door (G438) stays open, as §0 says. The lab template
+--   ottoq_lab took the same text and ledger row at 06:08 UTC.

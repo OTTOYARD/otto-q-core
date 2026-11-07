@@ -34,13 +34,16 @@
 --         twin       {service_role=X/postgres}                      new
 --       The test: outside storage no row grants anon or authenticated, and outside extensions none grants PUBLIC.
 --   (4) the browser roles' census (VOLATILE SECURITY DEFINER non-trigger functions in public that anon or authenticated
---       may execute) equals the 124 below: zero rows. 112 of them carry no file naming a signed-in reader (basis
+--       may execute) equals the 119 below (124 after 0701; 0791 closed five): zero rows. 107 of them carry no file naming a signed-in reader (basis
 --       'OPEN'); that list is the next item, not a clean bill.
 --   (5) ottoq_assert_anon_rpc_surface(): zero rows (it returned ottoq_fit_charge_fault_model before).
 --   (6) the lineage row FALSE/FALSE, carrying Chase's go-ahead with its date and CT time (0701 §0, P0a), and 31
 --       restore statements under '0701_pre' (1 function, 24 grants, 6 defaults).
 --   (7) the engine still signs: every SDR issued after the apply carries a signature (signed = issued; issued > 0 once
 --       any run has produced one since).
+--       READ 2026-11-07 12:21:56 UTC (6:21 AM CT): 1,991 issued since the apply, 1,991 signed, over 4 demo runs
+--       (3091816d, 5c19fd60, 73d71553 and the planner run a0001fd6), the oldest 06:23:02 UTC and the newest 12:21:47.
+--       Satisfied.
 --   (8) the API after the apply: no service_role request for any of the sixteen refused (401/403); a browser request
 --       for one, if any, refused. Run in the Supabase logs explorer over a window starting at the apply.
 --
@@ -84,7 +87,10 @@ SELECT CASE WHEN d.defaclnamespace = 0 THEN '(global)' ELSE d.defaclnamespace::r
  WHERE d.defaclrole = 'postgres'::regrole AND d.defaclobjtype = 'f'
  ORDER BY 1;
 
--- (4) the census against the reviewed list: zero rows after 0701
+-- (4) the census against the reviewed list: zero rows after 0701 and 0791
+--     0791 (applied 2026-11-07 06:07:11 UTC, 12:07 AM CT) closed five of the 124 to every browser role, and they leave
+--     this list as its GONE rule says: ottoq_benchmark_reset, ottoq_pause_run, ottoq_resume_run, ottoq_run_policy_to_end
+--     and ottoq_sim_run_scenario. Read on live 2026-11-07 06:09:53 UTC: the census is 119, none NEW, no role changed.
 WITH allow(fn, role, basis) AS (VALUES
     ('cuopt_log_gate(uuid, text, integer, jsonb, timestamp with time zone, text)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_account_disconnect(uuid)', 'authenticated', '0700: the sign-in page'),
@@ -100,7 +106,6 @@ WITH allow(fn, role, basis) AS (VALUES
     ('ottoq_assert_bess_state_vocabulary()', 'anon', 'read-only assert, PUBLIC by default'),
     ('ottoq_assert_dispatch_time_coherence(uuid)', 'anon', 'read-only assert, PUBLIC by default'),
     ('ottoq_assert_snapshot_integrity(uuid)', 'authenticated', 'OPEN: no file names a signed-in reader'),
-    ('ottoq_benchmark_reset(uuid, numeric, numeric)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_build_workflow_plan(uuid, uuid, timestamp with time zone, jsonb)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_capture_decision_snapshot(uuid, bigint, uuid, timestamp with time zone)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_check_fence_containment(uuid)', 'authenticated', 'OPEN: no file names a signed-in reader'),
@@ -164,7 +169,6 @@ WITH allow(fn, role, basis) AS (VALUES
     ('ottoq_onboard_vehicle_battery(uuid, text, numeric, integer, text)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_ops_approval_decide(uuid, text, text)', 'authenticated', '0487: the crew decides'),
     ('ottoq_ops_set_rush_valve(uuid, boolean, text, text)', 'authenticated', 'OPEN: no file names a signed-in reader'),
-    ('ottoq_pause_run(uuid, text)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_plan_overnight_wave(uuid, timestamp with time zone, integer, numeric, numeric)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_plan_visit_itinerary(uuid, uuid, timestamp with time zone)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_progress_commit(text, uuid, uuid, uuid, text, uuid, uuid, integer, integer, uuid, text)', 'authenticated', 'OPEN: no file names a signed-in reader'),
@@ -186,18 +190,15 @@ WITH allow(fn, role, basis) AS (VALUES
     ('ottoq_register_audit_report(text, text, uuid, uuid, timestamp with time zone, timestamp with time zone, text, text, text, text, text, timestamp with time zone, uuid)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_release_expired_tethers(timestamp with time zone)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_reopen_visit_atoms(uuid, text[], timestamp with time zone, text, timestamp with time zone)', 'authenticated', 'OPEN: no file names a signed-in reader'),
-    ('ottoq_resume_run(uuid)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_rollback_dial_promotion(bigint)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_run_archive_stamp(uuid, text, jsonb)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_run_boot_draw(uuid)', 'authenticated', 'OPEN: no file names a signed-in reader'),
-    ('ottoq_run_policy_to_end(uuid, integer)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_score_observation(text, text, uuid, jsonb, numeric, timestamp with time zone, uuid, uuid, jsonb)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_score_run(uuid)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_seed_vehicle_need_profiles(uuid)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_service_priority_propose(uuid)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_shield_and_log(uuid, bigint, uuid, jsonb, boolean)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_shield_probe(text, text, uuid, jsonb, uuid, uuid, uuid, uuid)', 'authenticated', 'OPEN: no file names a signed-in reader'),
-    ('ottoq_sim_run_scenario(text, bigint, text, timestamp with time zone)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_start_concurrent_atoms(uuid, timestamp with time zone)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_submit_external_proposal(uuid, uuid, text, text, uuid, jsonb, text, integer)', 'authenticated', 'OPEN: no file names a signed-in reader'),
     ('ottoq_sweep_orphaned_visit_artifacts(uuid)', 'authenticated', 'OPEN: no file names a signed-in reader'),

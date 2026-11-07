@@ -97,17 +97,45 @@ solvers run. So production needs the forecast in the database, the solver in the
    once it has 3 local days with 200 examples at every half hour ahead. The first demo run, 640e4fab (2026-11-06,
    1:14-2:59 PM CT, 5.26 sim-hours), logged 1,249 rows for 1,249 ticks: one fold, reaching every half hour ahead (h = 7:
    478 examples).
-4b. Apply 0808 (G529) before the next demo runs. Without it, a half hour ahead that only one fold reached gets a band of
+4b. ~~Apply 0808 (G529) before the next demo runs.~~ **Done** 2026-11-07 at 05:45:53 UTC (11:45 PM CT on 11-06). Without it, a half hour ahead that only one fold reached gets a band of
    0 kW, and the model is still called usable. Two runs of an hour each would have produced exactly that model, and the
    models are append-only. With 0808, usable needs every half hour's band read from 3 folds' out-of-sample misses, so
    **each of the next two demo runs must run 4 sim-hours or more** (about 80 real minutes at the app's 3x; 640e4fab ran
    5.26).
-5. Once a usable model exists (`SELECT public.ottoq_bess_forecast_model('11111111-…')` is not null), turn on
-   `bess_planner_enabled` = 1 and `energy_mpc_follow` = 1 at the twin depot.
-6. Check one demo run:
-   - energy commands with mode `mpc_follow`;
-   - `ottoq_energy_plan` rows from `bess_planner` landing `ready`;
-   - ledger rows under `intelligence_battery_planner`.
+4c. ~~Run the forecast-training demo runs.~~ **Done** 2026-11-07, on Chase's go-ahead to run the twin on his behalf: three
+   runs after 0808, 3091816d (busy_day, 5.2 sim-hours), 5c19fd60 (normal_day, stopped by its own 60-minute backstop at
+   3 sim-hours) and 73d71553 (busy_day, 5.45). The nightly refit wrote model 7 at 11:26:00 UTC and a refit by hand after the
+   last run wrote model 8 at 11:42:44 UTC, both usable (5 folds; model 8 23,881 examples, every half hour graded by 3 to 5
+   folds).
+5. ~~Turn on `bess_planner_enabled` = 1 and `energy_mpc_follow` = 1 at the twin depot.~~ **Done** at 11:43:39 UTC (5:43 AM CT)
+   under "Chase (delegated to Claude Code: 0804)", receipts ok, with model 8 in use.
+6. ~~Check one demo run.~~ **Done, and the chain works; the forecast it plans on does not (G530).** a0001fd6 (busy_day at 3x)
+   ran 11:43:54-13:30:44 UTC (5:43-7:30 AM CT), 5.34 sim-hours, 1,340 ticks, stopped through the twin app's door:
+   - `ottoq_energy_plan`: 63 plans from `bess_planner`, every one `optimal` (glop), 65 ms on average, 153 at most, all on
+     model 8;
+   - energy commands: the battery in `mpc_follow` on 1,339 of 1,340 ticks (the first came before any plan), its setpoint
+     the plan's step;
+   - the ledger: 63 calls under `intelligence_battery_planner`, all HTTP 200, answered;
+   - the cars: 220 charging sessions, 709 completed services and 153 dispatches against 210-223, 711-714 and 148-152 on
+     the two day-plan busy runs of the same morning; no demand-response call; the planner holds no car (the charge gate
+     never reads a plan).
+   **Its grade, at the 14:17 UTC sweep: 6.8% of the perfect-foresight prize, $377.18 left on the table**, against 24.4% to
+   38.6% for the day plan on the three busy runs before it (§6). The battery discharged 155 kWh (the day plan 358 to 546)
+   and ended 191 kWh fuller than it started; it took 52 kW off the billed half hour (1,472 to 1,420 kW at 11:00 AM CT),
+   where the day plan took 175 to 281. The plans say why: 54 of 63 held the grid at or above the 1,420 kW that was billed
+   (median 1,434), because model 8's upper bands, up to 823 kW over its point forecast at 3 1/2 hours ahead, told it a
+   larger peak was coming. That is G530 measured in production.
+   **Switched back off** at 14:23:50 UTC (8:23 AM CT): `bess_planner_enabled` and `energy_mpc_follow` = 0 at the twin depot
+   under "Chase (delegated to Claude Code: G530)", receipts ok, no run live. `bess_forecast_learning` and
+   `bess_hindsight_enabled` stay on, so the forecast keeps learning and every run is still graded.
+6b. **G530: model 8 plans on a worse forecast than the day plan's beyond the next half hour.** Its own record: out of sample
+   it misses more than the day plan's own EV forecast at 6 of 8 half hours. The ridge is fitted at lam = 10 and overfits
+   demo runs of a few hours; on the band the battery reads (0.8 pinball loss, summed over the half hours) it scores 858.6 kW
+   against the day plan's 825.1, where the regularization chosen out of sample scores 497.1 (551.2 nested). 0809 chooses
+   it per half hour and defers to the day plan where that missed less; on the six 36-hour lab days it changes nothing
+   ([g530_lab](../lab/research/p2_capacity/g530_lab_2026-11-07.md)). **Pending Chase's approval**; once applied, a refit by
+   hand writes the first model under it, and the planner goes back on for one demo run (rule 12) to show whether a
+   measured band lets it shave the peak.
 
 Until a model is usable, the request is empty and the day plan decides. That is also true whenever the planner is late or
 fails, and whenever a demand-response call is live.
@@ -173,6 +201,10 @@ four shorter runs were passed over, as 0807 intends). Both through the deployed 
 | 2026-10-23, 8 AM-5 PM | 78c0624c | $1,376.77 | $1,544.05 | $1,216.31 | 51.0% | $160.46 | 1,086 kW (no battery 1,371; perfect 806) |
 | 2026-10-25, 8 AM-5 PM | 763734d4 | $1,378.26 | $1,479.42 | $1,120.02 | 28.2% | $258.24 | 1,222 kW (no battery 1,384; perfect 806) |
 | 2026-11-06, 8:02 AM-1:15 PM | 640e4fab | $1,166.64 | $1,338.43 | $892.89 | 38.6% | $273.75 | 1,137 kW at 10:55 AM (no battery 1,418; perfect 662) |
+| 2026-11-07, 8:00 AM-1:14 PM | 3091816d | $1,425.72 | $1,590.49 | $1,149.75 | 37.4% | $275.97 | 1,414 kW at 10:10 AM (no battery 1,683; perfect 967) |
+| 2026-11-07, 8:01-11:00 AM (normal_day) | 5c19fd60 | $1,171.94 | $1,241.40 | $286.96 | 7.3% | $884.98 | 1,490 kW at 8:25 AM (no battery 1,569; perfect 146) |
+| 2026-11-07, 8:01 AM-1:28 PM | 73d71553 | $1,257.13 | $1,361.93 | $932.48 | 24.4% | $324.65 | 1,221 kW at 10:35 AM (no battery 1,396; perfect 674) |
+| 2026-11-07, 8:00 AM-1:20 PM (**planner on**, model 8) | a0001fd6 | $1,443.32 | $1,470.92 | $1,066.14 | **6.8%** | $377.18 | 1,420 kW at 11:00 AM (no battery 1,472; perfect 789) |
 
 The first two days ran on the day plan before today's battery changes. The third is the first demo run after them
 (busy_day, 1,249 ticks, about 15 sim-seconds each), graded by the hourly sweep at 21:17:01 UTC (3:17 PM CT) through the
@@ -181,6 +213,13 @@ third, the battery spent 675 of 1,249 ticks defending its level, 388 charging an
 Over the same run the day plan's own EV forecast for the next half hour averaged 2.21 times the draw that came (2,797 kW
 against 1,268), so it kept guarding against a peak that never came. Replacing that forecast is the learned forecast's
 job. Each part-day pays a whole day's demand rate for its own peak, as the research lab bills a day.
+
+The three runs of 2026-11-07 are the forecast-training runs (4c), all on the day plan (`followed_a_plan` 0), each graded by
+the next :17 sweep (08:17, 09:17 and 12:17 UTC). On 73d71553 the battery discharged only 358 kWh and ended at 2,479 kWh of
+its 2,672. On the normal day the billed half hour was the first (8:25 AM), the depot's EV draw then fell to almost nothing while the
+day plan kept forecasting 1,200 to 1,700 kW (g530_lab), and the battery discharged 38 kWh all morning: 7.3% captured, where
+perfect foresight would have held that half hour to 146 kW. A grade lands at the first :17 after a run stops; a read before
+then shows no grade, not a lost one.
 
 Lab check: on the same window the grade bills exactly as the research lab's `bound_energy.py` ($1,539.61 realized,
 $1,497.50 no battery). Two lab days were graded end to end: 52.8% captured with $211.74 left on the first; −1.6% with

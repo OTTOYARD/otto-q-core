@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261107060711
 -- migration-name:    a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run
 --
 -- 0791  **A signed-in user can no longer pause, resume, start, reset or fast-forward a run through /rest/v1/rpc, and a
@@ -34,6 +34,18 @@
 --   Once it is applied, db/checks/0438 (4) reads "GONE" for the five SECURITY DEFINER doors (its own instruction: update
 --   the list); do that in the sitting that writes this file's APPLIED footer, not before, since until then the list is
 --   true of live.
+--
+-- ══ §0a CHASE'S GO-AHEAD, AND THE RE-READ ON LIVE BEFORE THE APPLY ═══════════════════════════════════════════════
+--
+--   Chase, 2026-11-06, read by 11:53 PM CT: "Review the three security fixes and send them. Go execute everything needed- line by line without my input."
+--   Re-read 2026-11-07 05:56:07-05:56:24 UTC (11:56 PM CT on 11-06), by plain SELECTs: every P1 premise as written. No
+--   0791 lineage row or '0791_pre' snapshot; 17 of 17 signatures, and the sixteen names have 17 routines; every owner,
+--   kind, security and ACL as P1 lists them; pause 1e3ec33a... and resume b693dc33...; no browser-reachable SECURITY
+--   INVOKER caller; no dependent; every cron job as postgres; no routine or cron job names either door; the probe id is no
+--   run's. The census, run as one SELECT, reads 17: the fourteen this file names and 0701's three, and nothing else.
+--   The API logs, 2026-11-06 05:56 to 2026-11-07 05:56 UTC: no /rest/v1/rpc request names any of the seventeen. The
+--   twin app's run controls (ottoq_operator_start_run, ottoq_sim_stop_and_reset, ottoq_set_playback) came only from an
+--   edge function with the secret key (service_role), and none of the three is one of the seventeen.
 --
 -- ══ §1 WHY ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -774,3 +786,15 @@ VALUES ('0791_a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pau
   now());
 
 COMMIT;
+
+-- APPLIED 2026-11-07 at 06:07:11 UTC (12:07 AM CT), ledger 20261107060711, through apply_migration, on Chase's go-ahead
+--   (§0a), confirmed by Chase at the connector's prompt, after 0701 and 0720. Nothing live (no run running or paused, in
+--   flight 0, read 06:03:37 UTC). The text sent was this file before its version line and this footer were set: 61,532
+--   characters, md5 bef73759, equal to the ledger's statements[1] read back. P0, P1 (the census read the fourteen; 0701's
+--   three were already closed), P2, the anchors and V1-V5 passed inside the apply. Read back at 06:07:28 UTC: all 17 ACLs
+--   {postgres=X/postgres,service_role=X/postgres}; ottoq_pause_run 28cba396 and ottoq_resume_run 3950a271, the bodies §5
+--   names; 43 '0791_pre' rows (2 functions, 41 grants); the lineage row FALSE/FALSE; the twin app's own doors
+--   (ottoq_operator_start_run, ottoq_sim_stop_and_reset, ottoq_set_playback) unchanged, service_role only. db/checks/0438 (4)
+--   on live at 06:09:53 UTC: the census 119, the five doors GONE and taken off its list in the same sitting, none NEW. The
+--   lab template ottoq_lab took the same text and ledger row at 06:08 UTC. otto-twin-control's open routes (G394) are
+--   unchanged.

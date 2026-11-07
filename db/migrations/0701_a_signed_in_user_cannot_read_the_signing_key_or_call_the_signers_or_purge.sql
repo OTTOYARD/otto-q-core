@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261107060134
 -- migration-name:    a_signed_in_user_cannot_read_the_signing_key_or_call_the_signers_or_purge
 --
 -- 0701  **Anyone who signs up could read the key that signs every event, SDR and audit bundle, sign anything with it,
@@ -14,7 +14,7 @@
 --        (142; the 124 others hash to the same 3184962c...), the default privileges and the unread-INVOKER premise all
 --        read as below. 0703-0705, 0709-0713 and 0716 were applied in between and moved none of it.
 --
--- ══ §0 CHASE'S GO-AHEAD: NOT YET GIVEN. THIS FILE REFUSES TO APPLY UNTIL IT IS. ══════════════════════════════════════
+-- ══ §0 CHASE'S GO-AHEAD: GIVEN 2026-11-06 (READ BY 11:53 PM CT). THE FILE REFUSED TO APPLY UNTIL IT WAS. ═══════════════
 --
 --   FINDINGS G417 names three of the eighteen (the purge and the two busy-run starters) and leaves taking EXECUTE from
 --   authenticated to Chase: "Revoking a grant is a security change, which Chase set aside for the demo (S-03), so it is
@@ -26,7 +26,21 @@
 --   quote the same words here, and they are written into this file's ottoq_cert_lineage note, where the ledger keeps
 --   them. Rotating the key and closing sign-up stay his as well, and are not in this file.
 --
---   Chase's go-ahead, as given: (PENDING)
+--   Chase's go-ahead, as given: 2026-11-06, read by 11:53 PM CT: "Review the three security fixes and send them. Go
+--   execute everything needed- line by line without my input." (P0a carries the same words.)
+--
+-- ══ §0a RE-READ ON LIVE BEFORE THE APPLY, 2026-11-07 05:53:12-05:56:24 UTC (11:53-11:56 PM CT on 11-06) ═════════════
+--
+--   Every P1 premise read as written, by plain SELECTs: 0700 classified; no 0701 lineage row or '0701_pre' snapshot; the
+--   18 signatures exist and the sixteen names have 18 overloads; all SECURITY DEFINER, owned by postgres; authenticated
+--   may execute all 18 (anon the three named in §1 (c)); the resolver's definition md5 b92997a8...; system:v1 the one
+--   active Vault-backed key; no ottoq.signing role or database setting; no SECURITY INVOKER caller of the resolver or a
+--   signer, and no browser-reachable SECURITY INVOKER path to a target outside §1's six; all 26 cron jobs as postgres;
+--   the default privileges as written against (public and storage only). ottoq_assert_anon_rpc_surface() reports one
+--   row, ottoq_fit_charge_fault_model, one of the eighteen, so V6 reads empty after the revoke; the census is 142, as on
+--   2026-10-13. The API logs, 2026-11-06 05:56 to 2026-11-07 05:56 UTC (the 24 hours the logs serve): no /rest/v1/rpc
+--   request names any of the eighteen. Every RPC the browser sent was a read; the run controls (operator start, stop and
+--   reset, playback) came from an edge function with the secret key, i.e. service_role.
 --
 -- ══ §1 WHY ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -185,7 +199,7 @@ END $inflight$;
 CREATE TEMP TABLE p0701_go_ahead (said text NOT NULL) ON COMMIT DROP;
 DO $go_ahead$
 DECLARE
-  v_said text := $chase$PENDING$chase$;
+  v_said text := $chase$2026-11-06, read by 11:53 PM CT: "Review the three security fixes and send them. Go execute everything needed- line by line without my input."$chase$;
 BEGIN
   IF v_said ~* '^\s*PENDING\s*$'
      OR v_said !~ '2026-\d\d-\d\d'
@@ -718,3 +732,19 @@ VALUES ('0701_a_signed_in_user_cannot_read_the_signing_key_or_call_the_signers_o
   now());
 
 COMMIT;
+
+-- APPLIED 2026-11-07 at 06:01:34 UTC (12:01 AM CT), ledger 20261107060134, through apply_migration, on Chase's "Review the
+--   three security fixes and send them. Go execute everything needed- line by line without my input." (read by 11:53 PM CT
+--   on 11-06; P0a and §0 carry it), confirmed by Chase at the connector's prompt. Nothing live (no run running or paused,
+--   in flight 0, read 05:59:01 UTC); every P1 premise re-read on live first (§0a), and the file rehearsed end to end, in
+--   order with 0720 and 0791, on a copy of the lab template given a stand-in signing secret (every check passed). The text
+--   sent was this file before its version line and this footer were set: 51,482 characters, md5 e1901fe9, equal to the
+--   ledger's statements[1] read back. P0, P0a, P1, P2 and V1-V6 passed inside the apply. Read back at 06:01:56 UTC, and with
+--   db/checks/0438 (1)-(6) at 06:09:22 UTC: the eighteen anon 0, authenticated 0, PUBLIC 0, service_role 18; the resolver's
+--   prosrc ae44bc24 (definition a3ce7a03), no override, no session cache; the six default-privilege rows as §2 (c) writes
+--   them; ottoq_assert_anon_rpc_surface() empty; the lineage row FALSE/FALSE with Chase's words; 31 restore statements
+--   (1 function, 24 grants, 6 defaults). (7), the engine still signing a real run's SDRs, waits on the next run; V4 proved
+--   the signatures byte-identical on synthetic inputs inside the apply. The 19 read RPCs the browser sent in the 24 hours
+--   before keep anon and authenticated. The lab template ottoq_lab took the same text and ledger row at 06:08 UTC, with a
+--   stand-in signing secret in its vault. STILL OPEN (FINDINGS G428): the key was readable by any signed-in caller from
+--   2026-09-06 to 2026-11-07; rotating it (0722, drafted) and closing or gating sign-up are Chase's.

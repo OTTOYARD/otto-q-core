@@ -46,19 +46,21 @@ M0701 = os.path.join(ROOT, "db", "migrations",
 M0722 = os.path.join(ROOT, "db", "migrations",
                      "0722_the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies.sql")
 
-#: the line the lead replaces with Chase's words, in both files; the committed files carry it unedited
+#: the line the lead replaces with Chase's words; 0722 still carries it, 0701 carries his words since its apply (2026-11-07)
 PLACEHOLDER = "$chase$PENDING$chase$"
+#: a P0a line, whatever it holds
+GO_AHEAD = re.compile(r"(  v_said text := \$chase\$)(.*?)(\$chase\$;)")
 #: a stand-in, so the rest of each file can be exercised; it says what it is
 STAND_IN = '2026-01-01, 12:00 PM CT: "test fixture, not Chase\'s words"'
 
 
 def _with_go_ahead(path, said=STAND_IN):
-    """A copy of a migration with its P0a line filled in; the committed file is never edited."""
+    """A copy of a migration with its P0a line set to `said`; the committed file is never edited."""
     src = open(path, encoding="utf-8").read()
-    assert src.count(PLACEHOLDER) == 1, f"{os.path.basename(path)}'s P0a placeholder is not there exactly once"
+    assert len(GO_AHEAD.findall(src)) == 1, f"{os.path.basename(path)}'s P0a line is not there exactly once"
     fd, out = tempfile.mkstemp(prefix=os.path.basename(path)[:4] + "_go_ahead_", suffix=".sql")
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
-        fh.write(src.replace(PLACEHOLDER, "$chase$" + said + "$chase$"))
+        fh.write(GO_AHEAD.sub(lambda m: m.group(1) + said + m.group(3), src, count=1))
     atexit.register(lambda: os.path.exists(out) and os.remove(out))
     return out
 
