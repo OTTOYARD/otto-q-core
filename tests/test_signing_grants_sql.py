@@ -24,6 +24,7 @@ Loads tests/fixtures/signing_grants_stub.sql. SKIPS where no scratch PostgreSQL 
 """
 import atexit
 import os
+import re
 import sys
 import tempfile
 
@@ -36,19 +37,24 @@ from test_v2_door_sql import _drop, _new_db, _server_up  # noqa: E402
 STUB = os.path.join(ROOT, "tests", "fixtures", "signing_grants_stub.sql")
 MIG = os.path.join(ROOT, "db", "migrations", "0701_a_signed_in_user_cannot_read_the_signing_key_or_call_the_signers_or_purge.sql")
 
-#: the line the lead replaces with Chase's words (0701 §0, P0a); the committed file must carry it unedited
+#: the placeholder P0a held until Chase said go (0701 §0)
 PLACEHOLDER = "$chase$PENDING$chase$"
+#: P0a's line, whatever it holds: the placeholder before the apply, Chase's dated words since (applied 2026-11-07)
+GO_AHEAD = re.compile(r"(  v_said text := \$chase\$)(.*?)(\$chase\$;)")
+#: Chase's words as the committed file carries them in P0a (and §0 quotes them)
+CHASE_SAID = ('2026-11-06, read by 11:53 PM CT: "Review the three security fixes and send them. Go execute everything '
+              'needed- line by line without my input."')
 #: a stand-in, so the rest of the file can be exercised; it says what it is
 STAND_IN = '2026-01-01, 12:00 PM CT: "test fixture, not Chase\'s words"'
 
 
 def _with_go_ahead(said=STAND_IN):
-    """A copy of 0701 with the P0a line filled in; the committed file is never edited."""
+    """A copy of 0701 with the P0a line set to `said`; the committed file is never edited."""
     src = open(MIG, encoding="utf-8").read()
-    assert src.count(PLACEHOLDER) == 1, "0701's P0a placeholder is not there exactly once"
+    assert len(GO_AHEAD.findall(src)) == 1, "0701's P0a line is not there exactly once"
     fd, path = tempfile.mkstemp(prefix="0701_go_ahead_", suffix=".sql")
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
-        fh.write(src.replace(PLACEHOLDER, "$chase$" + said + "$chase$"))
+        fh.write(GO_AHEAD.sub(lambda m: m.group(1) + said + m.group(3), src, count=1))
     atexit.register(lambda: os.path.exists(path) and os.remove(path))
     return path
 
@@ -326,14 +332,19 @@ def test_a_privilege_the_trigger_does_not_fire_on_is_not_a_path():
         _drop(d)
 
 
-def test_as_committed_it_refuses_until_chase_says_go():
-    # the committed file holds the placeholder exactly once, in P0a, and refuses before it changes anything
+def test_as_committed_it_carries_chases_go_ahead_and_the_gate_still_refuses_without_one():
+    # applied 2026-11-07: the committed file carries Chase's dated words in P0a, once, and §0 quotes them; the
+    # placeholder is gone
     src = open(MIG, encoding="utf-8").read()
-    assert src.count(PLACEHOLDER) == 1
+    said = GO_AHEAD.findall(src)
+    assert len(said) == 1 and said[0][1] == CHASE_SAID, said
+    assert PLACEHOLDER not in src
+    assert "Chase's go-ahead, as given: 2026-11-06, read by 11:53 PM CT" in src
+    # and the gate is still the gate: the placeholder refuses before it changes anything
     d = _load()
     try:
         before = (d.val(FN_GRANTS), d.val(DEFAULT_ACL), d.val(RESOLVER_MD5))
-        rc, err = d.file(MIG)
+        rc, err = d.file(_with_go_ahead("PENDING"))
         assert rc != 0 and "0701 P0a: Chase's go-ahead is not in this file" in err, err
         assert (d.val(FN_GRANTS), d.val(DEFAULT_ACL), d.val(RESOLVER_MD5)) == before
         assert d.val("SELECT count(*) FROM public.ottoq_cert_lineage WHERE name LIKE '0701%'") == "0"
