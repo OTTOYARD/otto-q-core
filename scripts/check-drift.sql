@@ -849,8 +849,9 @@ repo_manifest(version, name, file) AS (
     ('20261106184139'::text, 'the_battery_grade_reads_its_day_in_five_minute_steps_whatever_the_tick'::text, '0807_the_battery_grade_reads_its_day_in_five_minute_steps_whatever_the_tick.sql'::text),
     ('20261107054553'::text, 'the_battery_forecast_is_usable_only_where_its_band_was_measured'::text, '0808_the_battery_forecast_is_usable_only_where_its_band_was_measured.sql'::text),
     ('PENDING'::text, 'the_battery_forecast_is_shrunk_as_far_as_its_own_misses_say_and_defers_to_the_day_plan_where_that_misses_less'::text, '0809_the_battery_forecast_is_shrunk_as_far_as_its_own_misses_say_and_defers_to_the_day_plan_where_that_misses_less.sql'::text),
-    ('PENDING'::text, 'the_twin_depot_has_an_electrical_one_line_and_every_transformer_is_measured'::text, '0810_the_twin_depot_has_an_electrical_one_line_and_every_transformer_is_measured.sql'::text),
-    ('PENDING'::text, 'five_standard_chargers_no_stall_names_are_decommissioned'::text, '0811_five_standard_chargers_no_stall_names_are_decommissioned.sql'::text)
+    ('20261111151626'::text, 'the_twin_depot_has_an_electrical_one_line_and_every_transformer_is_measured'::text, '0810_the_twin_depot_has_an_electrical_one_line_and_every_transformer_is_measured.sql'::text),
+    ('20261111151643'::text, 'five_standard_chargers_no_stall_names_are_decommissioned'::text, '0811_five_standard_chargers_no_stall_names_are_decommissioned.sql'::text),
+    ('PENDING'::text, 'the_right_size_reading_also_carries_the_busiest_half_hour'::text, '0812_the_right_size_reading_also_carries_the_busiest_half_hour.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

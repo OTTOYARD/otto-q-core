@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261111151643
 -- migration-name:    five_standard_chargers_no_stall_names_are_decommissioned
 --
 -- 0811  **Five standard chargers no stall names are decommissioned.** (G532)
@@ -62,3 +62,8 @@ VALUES ('0811_five_standard_chargers_no_stall_names_are_decommissioned', true, f
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-11: 2026-11-11 15:16:43 UTC (9:16 AM CT), ledger 20261111151643, by Claude Code through the Management API's migrations endpoint on Chase's
+--   instruction of 9:15 AM CT ("Apply 0810 and 0811 to the otto-q-core production database, deploy otto-twin-control, and
+--   start demo runs at the twin depot as needed"). The stored statement's md5 equals this file's as committed before this
+--   header and footer changed (aa7459021733fd3913ba3c1e747d9461).
