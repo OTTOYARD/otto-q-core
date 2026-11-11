@@ -1,0 +1,2363 @@
+{
+ "db": "ottoq_trip",
+ "run": "0911c1cf-4b32-413b-8a68-e144df5d9fad",
+ "seed": 171717,
+ "scenario": "busy_day",
+ "ticks": 48,
+ "trip": "TX-A1@20:90",
+ "trip_result": {
+  "ok": true,
+  "node": "TX-A1",
+  "trip_id": "d3869580-662f-4d02-9857-43e73382f798",
+  "cars_on_posts": 2,
+  "posts_faulted": 5,
+  "repair_minutes": 90,
+  "tripped_at_sim": "2026-09-01T12:00:00+00:00",
+  "recovers_at_sim": "2026-09-01T13:30:00+00:00",
+  "posts_under_node": 5,
+  "sessions_stopped": 2
+ },
+ "atoms": {
+  "fp": "a5e8cbbe5a62d0fadc7478aadaa08f83",
+  "h_cmd": "c18380bd60b58bf908c4687e44e5e885",
+  "h_dec": "44b33b367a6b226fe1c2620a3c1c6990",
+  "h_evt": "d81f1a02dce0b38e3b7cb9a0fb46ccc8",
+  "h_bkg": "3651973ebf423c071458ce5ee732f6fa",
+  "h_nrg": "3f3b99e28976039493df7d4d5cdfa948",
+  "h_prop": "12fb0a3f412c3d8259c5eca7bedb6532",
+  "h_defr": "d41d8cd98f00b204e9800998ecf8427e",
+  "h_cal": "b72a0671daa8a992a9d3f88f52422a46",
+  "h_rule": "a4bc6e2061f77f7619fc82f7721fa5de",
+  "h_rcl": "0a19c80a944e5b72f4382a94f0bc9929",
+  "h_sdr": "b5a4eb64c7860a70f5d26db25edda2f1",
+  "ticks": 48,
+  "endst": {
+   "legs": {
+    "fgn": {
+     "h": "d41d8cd98f00b204e9800998ecf8427e",
+     "n": 0
+    },
+    "vis": {
+     "h": "ee46928fcae30c60e612bf3314d75236",
+     "n": 1808
+    }
+   },
+   "world": "8ca0bea1707b3ed9e2d729e2ce194094",
+   "bookings": {
+    "fgn": {
+     "h": "d41d8cd98f00b204e9800998ecf8427e",
+     "n": 0
+    },
+    "vis": {
+     "h": "8f4d5481a1dde00b66da5496cd1b679d",
+     "n": 937
+    }
+   },
+   "chargers": {
+    "world": {
+     "h": "56b236b20236639302cf9ac9c1f7b767",
+     "n": 45
+    }
+   },
+   "dispatches": {
+    "fgn": {
+     "h": "d41d8cd98f00b204e9800998ecf8427e",
+     "n": 0
+    },
+    "vis": {
+     "h": "de0265ec4eda3eb269176dbe8cf42836",
+     "n": 238
+    }
+   },
+   "calibration": {
+    "h": "b72a0671daa8a992a9d3f88f52422a46"
+   },
+   "visit_needs": {
+    "fgn": {
+     "h": "d41d8cd98f00b204e9800998ecf8427e",
+     "n": 0
+    },
+    "vis": {
+     "h": "5b624906fd7960cb891095c167cc415f",
+     "n": 208
+    }
+   }
+  }
+ },
+ "one_line": {
+  "says": "Ratings are what is installed, at or above everything connected (rule 13). Nothing here limits a car.",
+  "nodes": [
+   {
+    "now": {
+     "kva": 10.1,
+     "kw_ac": 9.8,
+     "kw_dc": null,
+     "load_pu": 0.0065,
+     "loss_kw": null,
+     "ambient_c": 23.3,
+     "top_oil_c": null,
+     "hot_spot_c": null,
+     "aging_factor": null
+    },
+    "code": "NASH-BESS-01",
+    "kind": "bess",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T03:00:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 963.4,
+     "rightsize": null,
+     "peak_kw_ac": 934.5,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.623,
+     "energy_kwh_ac": 925.0,
+     "energy_kwh_dc": 0.0,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 17.5,
+     "max_hot_spot_at": null
+    },
+    "title": "Battery NASH-BESS-01",
+    "canopy": null,
+    "parent": "TX-AUX",
+    "rated_kw": 1500,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": null,
+    "power_node_fault": null
+   },
+   {
+    "now": {
+     "kva": 61.55,
+     "kw_ac": 59.7,
+     "kw_dc": null,
+     "load_pu": 0.2388,
+     "loss_kw": null,
+     "ambient_c": 23.3,
+     "top_oil_c": null,
+     "hot_spot_c": null,
+     "aging_factor": null
+    },
+    "code": "BUILDING",
+    "kind": "building",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T17:00:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 200.3,
+     "rightsize": null,
+     "peak_kw_ac": 194.3,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.7772,
+     "energy_kwh_ac": 2173.5,
+     "energy_kwh_dc": 0.0,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 23.5,
+     "max_hot_spot_at": null
+    },
+    "title": "Office, service garage, wash building, lighting",
+    "canopy": null,
+    "parent": "TX-AUX",
+    "rated_kw": 250,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": null,
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "MV-SWGR",
+    "kind": "mv_switchgear",
+    "study": null,
+    "title": "Primary switchgear (one feeder per transformer)",
+    "canopy": null,
+    "parent": "SERVICE",
+    "rated_kw": null,
+    "rated_kva": 17500,
+    "voltage_v": 13800,
+    "charger_state": null,
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-01",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T20:00:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 86.9,
+     "rightsize": null,
+     "peak_kw_ac": 84.3,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2265,
+     "energy_kwh_ac": 147.6,
+     "energy_kwh_dc": 138.8,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 4.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-01 W-01",
+    "canopy": "CANOPY-01",
+    "parent": "TX-A1",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": "TX-A1"
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-02",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T19:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 60.0,
+     "rightsize": null,
+     "peak_kw_ac": 58.2,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.1562,
+     "energy_kwh_ac": 153.5,
+     "energy_kwh_dc": 144.3,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 5.5,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-01 W-02",
+    "canopy": "CANOPY-01",
+    "parent": "TX-A1",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-03",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T21:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 114.0,
+     "rightsize": null,
+     "peak_kw_ac": 110.6,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2971,
+     "energy_kwh_ac": 284.7,
+     "energy_kwh_dc": 267.6,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 6.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-01 W-03",
+    "canopy": "CANOPY-01",
+    "parent": "TX-A1",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": "TX-A1"
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-04",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-02T00:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 74.6,
+     "rightsize": null,
+     "peak_kw_ac": 72.3,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.1942,
+     "energy_kwh_ac": 325.7,
+     "energy_kwh_dc": 306.2,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 7.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-01 W-04",
+    "canopy": "CANOPY-01",
+    "parent": "TX-A1",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": "TX-A1"
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-05",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T16:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 76.8,
+     "rightsize": null,
+     "peak_kw_ac": 74.5,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2001,
+     "energy_kwh_ac": 191.2,
+     "energy_kwh_dc": 179.7,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 6.5,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-01 W-05",
+    "canopy": "CANOPY-01",
+    "parent": "TX-A1",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-06",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T05:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 89.3,
+     "rightsize": null,
+     "peak_kw_ac": 86.6,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2325,
+     "energy_kwh_ac": 147.9,
+     "energy_kwh_dc": 139.0,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 3.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-01 E-06",
+    "canopy": "CANOPY-01",
+    "parent": "TX-A2",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-07",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T08:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 93.3,
+     "rightsize": null,
+     "peak_kw_ac": 90.5,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2432,
+     "energy_kwh_ac": 283.4,
+     "energy_kwh_dc": 266.4,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 6.5,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-01 E-07",
+    "canopy": "CANOPY-01",
+    "parent": "TX-A2",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-08",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T05:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 90.2,
+     "rightsize": null,
+     "peak_kw_ac": 87.4,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2349,
+     "energy_kwh_ac": 226.7,
+     "energy_kwh_dc": 213.1,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 6.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-01 E-08",
+    "canopy": "CANOPY-01",
+    "parent": "TX-A2",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-09",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T04:00:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 87.8,
+     "rightsize": null,
+     "peak_kw_ac": 85.1,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2287,
+     "energy_kwh_ac": 112.9,
+     "energy_kwh_dc": 106.2,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 3.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-01 E-09",
+    "canopy": "CANOPY-01",
+    "parent": "TX-A2",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Faulted",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-10",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T07:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 90.4,
+     "rightsize": null,
+     "peak_kw_ac": 87.7,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2354,
+     "energy_kwh_ac": 365.4,
+     "energy_kwh_dc": 343.4,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 8.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-01 E-10",
+    "canopy": "CANOPY-01",
+    "parent": "TX-A2",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-11",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T08:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 95.7,
+     "rightsize": null,
+     "peak_kw_ac": 92.9,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2494,
+     "energy_kwh_ac": 203.3,
+     "energy_kwh_dc": 191.1,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 5.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-02 W-11",
+    "canopy": "CANOPY-02",
+    "parent": "TX-B1",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-12",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-02T02:00:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 119.4,
+     "rightsize": null,
+     "peak_kw_ac": 115.8,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.311,
+     "energy_kwh_ac": 241.5,
+     "energy_kwh_dc": 227.1,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 6.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-02 W-12",
+    "canopy": "CANOPY-02",
+    "parent": "TX-B1",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-13",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-02T00:00:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 99.8,
+     "rightsize": null,
+     "peak_kw_ac": 96.8,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2599,
+     "energy_kwh_ac": 156.6,
+     "energy_kwh_dc": 147.2,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 3.5,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-02 W-13",
+    "canopy": "CANOPY-02",
+    "parent": "TX-B1",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-14",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T12:00:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 72.5,
+     "rightsize": null,
+     "peak_kw_ac": 70.3,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.1889,
+     "energy_kwh_ac": 142.7,
+     "energy_kwh_dc": 134.1,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 5.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-02 W-14",
+    "canopy": "CANOPY-02",
+    "parent": "TX-B1",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Faulted",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-15",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T20:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 106.0,
+     "rightsize": null,
+     "peak_kw_ac": 102.8,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2762,
+     "energy_kwh_ac": 282.7,
+     "energy_kwh_dc": 265.8,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 8.5,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-02 W-15",
+    "canopy": "CANOPY-02",
+    "parent": "TX-B1",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-16",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T20:00:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 99.6,
+     "rightsize": null,
+     "peak_kw_ac": 96.7,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2596,
+     "energy_kwh_ac": 132.0,
+     "energy_kwh_dc": 124.1,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 3.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-02 E-16",
+    "canopy": "CANOPY-02",
+    "parent": "TX-B2",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-17",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T08:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 91.6,
+     "rightsize": null,
+     "peak_kw_ac": 88.9,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2387,
+     "energy_kwh_ac": 215.2,
+     "energy_kwh_dc": 202.3,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 6.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-02 E-17",
+    "canopy": "CANOPY-02",
+    "parent": "TX-B2",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-18",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-02T01:00:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 127.1,
+     "rightsize": null,
+     "peak_kw_ac": 123.3,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.3311,
+     "energy_kwh_ac": 255.5,
+     "energy_kwh_dc": 240.2,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 5.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-02 E-18",
+    "canopy": "CANOPY-02",
+    "parent": "TX-B2",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-19",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-02T01:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 118.7,
+     "rightsize": null,
+     "peak_kw_ac": 115.2,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.3093,
+     "energy_kwh_ac": 279.1,
+     "energy_kwh_dc": 262.4,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 6.5,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-02 E-19",
+    "canopy": "CANOPY-02",
+    "parent": "TX-B2",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-20",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T09:00:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 99.8,
+     "rightsize": null,
+     "peak_kw_ac": 96.8,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.26,
+     "energy_kwh_ac": 372.8,
+     "energy_kwh_dc": 350.4,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 8.5,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-02 E-20",
+    "canopy": "CANOPY-02",
+    "parent": "TX-B2",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-21",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T20:00:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 101.8,
+     "rightsize": null,
+     "peak_kw_ac": 98.8,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2653,
+     "energy_kwh_ac": 140.6,
+     "energy_kwh_dc": 132.2,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 3.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-03 W-21",
+    "canopy": "CANOPY-03",
+    "parent": "TX-C1",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-22",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T20:00:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 80.4,
+     "rightsize": null,
+     "peak_kw_ac": 78.0,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2095,
+     "energy_kwh_ac": 194.7,
+     "energy_kwh_dc": 183.0,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 5.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-03 W-22",
+    "canopy": "CANOPY-03",
+    "parent": "TX-C1",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-23",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T23:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 102.0,
+     "rightsize": null,
+     "peak_kw_ac": 98.9,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2657,
+     "energy_kwh_ac": 252.4,
+     "energy_kwh_dc": 237.3,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 7.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-03 W-23",
+    "canopy": "CANOPY-03",
+    "parent": "TX-C1",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-24",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-02T01:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 84.4,
+     "rightsize": null,
+     "peak_kw_ac": 81.9,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.22,
+     "energy_kwh_ac": 314.1,
+     "energy_kwh_dc": 295.3,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 6.5,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-03 W-24",
+    "canopy": "CANOPY-03",
+    "parent": "TX-C1",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-25",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T17:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 98.7,
+     "rightsize": null,
+     "peak_kw_ac": 95.8,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2572,
+     "energy_kwh_ac": 333.2,
+     "energy_kwh_dc": 313.2,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 8.5,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-03 W-25",
+    "canopy": "CANOPY-03",
+    "parent": "TX-C1",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-26",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T04:00:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 71.5,
+     "rightsize": null,
+     "peak_kw_ac": 69.4,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.1863,
+     "energy_kwh_ac": 131.8,
+     "energy_kwh_dc": 123.9,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 4.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-03 E-26",
+    "canopy": "CANOPY-03",
+    "parent": "TX-C2",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-27",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T19:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 107.2,
+     "rightsize": null,
+     "peak_kw_ac": 104.0,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2793,
+     "energy_kwh_ac": 235.2,
+     "energy_kwh_dc": 221.0,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 6.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-03 E-27",
+    "canopy": "CANOPY-03",
+    "parent": "TX-C2",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-28",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T08:00:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 93.8,
+     "rightsize": null,
+     "peak_kw_ac": 91.0,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2444,
+     "energy_kwh_ac": 123.6,
+     "energy_kwh_dc": 116.2,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 3.5,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-03 E-28",
+    "canopy": "CANOPY-03",
+    "parent": "TX-C2",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-29",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T18:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 66.4,
+     "rightsize": null,
+     "peak_kw_ac": 64.4,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.1731,
+     "energy_kwh_ac": 280.5,
+     "energy_kwh_dc": 263.7,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 11.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-03 E-29",
+    "canopy": "CANOPY-03",
+    "parent": "TX-C2",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": null,
+    "code": "NASH-DCFC-30",
+    "kind": "post",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T20:30:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 95.1,
+     "rightsize": null,
+     "peak_kw_ac": 92.2,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.2477,
+     "energy_kwh_ac": 316.1,
+     "energy_kwh_dc": 297.1,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 9.0,
+     "max_hot_spot_at": null
+    },
+    "title": "CANOPY-03 E-30",
+    "canopy": "CANOPY-03",
+    "parent": "TX-C2",
+    "rated_kw": 350,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": "Available",
+    "power_node_fault": null
+   },
+   {
+    "now": {
+     "kva": 0.0,
+     "kw_ac": 0.0,
+     "kw_dc": null,
+     "load_pu": 0.0,
+     "loss_kw": null,
+     "ambient_c": 23.3,
+     "top_oil_c": null,
+     "hot_spot_c": null,
+     "aging_factor": null
+    },
+    "code": "PV-CANOPIES",
+    "kind": "solar",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T20:00:00+00:00",
+     "loss_kwh": 0.0,
+     "peak_kva": 423.2,
+     "rightsize": null,
+     "peak_kw_ac": 410.5,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.6842,
+     "energy_kwh_ac": -2992.3,
+     "energy_kwh_dc": 0.0,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": null,
+     "hours_energized": 12.0,
+     "max_hot_spot_at": null
+    },
+    "title": "Canopy solar (inverters)",
+    "canopy": null,
+    "parent": "TX-AUX",
+    "rated_kw": 600,
+    "rated_kva": null,
+    "voltage_v": 480,
+    "charger_state": null,
+    "power_node_fault": null
+   },
+   {
+    "now": {
+     "kva": 0.0,
+     "kw_ac": 0.0,
+     "kw_dc": 0,
+     "load_pu": 0.0,
+     "loss_kw": 4.167,
+     "ambient_c": 23.3,
+     "top_oil_c": 36.47,
+     "hot_spot_c": 36.47,
+     "aging_factor": 9.1e-05
+    },
+    "code": "TX-A1",
+    "kind": "transformer",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T06:30:00+00:00",
+     "loss_kwh": 98.3,
+     "peak_kva": 224.3,
+     "rightsize": {
+      "is": "a reading of one run, for a person; it changes no node (rules 10, 13)",
+      "rule": "hot spot never over 110 C and the day ages the insulation no faster than normal",
+      "by_size": [
+       {
+        "kva": 300,
+        "max_hot_spot_c": 58.6,
+        "aging_vs_normal": 0.0004
+       },
+       {
+        "kva": 500,
+        "max_hot_spot_c": 50.3,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 750,
+        "max_hot_spot_c": 47.3,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 1000,
+        "max_hot_spot_c": 46.1,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 1500,
+        "max_hot_spot_c": 45.4,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 2000,
+        "max_hot_spot_c": 45.2,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 2500,
+        "max_hot_spot_c": 45.1,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 3000,
+        "max_hot_spot_c": 45.1,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 3750,
+        "max_hot_spot_c": 45.1,
+        "aging_vs_normal": 0.0002
+       }
+      ],
+      "installed_kva": 2500,
+      "smallest_kva_this_day_fits": 300
+     },
+     "peak_kw_ac": 217.6,
+     "aging_hours": 0.004,
+     "load_seconds": [
+      84600.0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.0897,
+     "energy_kwh_ac": 1102.7,
+     "energy_kwh_dc": 1036.5,
+     "max_top_oil_c": 45.04,
+     "max_hot_spot_c": 45.14,
+     "peak_30min_kva": 224.33,
+     "hours_energized": 14.5,
+     "max_hot_spot_at": "2026-09-01T19:30:00+00:00"
+    },
+    "title": "Transformer TX-A1 (CANOPY-01, W side, 5 posts)",
+    "canopy": "CANOPY-01",
+    "parent": "MV-SWGR",
+    "rated_kw": null,
+    "rated_kva": 2500,
+    "voltage_v": 480,
+    "charger_state": null,
+    "power_node_fault": null
+   },
+   {
+    "now": {
+     "kva": 83.98,
+     "kw_ac": 81.46,
+     "kw_dc": 76.57,
+     "load_pu": 0.0336,
+     "loss_kw": 4.19,
+     "ambient_c": 23.3,
+     "top_oil_c": 36.46,
+     "hot_spot_c": 36.57,
+     "aging_factor": 9.2e-05
+    },
+    "code": "TX-A2",
+    "kind": "transformer",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T05:30:00+00:00",
+     "loss_kwh": 98.4,
+     "peak_kva": 239.1,
+     "rightsize": {
+      "is": "a reading of one run, for a person; it changes no node (rules 10, 13)",
+      "rule": "hot spot never over 110 C and the day ages the insulation no faster than normal",
+      "by_size": [
+       {
+        "kva": 300,
+        "max_hot_spot_c": 58.4,
+        "aging_vs_normal": 0.0004
+       },
+       {
+        "kva": 500,
+        "max_hot_spot_c": 49.3,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 750,
+        "max_hot_spot_c": 47.1,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 1000,
+        "max_hot_spot_c": 46.2,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 1500,
+        "max_hot_spot_c": 45.5,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 2000,
+        "max_hot_spot_c": 45.3,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 2500,
+        "max_hot_spot_c": 45.1,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 3000,
+        "max_hot_spot_c": 45.1,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 3750,
+        "max_hot_spot_c": 45.1,
+        "aging_vs_normal": 0.0002
+       }
+      ],
+      "installed_kva": 2500,
+      "smallest_kva_this_day_fits": 300
+     },
+     "peak_kw_ac": 231.9,
+     "aging_hours": 0.004,
+     "load_seconds": [
+      84600.0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.0956,
+     "energy_kwh_ac": 1136.3,
+     "energy_kwh_dc": 1068.1,
+     "max_top_oil_c": 45.04,
+     "max_hot_spot_c": 45.12,
+     "peak_30min_kva": 239.07,
+     "hours_energized": 14.5,
+     "max_hot_spot_at": "2026-09-01T20:00:00+00:00"
+    },
+    "title": "Transformer TX-A2 (CANOPY-01, E side, 5 posts)",
+    "canopy": "CANOPY-01",
+    "parent": "MV-SWGR",
+    "rated_kw": null,
+    "rated_kva": 2500,
+    "voltage_v": 480,
+    "charger_state": null,
+    "power_node_fault": null
+   },
+   {
+    "now": {
+     "kva": 71.65,
+     "kw_ac": 69.5,
+     "kw_dc": 0,
+     "load_pu": 0.0287,
+     "loss_kw": 4.184,
+     "ambient_c": 23.3,
+     "top_oil_c": 36.55,
+     "hot_spot_c": 36.64,
+     "aging_factor": 9.3e-05
+    },
+    "code": "TX-AUX",
+    "kind": "transformer",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T03:00:00+00:00",
+     "loss_kwh": 101.8,
+     "peak_kva": 905.9,
+     "rightsize": {
+      "is": "a reading of one run, for a person; it changes no node (rules 10, 13)",
+      "rule": "hot spot never over 110 C and the day ages the insulation no faster than normal",
+      "by_size": [
+       {
+        "kva": 300,
+        "max_hot_spot_c": 224.4,
+        "aging_vs_normal": 173.6224
+       },
+       {
+        "kva": 500,
+        "max_hot_spot_c": 118.5,
+        "aging_vs_normal": 0.0509
+       },
+       {
+        "kva": 750,
+        "max_hot_spot_c": 78.6,
+        "aging_vs_normal": 0.0011
+       },
+       {
+        "kva": 1000,
+        "max_hot_spot_c": 62.6,
+        "aging_vs_normal": 0.0004
+       },
+       {
+        "kva": 1500,
+        "max_hot_spot_c": 49.6,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 2000,
+        "max_hot_spot_c": 46.4,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 2500,
+        "max_hot_spot_c": 45.9,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 3000,
+        "max_hot_spot_c": 45.6,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 3750,
+        "max_hot_spot_c": 45.4,
+        "aging_vs_normal": 0.0002
+       }
+      ],
+      "installed_kva": 2500,
+      "smallest_kva_this_day_fits": 750
+     },
+     "peak_kw_ac": 878.7,
+     "aging_hours": 0.004,
+     "load_seconds": [
+      70200.0,
+      12600.0,
+      0,
+      1800.0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.3624,
+     "energy_kwh_ac": 3862.8,
+     "energy_kwh_dc": 0.0,
+     "max_top_oil_c": 45.33,
+     "max_hot_spot_c": 45.89,
+     "peak_30min_kva": 905.88,
+     "hours_energized": 23.0,
+     "max_hot_spot_at": "2026-09-01T20:30:00+00:00"
+    },
+    "title": "Transformer TX-AUX (battery, building, canopy solar)",
+    "canopy": null,
+    "parent": "MV-SWGR",
+    "rated_kw": null,
+    "rated_kva": 2500,
+    "voltage_v": 480,
+    "charger_state": null,
+    "power_node_fault": null
+   },
+   {
+    "now": {
+     "kva": 119.37,
+     "kw_ac": 115.79,
+     "kw_dc": 108.84,
+     "load_pu": 0.0477,
+     "loss_kw": 4.214,
+     "ambient_c": 23.3,
+     "top_oil_c": 36.46,
+     "hot_spot_c": 36.65,
+     "aging_factor": 9.4e-05
+    },
+    "code": "TX-B1",
+    "kind": "transformer",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T04:00:00+00:00",
+     "loss_kwh": 98.3,
+     "peak_kva": 197.8,
+     "rightsize": {
+      "is": "a reading of one run, for a person; it changes no node (rules 10, 13)",
+      "rule": "hot spot never over 110 C and the day ages the insulation no faster than normal",
+      "by_size": [
+       {
+        "kva": 300,
+        "max_hot_spot_c": 59.0,
+        "aging_vs_normal": 0.0003
+       },
+       {
+        "kva": 500,
+        "max_hot_spot_c": 50.9,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 750,
+        "max_hot_spot_c": 47.9,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 1000,
+        "max_hot_spot_c": 46.7,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 1500,
+        "max_hot_spot_c": 45.8,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 2000,
+        "max_hot_spot_c": 45.4,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 2500,
+        "max_hot_spot_c": 45.2,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 3000,
+        "max_hot_spot_c": 45.1,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 3750,
+        "max_hot_spot_c": 45.1,
+        "aging_vs_normal": 0.0002
+       }
+      ],
+      "installed_kva": 2500,
+      "smallest_kva_this_day_fits": 300
+     },
+     "peak_kw_ac": 191.9,
+     "aging_hours": 0.004,
+     "load_seconds": [
+      84600.0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.0791,
+     "energy_kwh_ac": 1026.9,
+     "energy_kwh_dc": 965.3,
+     "max_top_oil_c": 45.04,
+     "max_hot_spot_c": 45.23,
+     "peak_30min_kva": 197.8,
+     "hours_energized": 14.0,
+     "max_hot_spot_at": "2026-09-01T20:30:00+00:00"
+    },
+    "title": "Transformer TX-B1 (CANOPY-02, W side, 5 posts)",
+    "canopy": "CANOPY-02",
+    "parent": "MV-SWGR",
+    "rated_kw": null,
+    "rated_kva": 2500,
+    "voltage_v": 480,
+    "charger_state": null,
+    "power_node_fault": null
+   },
+   {
+    "now": {
+     "kva": 20.67,
+     "kw_ac": 20.05,
+     "kw_dc": 18.85,
+     "load_pu": 0.0083,
+     "loss_kw": 4.168,
+     "ambient_c": 23.3,
+     "top_oil_c": 36.51,
+     "hot_spot_c": 36.53,
+     "aging_factor": 9.2e-05
+    },
+    "code": "TX-B2",
+    "kind": "transformer",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T19:30:00+00:00",
+     "loss_kwh": 98.6,
+     "peak_kva": 237.5,
+     "rightsize": {
+      "is": "a reading of one run, for a person; it changes no node (rules 10, 13)",
+      "rule": "hot spot never over 110 C and the day ages the insulation no faster than normal",
+      "by_size": [
+       {
+        "kva": 300,
+        "max_hot_spot_c": 68.8,
+        "aging_vs_normal": 0.0009
+       },
+       {
+        "kva": 500,
+        "max_hot_spot_c": 55.0,
+        "aging_vs_normal": 0.0003
+       },
+       {
+        "kva": 750,
+        "max_hot_spot_c": 49.9,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 1000,
+        "max_hot_spot_c": 48.0,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 1500,
+        "max_hot_spot_c": 46.6,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 2000,
+        "max_hot_spot_c": 46.0,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 2500,
+        "max_hot_spot_c": 45.7,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 3000,
+        "max_hot_spot_c": 45.5,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 3750,
+        "max_hot_spot_c": 45.4,
+        "aging_vs_normal": 0.0002
+       }
+      ],
+      "installed_kva": 2500,
+      "smallest_kva_this_day_fits": 300
+     },
+     "peak_kw_ac": 230.4,
+     "aging_hours": 0.004,
+     "load_seconds": [
+      84600.0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.095,
+     "energy_kwh_ac": 1254.7,
+     "energy_kwh_dc": 1179.5,
+     "max_top_oil_c": 45.1,
+     "max_hot_spot_c": 45.68,
+     "peak_30min_kva": 237.5,
+     "hours_energized": 14.0,
+     "max_hot_spot_at": "2026-09-01T19:30:00+00:00"
+    },
+    "title": "Transformer TX-B2 (CANOPY-02, E side, 5 posts)",
+    "canopy": "CANOPY-02",
+    "parent": "MV-SWGR",
+    "rated_kw": null,
+    "rated_kva": 2500,
+    "voltage_v": 480,
+    "charger_state": null,
+    "power_node_fault": null
+   },
+   {
+    "now": {
+     "kva": 88.9,
+     "kw_ac": 86.23,
+     "kw_dc": 81.06,
+     "load_pu": 0.0356,
+     "loss_kw": 4.193,
+     "ambient_c": 23.3,
+     "top_oil_c": 36.47,
+     "hot_spot_c": 36.59,
+     "aging_factor": 9.3e-05
+    },
+    "code": "TX-C1",
+    "kind": "transformer",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T20:30:00+00:00",
+     "loss_kwh": 98.4,
+     "peak_kva": 210.8,
+     "rightsize": {
+      "is": "a reading of one run, for a person; it changes no node (rules 10, 13)",
+      "rule": "hot spot never over 110 C and the day ages the insulation no faster than normal",
+      "by_size": [
+       {
+        "kva": 300,
+        "max_hot_spot_c": 66.5,
+        "aging_vs_normal": 0.0006
+       },
+       {
+        "kva": 500,
+        "max_hot_spot_c": 54.0,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 750,
+        "max_hot_spot_c": 49.4,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 1000,
+        "max_hot_spot_c": 47.6,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 1500,
+        "max_hot_spot_c": 46.2,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 2000,
+        "max_hot_spot_c": 45.7,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 2500,
+        "max_hot_spot_c": 45.4,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 3000,
+        "max_hot_spot_c": 45.3,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 3750,
+        "max_hot_spot_c": 45.1,
+        "aging_vs_normal": 0.0002
+       }
+      ],
+      "installed_kva": 2500,
+      "smallest_kva_this_day_fits": 300
+     },
+     "peak_kw_ac": 204.5,
+     "aging_hours": 0.004,
+     "load_seconds": [
+      84600.0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.0843,
+     "energy_kwh_ac": 1235.0,
+     "energy_kwh_dc": 1160.9,
+     "max_top_oil_c": 45.05,
+     "max_hot_spot_c": 45.42,
+     "peak_30min_kva": 210.84,
+     "hours_energized": 15.0,
+     "max_hot_spot_at": "2026-09-01T20:30:00+00:00"
+    },
+    "title": "Transformer TX-C1 (CANOPY-03, W side, 5 posts)",
+    "canopy": "CANOPY-03",
+    "parent": "MV-SWGR",
+    "rated_kw": null,
+    "rated_kva": 2500,
+    "voltage_v": 480,
+    "charger_state": null,
+    "power_node_fault": null
+   },
+   {
+    "now": {
+     "kva": 15.11,
+     "kw_ac": 14.66,
+     "kw_dc": 13.78,
+     "load_pu": 0.006,
+     "loss_kw": 4.167,
+     "ambient_c": 23.3,
+     "top_oil_c": 36.45,
+     "hot_spot_c": 36.46,
+     "aging_factor": 9.1e-05
+    },
+    "code": "TX-C2",
+    "kind": "transformer",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T03:00:00+00:00",
+     "loss_kwh": 98.3,
+     "peak_kva": 228.9,
+     "rightsize": {
+      "is": "a reading of one run, for a person; it changes no node (rules 10, 13)",
+      "rule": "hot spot never over 110 C and the day ages the insulation no faster than normal",
+      "by_size": [
+       {
+        "kva": 300,
+        "max_hot_spot_c": 56.9,
+        "aging_vs_normal": 0.0004
+       },
+       {
+        "kva": 500,
+        "max_hot_spot_c": 49.9,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 750,
+        "max_hot_spot_c": 47.4,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 1000,
+        "max_hot_spot_c": 46.4,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 1500,
+        "max_hot_spot_c": 45.7,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 2000,
+        "max_hot_spot_c": 45.4,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 2500,
+        "max_hot_spot_c": 45.3,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 3000,
+        "max_hot_spot_c": 45.2,
+        "aging_vs_normal": 0.0002
+       },
+       {
+        "kva": 3750,
+        "max_hot_spot_c": 45.2,
+        "aging_vs_normal": 0.0002
+       }
+      ],
+      "installed_kva": 2500,
+      "smallest_kva_this_day_fits": 300
+     },
+     "peak_kw_ac": 222.0,
+     "aging_hours": 0.004,
+     "load_seconds": [
+      84600.0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.0916,
+     "energy_kwh_ac": 1087.2,
+     "energy_kwh_dc": 1022.0,
+     "max_top_oil_c": 45.05,
+     "max_hot_spot_c": 45.3,
+     "peak_30min_kva": 228.89,
+     "hours_energized": 17.0,
+     "max_hot_spot_at": "2026-09-01T19:30:00+00:00"
+    },
+    "title": "Transformer TX-C2 (CANOPY-03, E side, 5 posts)",
+    "canopy": "CANOPY-03",
+    "parent": "MV-SWGR",
+    "rated_kw": null,
+    "rated_kva": 2500,
+    "voltage_v": 480,
+    "charger_state": null,
+    "power_node_fault": null
+   },
+   {
+    "now": {
+     "kva": 429.87,
+     "kw_ac": 416.97,
+     "kw_dc": 299.1,
+     "load_pu": 0.0246,
+     "loss_kw": 29.283,
+     "ambient_c": 23.3,
+     "top_oil_c": null,
+     "hot_spot_c": null,
+     "aging_factor": null
+    },
+    "code": "SERVICE",
+    "kind": "utility_service",
+    "study": {
+     "hours": 23.5,
+     "peak_at": "2026-09-01T04:00:00+00:00",
+     "loss_kwh": 692.1,
+     "peak_kva": 869.9,
+     "rightsize": null,
+     "peak_kw_ac": 843.8,
+     "aging_hours": 0.0,
+     "load_seconds": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "peak_load_pu": 0.0497,
+     "energy_kwh_ac": 7872.5,
+     "energy_kwh_dc": 6432.2,
+     "max_top_oil_c": null,
+     "max_hot_spot_c": null,
+     "peak_30min_kva": 869.89,
+     "hours_energized": 23.5,
+     "max_hot_spot_at": null
+    },
+    "title": "Utility service, primary metered",
+    "canopy": null,
+    "parent": null,
+    "rated_kw": null,
+    "rated_kva": 17500,
+    "voltage_v": 13800,
+    "charger_state": null,
+    "power_node_fault": null
+   }
+  ],
+  "trips": [
+   {
+    "node": "TX-A1",
+    "actor": "lab_power_day",
+    "trip_id": "d3869580-662f-4d02-9857-43e73382f798",
+    "cars_on_posts": 2,
+    "posts_faulted": 5,
+    "tripped_at_sim": "2026-09-01T12:00:00+00:00",
+    "recovers_at_sim": "2026-09-01T13:30:00+00:00",
+    "sessions_stopped": 2
+   }
+  ],
+  "design": "one_line_v1",
+  "depot_id": "11111111-1111-1111-1111-111111111111",
+  "as_of_sim": "2026-09-02T02:00:00+00:00",
+  "run_status": "completed",
+  "sim_run_id": "0911c1cf-4b32-413b-8a68-e144df5d9fad",
+  "site_meter_kw": 368.6
+ },
+ "wall_s": 141.2,
+ "tick_s_mean": 2.91
+}

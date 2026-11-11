@@ -1,0 +1,77 @@
+{
+ "db": "ottoq_ctl2",
+ "run": "c2529bca-accc-425f-89af-7a9d02908c33",
+ "seed": 171717,
+ "scenario": "busy_day",
+ "ticks": 48,
+ "trip": null,
+ "atoms": {
+  "fp": "a5e8cbbe5a62d0fadc7478aadaa08f83",
+  "h_cmd": "01d531be43befb52ba4e89ee23d7ed01",
+  "h_dec": "dc12634f17fb74f7753b86c06782abe7",
+  "h_evt": "83290153f2a778f82f476d1cb01c1da1",
+  "h_bkg": "48b465d1332f0a00ee6391f60094ca9c",
+  "h_nrg": "8822c28bd2bb0bdfc1a84dcd898e2f28",
+  "h_prop": "606bdf8c8461369dbf8c6fb16cd0501a",
+  "h_defr": "d41d8cd98f00b204e9800998ecf8427e",
+  "h_cal": "b72a0671daa8a992a9d3f88f52422a46",
+  "h_rule": "1e6f2686a781848ff23968db4a61d8fb",
+  "h_rcl": "31ac1edf996bf023c0d74c1b205b69db",
+  "h_sdr": "daa85acad8d595d234304cd5b27b930b",
+  "ticks": 48,
+  "endst": {
+   "legs": {
+    "fgn": {
+     "h": "d41d8cd98f00b204e9800998ecf8427e",
+     "n": 0
+    },
+    "vis": {
+     "h": "b8bab7d0d1a61aadac7d62455321d043",
+     "n": 1797
+    }
+   },
+   "world": "19507cd1119b8e09400cb705d3a32b31",
+   "bookings": {
+    "fgn": {
+     "h": "d41d8cd98f00b204e9800998ecf8427e",
+     "n": 0
+    },
+    "vis": {
+     "h": "6bac65de1d05a07016838a6e2f7d4f0c",
+     "n": 923
+    }
+   },
+   "chargers": {
+    "world": {
+     "h": "5e06bb128e10989f4233844c096f7d3c",
+     "n": 45
+    }
+   },
+   "dispatches": {
+    "fgn": {
+     "h": "d41d8cd98f00b204e9800998ecf8427e",
+     "n": 0
+    },
+    "vis": {
+     "h": "9049e3466e0f06e3345a37f5de1869e2",
+     "n": 236
+    }
+   },
+   "calibration": {
+    "h": "b72a0671daa8a992a9d3f88f52422a46"
+   },
+   "visit_needs": {
+    "fgn": {
+     "h": "d41d8cd98f00b204e9800998ecf8427e",
+     "n": 0
+    },
+    "vis": {
+     "h": "58b11feae3152f9d557782bcc7feee48",
+     "n": 208
+    }
+   }
+  }
+ },
+ "wall_s": 138.8,
+ "tick_s_mean": 2.86
+}
