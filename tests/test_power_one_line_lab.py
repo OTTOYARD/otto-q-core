@@ -83,7 +83,7 @@ def test_no_engine_function_reads_the_tree_to_decide(db):
         select string_agg(p.proname, ',' order by p.proname) from pg_proc p
          where p.pronamespace::regnamespace::text in ('public', 'ottoq', 'twin') and p.prosrc ~ 'ottoq_power_node'""")
     assert set(readers.split(",")) == {
-        "ottoq_power_capture", "ottoq_power_one_line", "ottoq_power_one_line_design", "ottoq_power_rightsize",
+        "ottoq_power_capture", "ottoq_power_one_line", "ottoq_power_one_line_design", "ottoq_power_resilience", "ottoq_power_rightsize",
         "ottoq_power_study_on_run_end", "ottoq_twin_trip_power_node"}
 
 
@@ -136,7 +136,8 @@ def test_the_trip_door_refuses_what_it_should_and_only_the_server_may_call_it(db
     assert (priv("anon", trip), priv("authenticated", trip), priv("service_role", trip)) == ("f", "f", "t")
     read = "public.ottoq_power_one_line(uuid, uuid)"
     assert (priv("anon", read), priv("authenticated", read)) == ("t", "t")
-    for fn in ("public.ottoq_power_capture(uuid, uuid, timestamptz, numeric, numeric, numeric)", "public.ottoq_power_rightsize(uuid)"):
+    for fn in ("public.ottoq_power_capture(uuid, uuid, timestamptz, numeric, numeric, numeric)", "public.ottoq_power_rightsize(uuid)",
+               "public.ottoq_power_resilience(uuid)"):
         assert (priv("anon", fn), priv("authenticated", fn)) == ("f", "f")
     # the tables are read-only to the client keys
     assert _psql(db, "select bool_or(has_table_privilege(r, t, 'insert, update, delete')) from unnest(array['anon','authenticated']) r, "

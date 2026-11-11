@@ -1,6 +1,6 @@
 {
- "db": "ottoq_pw2",
- "run": "e7e66bcd-3fb4-4bed-a8c6-b9d8fd51fe7a",
+ "db": "ottoq_pw4",
+ "run": "2f1db0ba-66e1-411c-b8d2-7ebe00796fe6",
  "seed": 171717,
  "scenario": "busy_day",
  "ticks": 48,
@@ -96,6 +96,7 @@
      "peak_kva": 963.4,
      "rightsize": null,
      "peak_kw_ac": 934.5,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -149,6 +150,7 @@
      "peak_kva": 200.3,
      "rightsize": null,
      "peak_kw_ac": 194.3,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -210,6 +212,7 @@
      "peak_kva": 81.9,
      "rightsize": null,
      "peak_kw_ac": 79.4,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -257,6 +260,7 @@
      "peak_kva": 63.7,
      "rightsize": null,
      "peak_kw_ac": 61.8,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -304,6 +308,7 @@
      "peak_kva": 119.4,
      "rightsize": null,
      "peak_kw_ac": 115.8,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -351,6 +356,7 @@
      "peak_kva": 67.6,
      "rightsize": null,
      "peak_kw_ac": 65.6,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -398,6 +404,7 @@
      "peak_kva": 76.8,
      "rightsize": null,
      "peak_kw_ac": 74.5,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -445,6 +452,7 @@
      "peak_kva": 89.3,
      "rightsize": null,
      "peak_kw_ac": 86.6,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -492,6 +500,7 @@
      "peak_kva": 93.3,
      "rightsize": null,
      "peak_kw_ac": 90.5,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -539,6 +548,7 @@
      "peak_kva": 90.2,
      "rightsize": null,
      "peak_kw_ac": 87.4,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -586,6 +596,7 @@
      "peak_kva": 87.8,
      "rightsize": null,
      "peak_kw_ac": 85.1,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -633,6 +644,7 @@
      "peak_kva": 90.4,
      "rightsize": null,
      "peak_kw_ac": 87.7,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -680,6 +692,7 @@
      "peak_kva": 95.7,
      "rightsize": null,
      "peak_kw_ac": 92.9,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -727,6 +740,7 @@
      "peak_kva": 98.0,
      "rightsize": null,
      "peak_kw_ac": 95.1,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -774,6 +788,7 @@
      "peak_kva": 97.5,
      "rightsize": null,
      "peak_kw_ac": 94.6,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -821,6 +836,7 @@
      "peak_kva": 77.6,
      "rightsize": null,
      "peak_kw_ac": 75.2,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -868,6 +884,7 @@
      "peak_kva": 95.1,
      "rightsize": null,
      "peak_kw_ac": 92.2,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -915,6 +932,7 @@
      "peak_kva": 86.9,
      "rightsize": null,
      "peak_kw_ac": 84.3,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -962,6 +980,7 @@
      "peak_kva": 91.6,
      "rightsize": null,
      "peak_kw_ac": 88.9,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -1009,6 +1028,7 @@
      "peak_kva": 96.4,
      "rightsize": null,
      "peak_kw_ac": 93.5,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -1056,6 +1076,7 @@
      "peak_kva": 98.3,
      "rightsize": null,
      "peak_kw_ac": 95.3,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -1103,6 +1124,7 @@
      "peak_kva": 103.0,
      "rightsize": null,
      "peak_kw_ac": 100.0,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -1150,6 +1172,7 @@
      "peak_kva": 66.9,
      "rightsize": null,
      "peak_kw_ac": 64.9,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -1197,6 +1220,7 @@
      "peak_kva": 75.0,
      "rightsize": null,
      "peak_kw_ac": 72.8,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -1244,6 +1268,7 @@
      "peak_kva": 79.3,
      "rightsize": null,
      "peak_kw_ac": 76.9,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -1291,6 +1316,7 @@
      "peak_kva": 102.0,
      "rightsize": null,
      "peak_kw_ac": 98.9,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -1338,6 +1364,7 @@
      "peak_kva": 118.7,
      "rightsize": null,
      "peak_kw_ac": 115.2,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -1385,6 +1412,7 @@
      "peak_kva": 101.8,
      "rightsize": null,
      "peak_kw_ac": 98.8,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -1432,6 +1460,7 @@
      "peak_kva": 107.2,
      "rightsize": null,
      "peak_kw_ac": 104.0,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -1479,6 +1508,7 @@
      "peak_kva": 93.8,
      "rightsize": null,
      "peak_kw_ac": 91.0,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -1526,6 +1556,7 @@
      "peak_kva": 127.1,
      "rightsize": null,
      "peak_kw_ac": 123.3,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -1573,6 +1604,7 @@
      "peak_kva": 80.5,
      "rightsize": null,
      "peak_kw_ac": 78.0,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -1626,6 +1658,7 @@
      "peak_kva": 423.2,
      "rightsize": null,
      "peak_kw_ac": 410.5,
+     "resilience": null,
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -1731,6 +1764,15 @@
       "smallest_kva_this_day_fits": 300
      },
      "peak_kw_ac": 217.6,
+     "resilience": {
+      "is": "a reading of one run: posts already down are not counted out, and a car moved is still a charge interrupted",
+      "busiest_at": "2026-09-01T02:30:00+00:00",
+      "cars_at_busiest": 5,
+      "posts_elsewhere": 25,
+      "worst_shortfall_at": "2026-09-01T02:30:00+00:00",
+      "worst_shortfall_cars": 5,
+      "free_posts_elsewhere_then": 0
+     },
      "aging_hours": 0.004,
      "load_seconds": [
       84600.0,
@@ -1836,6 +1878,15 @@
       "smallest_kva_this_day_fits": 300
      },
      "peak_kw_ac": 231.9,
+     "resilience": {
+      "is": "a reading of one run: posts already down are not counted out, and a car moved is still a charge interrupted",
+      "busiest_at": "2026-09-01T02:30:00+00:00",
+      "cars_at_busiest": 5,
+      "posts_elsewhere": 25,
+      "worst_shortfall_at": "2026-09-01T02:30:00+00:00",
+      "worst_shortfall_cars": 5,
+      "free_posts_elsewhere_then": 0
+     },
      "aging_hours": 0.004,
      "load_seconds": [
       84600.0,
@@ -1941,6 +1992,7 @@
       "smallest_kva_this_day_fits": 750
      },
      "peak_kw_ac": 878.7,
+     "resilience": null,
      "aging_hours": 0.004,
      "load_seconds": [
       70200.0,
@@ -2046,6 +2098,15 @@
       "smallest_kva_this_day_fits": 300
      },
      "peak_kw_ac": 191.9,
+     "resilience": {
+      "is": "a reading of one run: posts already down are not counted out, and a car moved is still a charge interrupted",
+      "busiest_at": "2026-09-01T02:30:00+00:00",
+      "cars_at_busiest": 5,
+      "posts_elsewhere": 25,
+      "worst_shortfall_at": "2026-09-01T02:30:00+00:00",
+      "worst_shortfall_cars": 5,
+      "free_posts_elsewhere_then": 0
+     },
      "aging_hours": 0.004,
      "load_seconds": [
       84600.0,
@@ -2151,6 +2212,15 @@
       "smallest_kva_this_day_fits": 300
      },
      "peak_kw_ac": 213.9,
+     "resilience": {
+      "is": "a reading of one run: posts already down are not counted out, and a car moved is still a charge interrupted",
+      "busiest_at": "2026-09-01T02:30:00+00:00",
+      "cars_at_busiest": 5,
+      "posts_elsewhere": 25,
+      "worst_shortfall_at": "2026-09-01T02:30:00+00:00",
+      "worst_shortfall_cars": 5,
+      "free_posts_elsewhere_then": 0
+     },
      "aging_hours": 0.004,
      "load_seconds": [
       84600.0,
@@ -2256,6 +2326,15 @@
       "smallest_kva_this_day_fits": 300
      },
      "peak_kw_ac": 213.6,
+     "resilience": {
+      "is": "a reading of one run: posts already down are not counted out, and a car moved is still a charge interrupted",
+      "busiest_at": "2026-09-01T02:30:00+00:00",
+      "cars_at_busiest": 5,
+      "posts_elsewhere": 25,
+      "worst_shortfall_at": "2026-09-01T02:30:00+00:00",
+      "worst_shortfall_cars": 5,
+      "free_posts_elsewhere_then": 0
+     },
      "aging_hours": 0.004,
      "load_seconds": [
       84600.0,
@@ -2361,6 +2440,15 @@
       "smallest_kva_this_day_fits": 300
      },
      "peak_kw_ac": 229.0,
+     "resilience": {
+      "is": "a reading of one run: posts already down are not counted out, and a car moved is still a charge interrupted",
+      "busiest_at": "2026-09-01T02:30:00+00:00",
+      "cars_at_busiest": 5,
+      "posts_elsewhere": 25,
+      "worst_shortfall_at": "2026-09-01T02:30:00+00:00",
+      "worst_shortfall_cars": 5,
+      "free_posts_elsewhere_then": 0
+     },
      "aging_hours": 0.004,
      "load_seconds": [
       84600.0,
@@ -2414,6 +2502,16 @@
      "peak_kva": 869.9,
      "rightsize": null,
      "peak_kw_ac": 843.8,
+     "resilience": {
+      "cars": 120,
+      "sessions": 202,
+      "post_rating_kw": 350,
+      "sessions_over_150_kw": 0,
+      "most_any_post_delivered_kw": 145.68,
+      "lowest_battery_at_plug_in_pct": 30,
+      "cars_that_can_take_over_150_kw": 30,
+      "cars_with_no_inlet_limit_on_file": 12
+     },
      "aging_hours": 0.0,
      "load_seconds": [
       0,
@@ -2452,9 +2550,9 @@
   "depot_id": "11111111-1111-1111-1111-111111111111",
   "as_of_sim": "2026-09-02T02:00:00+00:00",
   "run_status": "completed",
-  "sim_run_id": "e7e66bcd-3fb4-4bed-a8c6-b9d8fd51fe7a",
+  "sim_run_id": "2f1db0ba-66e1-411c-b8d2-7ebe00796fe6",
   "site_meter_kw": 468.0
  },
- "wall_s": 139.3,
- "tick_s_mean": 2.87
+ "wall_s": 189.1,
+ "tick_s_mean": 3.9
 }

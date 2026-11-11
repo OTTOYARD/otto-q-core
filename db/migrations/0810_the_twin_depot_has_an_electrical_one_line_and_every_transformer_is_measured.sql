@@ -71,6 +71,10 @@
 --   (d) THE CEILING, FROM THE MEASUREMENT (rule 13). public.ottoq_power_rightsize(run) replays each transformer's
 --       measured day at every standard rating and names the smallest whose hot spot never passes 110 C and whose
 --       day ages the insulation no faster than normal. It is a reading for a person. It changes no node (rule 10).
+--   (d2) WHAT THE DAY ASKED OF THE POSTS, AND N-1. public.ottoq_power_resilience(run), made at the run's end from its
+--       charge sessions: for each charger transformer, its busiest moment and whether the posts under the other
+--       transformers could have taken its cars; for the depot, the most any post delivered against its rating and how
+--       many cars can take more than 150 kW at all (G535). A reading; it changes nothing.
 --   (e) THE ZONE TRIP. public.ottoq_twin_trip_power_node(run, node, minutes, actor) takes down every post under a node
 --       through the existing cockpit door, ottoq_twin_inject_charger_fault, one post at a time: the session ends, the
 --       charger reads Faulted, the car is re-queued to finish (rule 9: a charger fault is one of the two reasons a
@@ -338,6 +342,7 @@ CREATE TABLE public.ottoq_power_node_study (
   max_hot_spot_at   timestamptz,
   aging_hours       numeric NOT NULL DEFAULT 0,
   rightsize         jsonb,
+  resilience        jsonb,
   scenario_code     text,
   random_seed       bigint,
   engine_hash       text,
@@ -649,6 +654,81 @@ END $f$;
 REVOKE ALL ON FUNCTION public.ottoq_power_rightsize(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ottoq_power_rightsize(uuid) TO service_role;
 
+-- What the day asked of the posts, and whether it could have ridden through losing any one transformer. Read from the
+-- run's own charge sessions (working rows), so it is made once, at the run's end, and kept on the study.
+--   on a transformer's row: its busiest moment (the most cars charging under it at once), the posts free under the other
+--     transformers at that moment, and the worst shortfall of the day (cars under it that no other post could have
+--     taken, at any session start). Posts already down are not counted out, so it is the best case.
+--   on the service's row: the most any post delivered, how many charges ever passed 150 kW, and how many of the depot's
+--     cars can take more than 150 kW at all (vehicles.inlet_max_kw).
+-- A reading for a person; it changes nothing (rules 10, 13).
+CREATE FUNCTION public.ottoq_power_resilience(p_sim_run_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $f$
+DECLARE
+  v_depot uuid; v_end timestamptz; v_tx record; v_busy record; v_short record; v_out jsonb := '[]'::jsonb; v_posts jsonb;
+  v_n int;
+BEGIN
+  SELECT depot_id, last_clock_at INTO v_depot, v_end FROM public.ottoq_power_node_study
+   WHERE sim_run_id = p_sim_run_id AND node_code = 'SERVICE';
+  IF v_depot IS NULL THEN RETURN jsonb_build_object('sim_run_id', p_sim_run_id, 'measured', false); END IF;
+  SELECT count(*) INTO v_n FROM public.ocpp_sessions WHERE sim_run_id = p_sim_run_id;
+  IF v_n = 0 THEN RETURN jsonb_build_object('sim_run_id', p_sim_run_id, 'measured', false, 'why', 'no charge sessions left to read'); END IF;
+
+  FOR v_tx IN
+    SELECT n.node_code, (SELECT count(*) FROM public.ottoq_power_nodes p WHERE p.depot_id = n.depot_id AND p.kind = 'post' AND p.parent_code <> n.node_code) AS posts_else
+      FROM public.ottoq_power_nodes n
+     WHERE n.depot_id = v_depot AND n.kind = 'transformer'
+       AND EXISTS (SELECT 1 FROM public.ottoq_power_nodes p WHERE p.depot_id = n.depot_id AND p.parent_code = n.node_code AND p.kind = 'post')
+     ORDER BY n.node_code
+  LOOP
+    WITH s AS (
+      SELECT o.started_at, COALESCE(o.ended_at, v_end) AS ended_at, (pn.parent_code = v_tx.node_code) AS here
+        FROM public.ocpp_sessions o JOIN public.stalls st ON st.id = o.stall_id
+        JOIN public.ottoq_power_nodes pn ON pn.charger_id = st.ocpp_charger_id
+       WHERE o.sim_run_id = p_sim_run_id),
+    m AS (
+      SELECT b.t,
+             (SELECT count(*) FROM s WHERE s.here AND s.started_at <= b.t AND s.ended_at > b.t) AS cars_here,
+             v_tx.posts_else - (SELECT count(*) FROM s WHERE NOT s.here AND s.started_at <= b.t AND s.ended_at > b.t) AS free_else
+        FROM (SELECT DISTINCT started_at AS t FROM s WHERE here) b)
+    SELECT * INTO v_busy FROM m ORDER BY cars_here DESC, free_else, t LIMIT 1;
+    WITH s AS (
+      SELECT o.started_at, COALESCE(o.ended_at, v_end) AS ended_at, (pn.parent_code = v_tx.node_code) AS here
+        FROM public.ocpp_sessions o JOIN public.stalls st ON st.id = o.stall_id
+        JOIN public.ottoq_power_nodes pn ON pn.charger_id = st.ocpp_charger_id
+       WHERE o.sim_run_id = p_sim_run_id),
+    m AS (
+      SELECT b.t,
+             (SELECT count(*) FROM s WHERE s.here AND s.started_at <= b.t AND s.ended_at > b.t) AS cars_here,
+             v_tx.posts_else - (SELECT count(*) FROM s WHERE NOT s.here AND s.started_at <= b.t AND s.ended_at > b.t) AS free_else
+        FROM (SELECT DISTINCT started_at AS t FROM s WHERE here) b)
+    SELECT t, cars_here, free_else, GREATEST(cars_here - free_else, 0) AS short INTO v_short
+      FROM m ORDER BY GREATEST(cars_here - free_else, 0) DESC, t LIMIT 1;
+    UPDATE public.ottoq_power_node_study SET resilience = jsonb_build_object(
+        'busiest_at', v_busy.t, 'cars_at_busiest', COALESCE(v_busy.cars_here, 0), 'free_posts_elsewhere_then', v_busy.free_else,
+        'worst_shortfall_cars', COALESCE(v_short.short, 0), 'worst_shortfall_at', CASE WHEN v_short.short > 0 THEN v_short.t END,
+        'posts_elsewhere', v_tx.posts_else,
+        'is', 'a reading of one run: posts already down are not counted out, and a car moved is still a charge interrupted')
+     WHERE sim_run_id = p_sim_run_id AND node_code = v_tx.node_code;
+    v_out := v_out || jsonb_build_object('node', v_tx.node_code, 'cars_at_busiest', COALESCE(v_busy.cars_here, 0),
+      'worst_shortfall_cars', COALESCE(v_short.short, 0));
+  END LOOP;
+
+  SELECT jsonb_build_object(
+           'sessions', count(*), 'most_any_post_delivered_kw', max(o.peak_power_kw),
+           'sessions_over_150_kw', count(*) FILTER (WHERE o.peak_power_kw > 150),
+           'lowest_battery_at_plug_in_pct', min(o.soc_start),
+           'cars', (SELECT count(*) FROM public.vehicles v WHERE v.home_depot_id = v_depot),
+           'cars_that_can_take_over_150_kw', (SELECT count(*) FROM public.vehicles v WHERE v.home_depot_id = v_depot AND v.inlet_max_kw > 150),
+           'cars_with_no_inlet_limit_on_file', (SELECT count(*) FROM public.vehicles v WHERE v.home_depot_id = v_depot AND v.inlet_max_kw IS NULL),
+           'post_rating_kw', (SELECT max(rated_kw) FROM public.ottoq_power_nodes WHERE depot_id = v_depot AND kind = 'post'))
+    INTO v_posts FROM public.ocpp_sessions o WHERE o.sim_run_id = p_sim_run_id;
+  UPDATE public.ottoq_power_node_study SET resilience = v_posts WHERE sim_run_id = p_sim_run_id AND node_code = 'SERVICE';
+  RETURN jsonb_build_object('sim_run_id', p_sim_run_id, 'measured', true, 'posts', v_posts, 'transformers', v_out);
+END $f$;
+REVOKE ALL ON FUNCTION public.ottoq_power_resilience(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ottoq_power_resilience(uuid) TO service_role;
+
 -- A run that stops is read once, while its working rows still exist; and its engine hash is stamped on its study.
 CREATE FUNCTION public.ottoq_power_study_on_run_end()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $f$
@@ -658,6 +738,7 @@ BEGIN
       UPDATE public.ottoq_power_node_study SET engine_hash = public.ottoq_engine_hash()
        WHERE sim_run_id = NEW.sim_run_id AND engine_hash IS NULL;
       PERFORM public.ottoq_power_rightsize(NEW.sim_run_id);
+      PERFORM public.ottoq_power_resilience(NEW.sim_run_id);
     END IF;
   EXCEPTION WHEN OTHERS THEN
     RAISE WARNING '0810 power study at run end: % %', SQLSTATE, SQLERRM;
@@ -770,7 +851,7 @@ BEGIN
                'peak_30min_kva', st.peak_30min_kva, 'peak_load_pu', st.peak_load_pu,
                'hours_energized', round(st.seconds_energized / 3600.0, 2), 'load_seconds', to_jsonb(st.load_seconds),
                'max_top_oil_c', st.max_top_oil_c, 'max_hot_spot_c', st.max_hot_spot_c, 'max_hot_spot_at', st.max_hot_spot_at,
-               'aging_hours', round(st.aging_hours, 3), 'rightsize', st.rightsize) END)
+               'aging_hours', round(st.aging_hours, 3), 'rightsize', st.rightsize, 'resilience', st.resilience) END)
       ORDER BY n.kind, n.node_code), '[]'::jsonb)
     INTO v_nodes
     FROM public.ottoq_power_nodes n

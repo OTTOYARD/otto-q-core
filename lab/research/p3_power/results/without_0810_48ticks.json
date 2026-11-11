@@ -1,6 +1,6 @@
 {
- "db": "ottoq_ctl2",
- "run": "c2529bca-accc-425f-89af-7a9d02908c33",
+ "db": "ottoq_ctl3",
+ "run": "581ad3b2-c77f-4357-93c6-7ad325ff09b0",
  "seed": 171717,
  "scenario": "busy_day",
  "ticks": 48,
@@ -72,6 +72,6 @@
    }
   }
  },
- "wall_s": 138.8,
- "tick_s_mean": 2.86
+ "wall_s": 190.1,
+ "tick_s_mean": 3.92
 }

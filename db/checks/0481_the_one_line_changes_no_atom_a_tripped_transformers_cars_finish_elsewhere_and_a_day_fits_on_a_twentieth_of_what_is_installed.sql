@@ -13,6 +13,8 @@
 --   48 ticks of 30 sim-minutes, one in a database with 0810 and one without:
 --     with 0810     run e7e66bcd   2.87 s a tick
 --     without 0810  run c2529bca   2.86 s a tick
+--   Repeated at 13:35 UTC on 11-11 after 0810 gained its run-end resilience reading (§7): runs 2f1db0ba and 581ad3b2,
+--   fourteen of fourteen again (3.90 s against 3.92 s a tick on a busier machine).
 --   All fourteen atoms equal (fingerprint, commands, decisions, events, bookings, energy, proposals, deferrals,
 --   calibration, rules, recalls, SDRs, tick count, end state). So 0810 is forces_recert FALSE on a measurement, not on
 --   an argument.
@@ -23,7 +25,7 @@
 --
 -- ══ (2) THE POSTS ADD UP TO THE SITE METER ON EVERY TICK ════════════════════════════════════════════════════════════
 --
---   The capture reads each post's power by the site meter's own predicate. On the 2-minute day (run 4c87dd16, 420
+--   The capture reads each post's power by the site meter's own predicate. On the 2-minute day (run 4c87dd16 (repeated as e2c1a471 with identical figures), 420
 --   ticks) and on the 48-tick day: the service node's DC sum equals site_energy_snapshots.total_ev_charging_kw on 420
 --   of 420 and 48 of 48 ticks (worst difference 0.05 kW, the snapshot's rounding to one decimal).
 SELECT count(*) AS ticks,
@@ -107,3 +109,27 @@ SELECT st.node_code, st.rated_kva, round(st.peak_kva) AS peak_kva, st.peak_30min
 --         is its own certified change with an ottoq_evidence_regimes row. Not built.
 --   G537  The 3D yard draws one transformer in the battery compound and no primary switchgear, for a depot the one-line
 --         gives seven transformers. Where seven pad-mounted units stand is a site-plan decision. Not built.
+--
+-- ══ (7) ADDED 13:20-13:45 UTC ON 11-11 (7:20-7:45 AM CT): WHAT THE DAY ASKED OF THE POSTS, AND LOSING ONE TRANSFORMER ══
+--
+--   0810 gained public.ottoq_power_resilience, made at a run's end from its charge sessions and kept on the study.
+--   The 2-minute day was run again with it (run e2c1a471; every figure in (5) reproduced exactly: same seed, same day).
+--
+--   G535 ANSWERED: THE CARS SET THE 122.5 kW, NOT THE DEPOT. vehicles.inlet_max_kw at the twin depot: 44 cars at
+--   104 kW (Waymo and Jaguar I-PACE), 34 at 100 kW (Zoox), 30 at 250 kW (Tesla Model Y), 12 with none on file. And cars
+--   come home at their reserve, not empty: the lowest battery at plug-in on the day was 39%, where a Model Y's curve is
+--   already near 120 kW. So 0 of 170 charges passed 150 kW, and 30 of the depot's 120 cars can take more than 150 kW at
+--   all. A 350 kW post was asked for at most 35% of its rating by this fleet, recalled at this reserve. That is a
+--   reading for whoever buys the next posts, not a change: rule 13 keeps the limits at what is installed.
+--   (Zoox cars carry max_charge_rate_kw 200 beside inlet_max_kw 100; the twin reads the inlet figure. Not resolved.)
+--
+--   LOSING ONE TRANSFORMER. For each charger transformer, at every moment a charge began under it: the cars charging
+--   under it against the posts free under the other five. On the 2-minute day the worst moments were all in the
+--   opening half hour (6:30-6:40 AM CT), when the cars the day began with plug in together: 3 cars with no free post
+--   elsewhere for five of the six transformers, 1 for TX-A1. After the opening, every transformer's cars could have
+--   moved (TX-C2's busiest moment, 11:38 AM CT, 5 cars, had 5 posts free elsewhere). On the 30-minute-tick day every
+--   post is full at the first tick, so each transformer reads 5 of 5 stranded there. It is the best case: posts already
+--   down are not counted out, and a car that moves has still had its charge interrupted.
+SELECT st.node_code, st.resilience FROM public.ottoq_power_node_study st
+ WHERE st.depot_id = '11111111-1111-1111-1111-111111111111' AND st.resilience IS NOT NULL
+ ORDER BY st.last_clock_at DESC, st.node_code;
