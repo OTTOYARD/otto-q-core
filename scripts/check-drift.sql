@@ -851,7 +851,8 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'the_battery_forecast_is_shrunk_as_far_as_its_own_misses_say_and_defers_to_the_day_plan_where_that_misses_less'::text, '0809_the_battery_forecast_is_shrunk_as_far_as_its_own_misses_say_and_defers_to_the_day_plan_where_that_misses_less.sql'::text),
     ('20261111151626'::text, 'the_twin_depot_has_an_electrical_one_line_and_every_transformer_is_measured'::text, '0810_the_twin_depot_has_an_electrical_one_line_and_every_transformer_is_measured.sql'::text),
     ('20261111151643'::text, 'five_standard_chargers_no_stall_names_are_decommissioned'::text, '0811_five_standard_chargers_no_stall_names_are_decommissioned.sql'::text),
-    ('20261111153741'::text, 'the_right_size_reading_also_carries_the_busiest_half_hour'::text, '0812_the_right_size_reading_also_carries_the_busiest_half_hour.sql'::text)
+    ('20261111153741'::text, 'the_right_size_reading_also_carries_the_busiest_half_hour'::text, '0812_the_right_size_reading_also_carries_the_busiest_half_hour.sql'::text),
+    ('PENDING'::text, 'the_electrical_yard_is_on_the_site_record_and_the_fourth_solar_array_is_the_carports'::text, '0813_the_electrical_yard_is_on_the_site_record_and_the_fourth_solar_array_is_the_carports.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
