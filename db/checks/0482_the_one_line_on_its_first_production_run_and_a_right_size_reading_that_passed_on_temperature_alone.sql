@@ -1,5 +1,5 @@
 -- 0482  **The one-line on its first production run: every tick measured, a tripped transformer's four cars all re-seated,
---        and a right-size reading that passed on temperature alone.** (0810, 0811 applied; G538, 0812 pending)
+--        and a right-size reading that passed on temperature alone.** (0810, 0811, 0812 applied; G538 fixed)
 --        Production, 2026-11-11, 15:16-15:32 UTC (9:16-9:32 AM CT). Rule 8: the twin depot. Rule 12: one demo run to
 --        show a finished change working; no pair, no sweep.
 --
@@ -68,6 +68,7 @@ SELECT st.node_code, st.rated_kva, round(st.peak_kva) AS peak_kva, st.peak_30min
 --   units' own half hours were 217 to 374 kVA, so 300 is wrong for four of those six as well.
 --   0812 adds the missing condition (a size at or above the busiest full half hour) and names the figure it used.
 --   Lab, same function body as production (md5 1136d5f4): the 2-minute day's readings do not change (TX-AUX 1,000, the
---   six charger units 300), and with this run's TX-AUX figures it reads 500. 0812 is PENDING: the instruction named
---   0810 and 0811, and the session's gate refused a third apply. Until it is applied and the reader is run again on
---   this run, do not quote this run's "fits on" figures.
+--   six charger units 300), and with this run's TX-AUX figures it reads 500. 0812 was applied at 15:37:41 UTC (9:37 AM CT),
+--   ledger 20261111153741, on Chase's "apply 0812", and the reader run again on this run: TX-A2, TX-B1, TX-C1 and TX-AUX
+--   now read 500 kVA (their half hours 306, 352, 374 and 434 kVA) and TX-A1, TX-B2 and TX-C2 read 300 (217, 293, 289).
+--   The query in (4) returns the corrected figures.

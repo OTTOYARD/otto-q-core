@@ -900,7 +900,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0809](db/migrations/0809_the_battery_forecast_is_shrunk_as_far_as_its_own_misses_say_and_defers_to_the_day_plan_where_that_misses_less.sql) | `PENDING` | no — pending | **The battery's forecast is shrunk as far as its own misses say, and defers to the day plan where that misses |
 | [0810](db/migrations/0810_the_twin_depot_has_an_electrical_one_line_and_every_transformer_is_measured.sql) | `20261111151626` | yes — ledger | **The twin depot has an electrical one-line: a utility service, seven transformers and thirty posts, each |
 | [0811](db/migrations/0811_five_standard_chargers_no_stall_names_are_decommissioned.sql) | `20261111151643` | yes — ledger | **Five standard chargers no stall names are decommissioned.** (G532) |
-| [0812](db/migrations/0812_the_right_size_reading_also_carries_the_busiest_half_hour.sql) | `PENDING` | no — pending | **The right-size reading also requires a unit to carry the busiest half hour, not only to stay cool.** (G538) |
+| [0812](db/migrations/0812_the_right_size_reading_also_carries_the_busiest_half_hour.sql) | `20261111153741` | yes — ledger | **The right-size reading also requires a unit to carry the busiest half hour, not only to stay cool.** (G538) |
 
 620 migrations indexed.
 

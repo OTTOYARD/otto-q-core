@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261111153741
 -- migration-name:    the_right_size_reading_also_carries_the_busiest_half_hour
 --
 -- 0812  **The right-size reading also requires a unit to carry the busiest half hour, not only to stay cool.** (G538)
@@ -92,3 +92,8 @@ VALUES ('0812_the_right_size_reading_also_carries_the_busiest_half_hour', false,
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-11: 15:37:41 UTC (9:37 AM CT), ledger 20261111153741, by Claude Code through the Management API's migrations
+--   endpoint on Chase's instruction ("apply 0812"). The stored statement's md5 equals this file's as committed before this
+--   header and footer changed (aefbff7e). The reader was then run again on production run 54c0d20f: TX-A2, TX-B1, TX-C1 and
+--   TX-AUX read 500 kVA (their half hours 306, 352, 374 and 434 kVA); TX-A1, TX-B2 and TX-C2 read 300 (217, 293, 289).
