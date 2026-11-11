@@ -117,7 +117,7 @@ against this table without trusting any metadata column.
 | Function | v | verify_jwt | Deployed (UTC) | match | Deployed sha256 |
 |---|---:|---|---|---|---|
 | otto-q-api | 26 | false | 2026-04-19 01:54 | **repo ahead¹²** | `01762cf6734e0dd506a057a3a9ac58f09aa2acd18dc4dc23868b42c1afb9eff0` |
-| otto-twin-control | 30 | false | 2026-09-29 02:48 | markers¹ | `12a5c37d616fa19efcd43bda11f235ca644fa946cd4e3d112d748a8341746700` (repo file) |
+| otto-twin-control | 31 | false | 2026-11-11 15:17 | yes¹ | `9aa2160b76d8f58701a9b1c80ee46607a7d2d9a580c4c2e14df2fa41e42280df` (repo file) |
 | ottoq-agent-gateway | 2 | false | 2026-10-10 07:23 | yes¹³ | `d72d2f7fd123b1844638572625215add017a4457c5ed43641ae69419a2ec4098` |
 | ottoq-amend | 9 | true | 2026-06-18 04:24 | yes | `70f038ae2cfdb8891f2589f2e3158cc59792f0318718963cfa9c544249b1376b` |
 | ottoq-approval-copilot | 4 | true | 2026-07-25 01:46 | yes | `3abc122e20aa24a1222abe7a3bd7ce8ef6e91f78cc236b5afe2f0dc7f46293c0` |
@@ -151,6 +151,10 @@ against this table without trusting any metadata column.
 Shared modules `_shared/agent_solver_chain.ts` and `_shared/cpsat_agent_chain.ts`
 were also pulled and are byte-identical to the committed copies.
 
+¹ **`otto-twin-control` v31 was deployed 2026-11-11 at 15:17 UTC (9:17 AM CT) with this directory's `index.ts` as its
+content, through the Management API's deploy endpoint, on Chase's instruction: `inject_fault` gains kind `power_zone`
+(0810's transformer trip), version string `1.11.0-power-zone`, read back from the function's health route. The v30
+record follows.**
 ¹ **`otto-twin-control` is the one row updated after the 09-19 pull (2026-09-29, migration 0564).**
 Versions 25-29 were deployed after the pull and never recorded here. v30 was deployed at
 9:48 PM CT on 2026-09-28 with this directory's `index.ts` as its content, through the Supabase

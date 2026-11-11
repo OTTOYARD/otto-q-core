@@ -150,3 +150,26 @@ def test_the_registry_and_the_world_fingerprint_are_untouched(db):
     assert classes == {"ottoq_power_node_ticks": "engine", "ottoq_power_node_study": "evidence", "ottoq_power_node_trips": "evidence"}
     assert _psql(db, f"select ottoq.ottoq_world_fingerprint_sections('{TWIN}')") == _psql(
         "ottoq_lab", f"select ottoq.ottoq_world_fingerprint_sections('{TWIN}')")
+
+
+def test_0813_every_transformer_stands_on_the_site_and_solar_generation_is_unchanged(db):
+    """0813: seven transformer structures named as the nodes are, canopy_4's 288 panels on the carports, same solar."""
+    before = _psql(db, f"select sum(nameplate_dc_kw), count(*) from ottoq_canopy_state where depot_id = '{TWIN}'")
+    m0813 = glob.glob(os.path.join(ROOT, "db", "migrations", "0813_*.sql"))[0]
+    p = subprocess.run(["psql", *CONN, "-d", db, "-X", "-q", "-v", "ON_ERROR_STOP=1", "-f", m0813],
+                       capture_output=True, text=True)
+    assert p.returncode == 0, p.stderr
+    assert _psql(db, f"select sum(nameplate_dc_kw), count(*) from ottoq_canopy_state where depot_id = '{TWIN}'") == before
+    assert _psql(db, f"""select count(*) from ottoq_power_nodes n left join ottoq_site_structures s
+                           on s.depot_id = n.depot_id and s.structure_code = n.node_code
+                          and s.structure_kind = 'transformer' and s.status = 'active'
+                         where n.depot_id = '{TWIN}' and n.kind = 'transformer' and s.structure_id is null""") == "0"
+    assert _psql(db, f"""select sum((properties->>'panel_count')::int) from ottoq_site_structures
+                         where depot_id = '{TWIN}' and properties->>'solar_array' = 'canopy_4'""") == "288"
+    # no transformer stands on another structure of its yard row, and the fence check still passes
+    assert _psql(db, f"""select count(*) from ottoq_site_structures a join ottoq_site_structures b
+                           on a.depot_id = b.depot_id and a.structure_code < b.structure_code
+                         where a.depot_id = '{TWIN}' and a.structure_kind = 'transformer' and b.structure_kind = 'transformer'
+                           and a.origin_x_ft < b.origin_x_ft + b.width_ft and b.origin_x_ft < a.origin_x_ft + a.width_ft
+                           and a.origin_y_ft < b.origin_y_ft + b.length_ft and b.origin_y_ft < a.origin_y_ft + a.length_ft""") == "0"
+    assert json.loads(_psql(db, f"select ottoq_check_fence_containment('{TWIN}')"))["passed"] is True

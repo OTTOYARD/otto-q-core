@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261111151626
 -- migration-name:    the_twin_depot_has_an_electrical_one_line_and_every_transformer_is_measured
 --
 -- 0810  **The twin depot has an electrical one-line: a utility service, seven transformers and thirty posts, each
@@ -972,3 +972,8 @@ VALUES ('0810_the_twin_depot_has_an_electrical_one_line_and_every_transformer_is
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-11: 2026-11-11 15:16:26 UTC (9:16 AM CT), ledger 20261111151626, by Claude Code through the Management API's migrations endpoint on Chase's
+--   instruction of 9:15 AM CT ("Apply 0810 and 0811 to the otto-q-core production database, deploy otto-twin-control, and
+--   start demo runs at the twin depot as needed"). The stored statement's md5 equals this file's as committed before this
+--   header and footer changed (1986d5e6f3fbe9b6b6aa91807fdef032).

@@ -26,6 +26,8 @@
 //   PUT  /sim_runs/:id/time_scale         {time_scale} → honest speed (sim-min per tick; 60 = 1×)
 //   POST /sim_runs/:id/inject_fault       {kind, target_id?, payload?}
 //        kind = charger_offline → ottoq_twin_inject_charger_fault (0451): a real charger fault
+//        kind = power_zone, target_id = a power node (TX-A1 ...) → ottoq_twin_trip_power_node (0810):
+//               every post under that transformer faults at once
 //        other kinds            → an event only; the response says engine_effect = "none"
 //   GET  /sim_runs/:id/kpis               → ottoq_kpi_five: the five canonical KPIs for the run, and beside them
 //                                           charge_wait (ottoq_kpi_charge_wait, 0501): the wait for a charger
@@ -383,6 +385,23 @@ async function injectFault(simRunId: string, req: Request) {
     return ok({ ...res, kind: body.kind, engine_effect: "charger_faulted" });
   }
 
+  // 0810: A WHOLE TRANSFORMER. target_id is a power node's code (TX-A1 ...). The engine's door takes down every
+  // post under it through the charger-fault door above, one post at a time, and records one common-cause trip.
+  if (body.kind === "power_zone") {
+    if (!body.target_id || !/^[A-Z0-9-]{2,24}$/.test(body.target_id)) return err("target_id must be a power node code, e.g. TX-A1");
+    const repair = Number((body.payload as Record<string, unknown> | undefined)?.repair_minutes ?? 90);
+    const { data, error } = await supabase.rpc("ottoq_twin_trip_power_node", {
+      p_sim_run_id: simRunId,
+      p_node_code: body.target_id,
+      p_repair_minutes: Number.isFinite(repair) ? repair : 90,
+      p_actor: "cockpit_operator",
+    });
+    if (error) return err("power node trip failed", 500, error.message);
+    const res = data as { ok?: boolean; reason?: string } | null;
+    if (!res?.ok) return err(`power node not tripped: ${res?.reason ?? "no post under it was in service"}`, 409, res);
+    return ok({ ...res, kind: body.kind, engine_effect: "posts_faulted" });
+  }
+
   const { data: run, error: runErr } = await supabase
     .from("ottoq_sim_runs")
     .select("depot_id, sim_clock_current")
@@ -640,7 +659,7 @@ serve(async (req: Request) => {
 
   // Health probe
   if (method === "GET" && (parts[0] === "" || parts[0] === "health")) {
-    return ok({ service: "otto-twin-control", version: "1.10.0-start-interrupts-checks", time: new Date().toISOString() });
+    return ok({ service: "otto-twin-control", version: "1.11.0-power-zone", time: new Date().toISOString() });
   }
 
   return err(`route not found: ${method} /${parts.join("/")}`, 404);

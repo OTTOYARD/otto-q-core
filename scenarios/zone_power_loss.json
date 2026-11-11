@@ -2,8 +2,7 @@
   "scenario_id": "C7.zone_power_loss",
   "name": "zone_power_loss",
   "description": "A transformer or feeder trips and every post under it goes dark at once",
-  "status": "partial",
-  "provisional_gap": "the injector is built and lab-tested (db/migrations/0810, db/checks/0481) and is PENDING apply to production; this file reads executable the day 0810 is applied",
+  "status": "executable",
   "seed_discipline": "run under a fixed seed; cite the run ID",
   "mechanism": "public.ottoq_twin_trip_power_node(sim_run_id, node_code, repair_minutes, actor) (db/migrations/0810): every post under the node in ottoq_power_nodes faults through ottoq_twin_inject_charger_fault, one post at a time; the trip is recorded once in ottoq_power_node_trips as a common-cause event. From the cockpit: otto-twin-control POST inject_fault {kind: power_zone, target_id: <node_code>, payload: {repair_minutes}}. The site-wide cap (inject_dr_call {cap_kw, duration_min}) is still a separate injector",
   "injection": {
@@ -20,5 +19,5 @@
   },
   "nodes": "the twin depot's one-line: TX-A1, TX-A2, TX-B1, TX-B2, TX-C1, TX-C2 (five posts each), MV-SWGR and SERVICE (all thirty)",
   "expected_kernel_behavior": "each open session on the node's posts ends faulted and its car is re-queued to finish its charge on a post under another transformer (rule 9: a charger fault ends a charge short, and the car is re-queued); the posts read Faulted until repair_minutes have passed on the sim clock, then return to service together",
-  "measured": "db/checks/0481: lab, busy_day seed 171717, TX-A1 tripped for 90 sim-min with two cars charging at 96% and 93%; both finished at 100% on posts under TX-A2 and TX-C2"
+  "measured": "db/checks/0481: lab, busy_day seed 171717, TX-A1 tripped for 90 sim-min with two cars charging at 96% and 93%; both finished at 100% on posts under TX-A2 and TX-C2; production run 54c0d20f (2026-11-11): TX-B1 tripped with four cars charging, db/checks/0482"
 }
