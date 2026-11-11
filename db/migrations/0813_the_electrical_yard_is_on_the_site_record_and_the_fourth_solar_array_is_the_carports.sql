@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261111180445
 -- migration-name:    the_electrical_yard_is_on_the_site_record_and_the_fourth_solar_array_is_the_carports
 --
 -- 0813  **The electrical yard is on the site record, and the fourth solar array is the carports'.** (G536, G537)
@@ -107,3 +107,8 @@ VALUES ('0813_the_electrical_yard_is_on_the_site_record_and_the_fourth_solar_arr
         now());
 
 COMMIT;
+
+-- APPLIED 2026-11-11: 18:04:45 UTC (12:04 PM CT), ledger 20261111180445, by Claude Code through the Management API's migrations
+-- endpoint, on Chase's instruction in session ("apply 0813"). Read back at 18:05 UTC: 7 active transformer structures
+-- matching 7 transformer nodes; 288 panels on the five carports; ottoq_canopy_state still 720 kW DC over four arrays;
+-- BESS-COMPOUND at 6.2795, 254.3209, 87.9134 x 53.3760 ft; the solar node titled "Canopy and carport solar (inverters)".

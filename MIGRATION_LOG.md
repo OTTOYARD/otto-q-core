@@ -901,7 +901,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0810](db/migrations/0810_the_twin_depot_has_an_electrical_one_line_and_every_transformer_is_measured.sql) | `20261111151626` | yes — ledger | **The twin depot has an electrical one-line: a utility service, seven transformers and thirty posts, each |
 | [0811](db/migrations/0811_five_standard_chargers_no_stall_names_are_decommissioned.sql) | `20261111151643` | yes — ledger | **Five standard chargers no stall names are decommissioned.** (G532) |
 | [0812](db/migrations/0812_the_right_size_reading_also_carries_the_busiest_half_hour.sql) | `20261111153741` | yes — ledger | **The right-size reading also requires a unit to carry the busiest half hour, not only to stay cool.** (G538) |
-| [0813](db/migrations/0813_the_electrical_yard_is_on_the_site_record_and_the_fourth_solar_array_is_the_carports.sql) | `PENDING` | no — pending | **The electrical yard is on the site record, and the fourth solar array is the carports'.** (G536, G537) |
+| [0813](db/migrations/0813_the_electrical_yard_is_on_the_site_record_and_the_fourth_solar_array_is_the_carports.sql) | `20261111180445` | yes — ledger | **The electrical yard is on the site record, and the fourth solar array is the carports'.** (G536, G537) |
 
 621 migrations indexed.
 
