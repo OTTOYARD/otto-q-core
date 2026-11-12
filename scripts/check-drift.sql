@@ -852,7 +852,9 @@ repo_manifest(version, name, file) AS (
     ('20261111151626'::text, 'the_twin_depot_has_an_electrical_one_line_and_every_transformer_is_measured'::text, '0810_the_twin_depot_has_an_electrical_one_line_and_every_transformer_is_measured.sql'::text),
     ('20261111151643'::text, 'five_standard_chargers_no_stall_names_are_decommissioned'::text, '0811_five_standard_chargers_no_stall_names_are_decommissioned.sql'::text),
     ('20261111153741'::text, 'the_right_size_reading_also_carries_the_busiest_half_hour'::text, '0812_the_right_size_reading_also_carries_the_busiest_half_hour.sql'::text),
-    ('20261111180445'::text, 'the_electrical_yard_is_on_the_site_record_and_the_fourth_solar_array_is_the_carports'::text, '0813_the_electrical_yard_is_on_the_site_record_and_the_fourth_solar_array_is_the_carports.sql'::text)
+    ('20261111180445'::text, 'the_electrical_yard_is_on_the_site_record_and_the_fourth_solar_array_is_the_carports'::text, '0813_the_electrical_yard_is_on_the_site_record_and_the_fourth_solar_array_is_the_carports.sql'::text),
+    ('20261112024432'::text, 'the_cleaning_arm_stops_for_an_item_left_in_the_cabin_and_an_attendant_secures_it'::text, '0814_the_cleaning_arm_stops_for_an_item_left_in_the_cabin_and_an_attendant_secures_it.sql'::text),
+    ('20261112030415'::text, '0815_the_fast_chargers_arm_does_the_interior_deep_clean_so_no_door_opens_in_the_wash_bay'::text, '0815_the_fast_chargers_arm_does_the_interior_deep_clean_so_no_door_opens_in_the_wash_bay.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

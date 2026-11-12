@@ -1,4 +1,7 @@
--- 0815_the_fast_chargers_arm_does_the_interior_deep_clean_so_no_door_opens_in_the_wash_bay.sql
+-- migration-version: 20261112030415
+-- migration-name:    0815_the_fast_chargers_arm_does_the_interior_deep_clean_so_no_door_opens_in_the_wash_bay
+--
+-- 0815  **The fast charger's arm does the interior deep clean, so no door opens in the wash bay.**
 --
 -- WHY. Chase, 2026-11-11: "lets consider if a vehicle needs an interior vaccuum one in the large wash bay, since all
 -- charge stations have internal vaccuum arms for quick clean. I don't think doors should open whatsoever once in the
