@@ -855,7 +855,9 @@ repo_manifest(version, name, file) AS (
     ('20261111180445'::text, 'the_electrical_yard_is_on_the_site_record_and_the_fourth_solar_array_is_the_carports'::text, '0813_the_electrical_yard_is_on_the_site_record_and_the_fourth_solar_array_is_the_carports.sql'::text),
     ('20261112024432'::text, 'the_cleaning_arm_stops_for_an_item_left_in_the_cabin_and_an_attendant_secures_it'::text, '0814_the_cleaning_arm_stops_for_an_item_left_in_the_cabin_and_an_attendant_secures_it.sql'::text),
     ('20261112030415'::text, '0815_the_fast_chargers_arm_does_the_interior_deep_clean_so_no_door_opens_in_the_wash_bay'::text, '0815_the_fast_chargers_arm_does_the_interior_deep_clean_so_no_door_opens_in_the_wash_bay.sql'::text),
-    ('20261112060812'::text, '0816_a_car_still_to_charge_keeps_its_deep_clean_for_its_posts_arm'::text, '0816_a_car_still_to_charge_keeps_its_deep_clean_for_its_posts_arm.sql'::text)
+    ('20261112060812'::text, '0816_a_car_still_to_charge_keeps_its_deep_clean_for_its_posts_arm'::text, '0816_a_car_still_to_charge_keeps_its_deep_clean_for_its_posts_arm.sql'::text),
+    ('20261112140245'::text, '0817_the_wash_bay_is_exterior_only_and_cabin_work_is_done_at_a_fast_charger_post'::text, '0817_the_wash_bay_is_exterior_only_and_cabin_work_is_done_at_a_fast_charger_post.sql'::text),
+    ('20261112140612'::text, '0818_the_twin_snapshot_names_the_post_of_a_cabin_stop'::text, '0818_the_twin_snapshot_names_the_post_of_a_cabin_stop.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
