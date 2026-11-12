@@ -64,7 +64,7 @@ SELECT count(*) AS detail_seats_in_a_wash_bay,
 --     - wash seats: 12 done, mean 6.41 minutes (the seat is 6.5 since 05:35 UTC).
 --     - found items: 5 found, 5 secured.
 --   READ AGAIN at 07:10:28 UTC, sim 20:26 (6.4 sim hours, 703 ticks; the run played at 1x from 06:35:44 to 06:51:03
---   UTC and from 07:10:10 UTC, for filming, and at 8x otherwise):
+--   UTC and from 07:10:10 to 07:20:57 UTC, for filming, and at 8x otherwise):
 --     - deep cleans: 26 atoms, all 26 done by a post's arm (26 legs at a post, mean 10.84 minutes). None open, and
 --       none closed by a bay. On run 893a0313 it was 28 by the arm and 4 by a bay, with 2 open at its end.
 --     - detail seats in a wash bay: 13. 3 were the cars with no visit record. 4 were cars whose deep clean a post's arm
