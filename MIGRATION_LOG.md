@@ -264,7 +264,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0819 — GENERATED, not a log
+## Index, 0134–0820 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0559, 0560, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0603, 0604, 0605, 0606, 0607, 0608, 0609, 0610, 0611, 0612, 0613, 0614, 0615, 0616, 0617, 0618, 0619, 0620, 0621, 0622, 0623, 0624, 0625, 0626, 0627, 0628, 0629, 0630, 0631, 0632, 0633, 0634, 0635, 0636, 0637, 0638, 0639, 0640, 0641, 0642, 0643, 0644, 0647, 0648, 0649, 0650, 0651, 0652, 0653, 0654, 0655, 0656, 0657, 0658, 0659, 0690, 0691, 0692, 0693, 0694, 0695, 0696, 0698, 0699, 0701, 0714, 0720, 0738, 0749, 0755, 0759, 0760, 0761, 0762, 0763, 0764, 0765, 0766, 0767, 0768, 0769, 0780, 0781, 0782, 0783, 0784, 0785, 0791, 0792, 0793, 0794, 0795, 0796, 0797, 0798, 0799, 0800, 0801, 0802, 0803, 0804, 0805, 0806, 0807, 0808, 0809, 0814, 0815 — which are indexed below as well as logged above; the log row is
@@ -910,7 +910,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0817](db/migrations/0817_the_wash_bay_is_exterior_only_and_cabin_work_is_done_at_a_fast_charger_post.sql) | `20261112140245` | yes — ledger | **The wash bay is exterior only, and a car's cabin work is done at a fast-charger post.** |
 | [0818](db/migrations/0818_the_twin_snapshot_names_the_post_of_a_cabin_stop.sql) | `20261112140612` | yes — ledger | **The twin snapshot names the post of a cabin stop.** |
 | [0819](db/migrations/0819_the_wash_triage_leaves_a_car_on_its_cabin_stop.sql) | `20261112141807` | yes — ledger | **The twin's wash triage leaves a car on its cabin stop.** |
+| [0820](db/migrations/0820_a_cabin_stop_may_use_a_post_whose_charger_is_faulted_and_a_car_to_charge_and_clean_waits_for_a_fast_charger.sql) | `20261112163417` | yes — ledger | **A cabin stop may use a post whose charger is faulted. A car with a charge and a cabin clean to do waits for |
 
-627 migrations indexed.
+628 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
