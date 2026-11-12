@@ -1,0 +1,77 @@
+-- 0484  **The wash bay exterior only, on its first run; and the defect its first cabin stop found.**
+--        (0817, 0818 and 0819 seen working; one reading of mine corrected; one cost stated)
+--        Production, 2026-11-12, 14:02-14:36 UTC (8:02 to 8:36 AM CT). Rule 8: the twin depot.
+--        Rule 12: one demo run to show a finished change working; no pair, no sweep. A single run: readings, not ranges.
+--
+-- ══ (1) A READING OF MINE, CORRECTED: THE DETAIL SEAT'S DOORS WERE NOT THE TECHNICIAN FLAGS ════════════════════════════
+--
+--   db/checks/0483 §2 and §5 (b) said of 14 detail seats that "the flag is the likely door" (minor_cosmetic, wash_due),
+--   "read from the source, not measured", and I put that to Chase as his decision. MEASURED on run 5480be1f before it
+--   was purged, from each seat's own booking: none of its 17 detail seats came from a flag.
+--      9   booked by the needs card for need interior_deep_clean, with NO atom on the visit (need_source
+--          inferred_from_purpose). 4 were cars at 85 to 90%, 5 were cars at 100% whose charge was done.
+--      8   a wash-bay reservation made for the visit's deep-clean atom when the visit was planned, still held after
+--          the post's arm had done the clean, and activated 30 to 320 minutes later (source
+--          bay_reservation_activated_early).
+--   A door read from the source is a door that exists. It is not the door the cars used. 0817 closes all three.
+--
+-- ══ (2) RUN 56d8465f (busy_day, operator_demo, live at 8x; started 14:02:57 UTC, 12 seconds after 0817) ═══════════════
+--
+--   Read at 14:35:34 UTC, sim 18:20 of a day that began at sim 14:00 (4.3 sim hours):
+--     - no car was seated in a wash bay for cabin work: 0 detail legs in a wash bay, 0 moves to in_detail_bay.
+--     - 20 wash-bay reservations held for cabin work were released (release_reason cabin_work_is_the_posts_arm).
+--     - interior deep cleans: 26 done, all 26 by a fast-charger post's arm. None done any other way. 7 pending.
+--     - wash seats: 21 done, mean 6.46 minutes.
+--     - cabin stops: 4 seated, 3 ended with the clean done, 1 lost to the defect of §3.
+SELECT to_char(d.sim_clock, 'HH24:MI:SS') AS seated_sim, left(d.entity_id::text, 8) AS car, d.outcome_status,
+       d.context_frame->>'waited_the_floor' AS waited_the_floor, d.context_frame->>'wait_min' AS wait_min,
+       (SELECT s.stall_code FROM public.stalls s WHERE s.id = (d.proposed_action->>'stall_id')::uuid) AS post
+  FROM public.ottoq_decisions d
+ WHERE d.sim_run_id = '56d8465f-cb50-4a3d-a945-f047b2b92b1c' AND d.proposed_action->>'source' = 'cabin_post_stop'
+ ORDER BY d.sim_clock;
+--     15:46:24  ef0b46c0  NASH-DCFC-STALL-10  waited 91.0   the defect (§3): the arm never began
+--     17:00:30  c3333333  NASH-DCFC-STALL-07  waited 90.4   arm 17:01:57 to 17:12:45 (10.8 minutes), post freed 17:13:53,
+--                                                           the post taken by another car, the car deployed by 17:22
+--     17:41:07  ef0b46c0  NASH-DCFC-STALL-20  waited 93.7   arm 17:42:33 to 17:53:21, done, the car deployed
+--     17:53:35  44444820  NASH-DCFC-STALL-20  waited 91.4   seated 14 seconds after the post was freed
+--   No fast-charger post held a car that did not point back at it, at any reading (the G121 shape).
+--
+-- ══ (3) THE DEFECT 0817'S FIRST LIVE STOP FOUND, AND 0819 ══════════════════════════════════════════════════════════════
+--
+--   Car ef0b46c0, sim 15:47:20. The command was confirmed and the car stood on its post, charge_complete_holding. In
+--   the same world tick twin.ottoq_sim_wash_triage read it as a car that had just finished a charge and moved it on
+--   (staged_awaiting_service, svc_step need_service: its visit also has a mechanical PM). The car still stood on the
+--   post. The arm's starter takes a cabin stop only from charge_complete_holding, so it never began. The stop's own
+--   20-minute limit freed the post at 16:07 with the clean not done, and the car's wait began again from zero.
+--   0817's V3 passed because it called the command confirm and the arm's starter directly. It never ran a world tick
+--   between them, so the triage never ran. A STAGED TEST THAT CALLS THE STEPS IT KNOWS ABOUT CANNOT FIND THE STEP IT
+--   DOES NOT KNOW ABOUT.
+--   0819 (applied 14:18:07 UTC, sim 16:00 of the same run): the triage passes over a car on its cabin stop. The three
+--   stops seated after it all held their car on the post, and the two that have ended ended done.
+--   COST TO ONE CAR, STATED: ef0b46c0 waited 91 minutes, lost its stop, and waited 93.7 minutes more. Its clean was
+--   done at 17:53 and it deployed. No service was skipped. It waited about 115 minutes longer than it should have.
+--
+-- ══ (4) THE COST OF THE RULE ON A BUSY DAY, WHICH IS A CAPACITY FINDING ════════════════════════════════════════════════
+--
+--   EVERY cabin stop on this run waited the 90-minute floor. None was seated on "a post the charge step left free",
+--   because there was none: read at sim 15:08, of the depot's 30 fast-charger posts 21 held a car, 8 had a Faulted
+--   charger and 1 was promised on the calendar, with 44 cars waiting to charge. Before 0817 such a car took a wash bay
+--   at once (and had its doors opened beside the wash). Now it queues for a post. Rule 9 allows queueing and names
+--   capacity and fewer charger faults as the answer; this is the reading.
+--   8 OF 30 POSTS STOOD FREE WITH A FAULTED CHARGER WHILE THESE CARS WAITED. A cabin stop does not use the charger.
+--   0817 does not use such a post (its §4). Whether the cleaning arm of a post is fit when the post's charger is
+--   faulted is a fact about the hardware, and is put to Chase.
+--
+-- ══ (5) WHAT IS OPEN ════════════════════════════════════════════════════════════════════════════════════════════════════
+--
+--   (a) The question of §4: use a post whose charger is faulted for a cabin stop?
+--   (b) A car that has both a charge and a deep clean to do, and no atom for the clean (the needs card raised it), is
+--       cleaned on a cabin stop after its charge, not by its charging post's arm during it. Two trips to a post.
+--   (c) A stop's booking on its post closed as superseded_by_enacted_decision, not done, on the stop of 17:00 (another
+--       writer closed it first). The window is right. The state word is not.
+--   (d) The planner still reserves a wash bay for a deep clean, and 0817 releases it (20 on this run).
+--   (e) SEEN ON THE LIVE VIEW, at 14:52 UTC (the run at 1x from 14:46:30 to 14:52:56 UTC for the picture, 8x
+--       otherwise): the fifth stop, car ec5d2c18 on NASH-DCFC-STALL-14 (seated sim 19:45:23, waited the floor). The
+--       twin drew the car on its post, its door open, the post's cleaning arm in the cabin and the charge arm stowed
+--       (ottoyarddepot-sim, docs/pr-shots/cabin-stop). All 3 stops that had ended after 0819 ended with the clean done.
+--   (f) The routine sensor clean stays at the charger, by a technician (Chase, 2026-11-12). No machine does it.

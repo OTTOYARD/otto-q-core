@@ -222,6 +222,23 @@ When information is missing:
      below 99%, as low as 80% (FINDINGS G268). Built by `0543`: one departure test at both
      dispatchers (`public.ottoq_departure_clear`), and a recheck each tick that sends a car staged to
      leave but unfinished back to its charger or bay.
+   - **THE WASH BAY IS EXTERIOR ONLY. CABIN WORK IS DONE AT A FAST-CHARGER POST — Chase, 2026-11-12, morning CT:**
+     *"the washbay is only for external washing and then the sensor/camera detail ... If the vehicle needs full detail,
+     being interior and exterior, then it should first go to a charging post with the overhead vacuum, have the interior
+     complete, and then proceed to the washbay for external detail ... I'm just trying to remove opening the doors in any
+     fashion away from the wash base since there is water and dampness occurring."* And: *"let's keep everything at 100%
+     because I don't want a vehicle leaving less than perfect. That should be part of our contract is that they leave
+     clean charged and ready for maximum uptime."*
+     Built by `0817`, behind `wash_bay_exterior_only` (on at the twin depot): no cabin work is routed to a wash bay; a
+     car with an interior deep clean and no charge to do takes a **cabin stop**, standing on a free fast-charger post,
+     not plugged in, for the arm's program, and then goes to the wash bay if it has an exterior wash to do. The
+     `wash_due` flag takes a wash seat. `minor_cosmetic` is cosmetic damage to the body, not an interior flag, and takes
+     no seat. The routine sensor clean stays at the charger, by a technician, until a machine for it exists (Chase, the
+     same morning: "let's just leave that at the charging post"). There is no charge threshold: every car below its
+     target charges to it (0539). **And a correction that travels with this:** I told Chase the technician flags were
+     the likely door into the detail seat. Measured on run `5480be1f`, no seat came from a flag. The doors were the needs
+     card raising a deep clean with no atom on the visit (9 of 17), and a wash-bay reservation left held after the arm
+     had already cleaned the cabin (8 of 17). `db/checks/0484`.
 
 **10. OTTO-Q DOES NOT EXPERIMENT IN PRODUCTION. HYPOTHESES AND TESTS BELONG TO THE RESEARCH WING, IN THE TWIN — added 2026-09-27 in Chase's words.**
 
