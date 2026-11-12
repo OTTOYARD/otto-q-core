@@ -239,7 +239,7 @@ When information is missing:
      the likely door into the detail seat. Measured on run `5480be1f`, no seat came from a flag. The doors were the needs
      card raising a deep clean with no atom on the visit (9 of 17), and a wash-bay reservation left held after the arm
      had already cleaned the cabin (8 of 17). `db/checks/0484`.
-     **A FAULTED POST MAY HOLD A CABIN STOP, AND A CAR TO CHARGE AND CLEAN MAKES ONE STOP — Chase, 2026-11-12, 10:20 AM
+     **A FAULTED POST MAY HOLD A CABIN STOP, AND A CAR TO CHARGE AND CLEAN MAKES ONE STOP — Chase, 2026-11-12, mid-morning
      CT:** *"they can use faulted charging bays for cleaning, as long as they do not ALSO need a charge. If they need
      charging as well, hold until both can be completed simultaneously. That way we avoid multiple trips to the same
      type of service stalls (charging/interior cleaning)."* Built by `0820`: a cabin stop takes a post whose charger is
