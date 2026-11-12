@@ -1,6 +1,6 @@
 -- 0483  **The arm's deep clean and the found items on their first runs, and who still takes the detail seat.**
 --        (0814, 0815 seen working; 0816 applied; one count of mine corrected)
---        Production, 2026-11-12, 04:31-06:15 UTC (10:31 PM CT on 2026-11-11 to 12:15 AM CT). Rule 8: the twin depot.
+--        Production, 2026-11-12, 04:31-07:10 UTC (10:31 PM CT on 2026-11-11 to 1:10 AM CT). Rule 8: the twin depot.
 --        Rule 12: one demo run to show a finished change working; no pair, no sweep. Single runs: readings, not ranges.
 --
 -- ══ (1) RUN 893a0313 (busy_day, operator_demo, live at 8x; started 04:31:11 UTC, ended by hand 06:06:51 UTC at sim
@@ -51,7 +51,7 @@ SELECT count(*) AS detail_seats_in_a_wash_bay,
 --   (deep_status is read now, after the run. "done" for the 4 of 0816's case is the bay's own credit, so the query
 --   puts them with the 11. The split of 4 and 11 above is from each atom's done_at against the leg's start.)
 
--- ══ (3) 0816, APPLIED AT 06:08:12 UTC, AND ITS FIRST SIM HOUR ═══════════════════════════════════════════════════════
+-- ══ (3) 0816, APPLIED AT 06:08:12 UTC, AND ITS FIRST RUN ════════════════════════════════════════════════════════════
 --
 --   0816 keeps the deep clean of a car that still has its charge to do for its post's arm, and puts a deep program cut
 --   short by a charger fault back to pending before the starter runs. Run 5480be1f (busy_day, operator_demo, live at
@@ -63,8 +63,18 @@ SELECT count(*) AS detail_seats_in_a_wash_bay,
 --       before its charge.
 --     - wash seats: 12 done, mean 6.41 minutes (the seat is 6.5 since 05:35 UTC).
 --     - found items: 5 found, 5 secured.
---   ONE SIM HOUR OF ONE RUN. It shows the change at work on the cars it was written for. It does not show a day, and it
---   did not include a deep program cut short by a fault, so §2(e) of 0816 is not yet seen on a run.
+--   READ AGAIN at 07:10:28 UTC, sim 20:26 (6.4 sim hours, 703 ticks; the run played at 1x from 06:35:44 to 06:51:03
+--   UTC and from 07:10:10 UTC, for filming, and at 8x otherwise):
+--     - deep cleans: 26 atoms, all 26 done by a post's arm (26 legs at a post, mean 10.84 minutes). None open, and
+--       none closed by a bay. On run 893a0313 it was 28 by the arm and 4 by a bay, with 2 open at its end.
+--     - detail seats in a wash bay: 13. 3 were the cars with no visit record. 4 were cars whose deep clean a post's arm
+--       had already done. 6 were cars with no deep-clean atom. NONE was a car with a deep clean and a charge still to
+--       do, which is 0816's case (4 of 23 on run 893a0313).
+--     - wash seats: 32 done, mean 6.45 minutes.
+--     - found items: 12 found, 12 secured, mean pause 75.0 s.
+--     - no deep program was cut short by a fault, so §2(e) of 0816 is not yet seen on a run.
+--   ONE RUN, 6.4 SIM HOURS. It shows the change at work on the cars it was written for. The 10 seats given to cars
+--   with a visit and no deep clean open are §5(b)'s question.
 
 -- ══ (4) THE WASH SEAT IS 6.5 MINUTES AT THE TWIN DEPOT ══════════════════════════════════════════════════════════════
 --
