@@ -70,6 +70,8 @@ SELECT to_char(d.sim_clock, 'HH24:MI:SS') AS seated_sim, left(d.entity_id::text,
 --   (c) A stop's booking on its post closed as superseded_by_enacted_decision, not done, on the stop of 17:00 (another
 --       writer closed it first). The window is right. The state word is not.
 --   (d) The planner still reserves a wash bay for a deep clean, and 0817 releases it (20 on this run).
---   (e) The twin drew the third stop's car driving to its post with no charge arm on it. The vacuum arm at work on a
---       cabin stop is held by the driver's tests and was not yet seen on a live view at this reading.
+--   (e) SEEN ON THE LIVE VIEW, at 14:52 UTC (the run at 1x from 14:46:30 to 14:52:56 UTC for the picture, 8x
+--       otherwise): the fifth stop, car ec5d2c18 on NASH-DCFC-STALL-14 (seated sim 19:45:23, waited the floor). The
+--       twin drew the car on its post, its door open, the post's cleaning arm in the cabin and the charge arm stowed
+--       (ottoyarddepot-sim, docs/pr-shots/cabin-stop). All 3 stops that had ended after 0819 ended with the clean done.
 --   (f) The routine sensor clean stays at the charger, by a technician (Chase, 2026-11-12). No machine does it.
