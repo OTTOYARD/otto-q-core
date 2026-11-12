@@ -28,7 +28,7 @@ SELECT s.stall_type::text, s.stall_kind, count(*) FROM public.stalls s
 --                                               0e3cc3c2 (before 0821)    02ca304f (after 0821)
 --     cabin stops seated                        10                        8
 --     of them a second trip after a charge      6                         2
---     cabin cleans done during the charge       14 at the end + 7 running 39 (15 of them raised by the needs card)
+--     cabin cleans done during the charge       31 (7 raised by the card) 39 (15 raised by the needs card)
 --     cabin work seated in a wash bay           0                         0
 --   Different seeds. Not a pair. The direction is what the change was built for; the size is one run's.
 --   THE TWO SECOND TRIPS THAT REMAIN. One read: car c3333333-0003 charged 16:53 to 17:52 with no clean on its visit,
