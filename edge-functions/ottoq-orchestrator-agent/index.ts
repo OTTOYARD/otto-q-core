@@ -10,6 +10,18 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v33 (db/checks/0489, G543): THE FALLBACK IS A CHAIN, AND THE FUNCTION CAN SAY WHICH MODELS ANSWER.
+//      v23's one fallback model, nvidia/nemotron-3-super-120b-a12b, last answered on 2026-10-14. Since then it has
+//      returned HTTP 404 on every key (85 passes in 30 days), so a primary timeout was a pass with no answer; the
+//      endpoint's public model list still names it (read 2026-11-13), which is why nothing looked wrong.
+//      * The fallback is now FALLBACK_MODELS, tried in order after the primary. A model no key may call (404 on
+//        every key, in about 50 ms each) costs nothing but the attempts, so the old name stays last in case it
+//        returns. The attempt cap counts every key for every model.
+//      * _shared/agent_model_call.ts counts a model's key refusals per model (it used to test whether the key index
+//        had wrapped, which gave a model up early once a 429 had moved the index).
+//      * POST {"probe_models": true} asks each model of the chain for a six-token JSON answer on each key and returns
+//        what each said (status and milliseconds, never a key). It reads no depot row, writes nothing and claims no
+//        tick. It is how the chain's order was chosen and how a dead model is found before a run finds it.
 // v32 (0823; db/checks/0488, G540): THE AGENT IS TOLD WHY IT WAS WOKEN, AND WHAT IT SAID LAST.
 //      Since 0795 the agent is consulted on exceptions, and the wake gate knows why each consult happened, but the
 //      model was sent its board alone. Of 286 answered consults at the twin depot from 2026-11-05 to 2026-11-13, none of
@@ -218,17 +230,31 @@ const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers
 function json(o: unknown, s = 200) { return new Response(JSON.stringify(o), { status: s, headers: { ...cors, "Content-Type": "application/json" } }); }
 
 const OPS_WHITELIST = new Set(Object.keys(OPS_ACTION_DIAL));
-const AGENT_VERSION = "v32";
+const AGENT_VERSION = "v33";
 
 const NV_KEYS = ["NVIDIA_API_KEY_NEMOTRON", "NVIDIA_API_KEY_CUOPT", "NVIDIA_API_KEY"];
 const NV_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 const MODEL = "nvidia/nemotron-3-ultra-550b-a55b";
-// v23. The fallback when the primary refuses twice. Listed by https://integrate.api.nvidia.com/v1/models on
-// 2026-10-07. Its model card (https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8, v1.0 GA,
-// released 2026-03-11; read 2026-10-07) documents reasoning off via chat_template_kwargs enable_thinking=false and
-// says to "use temperature=1.0 and top_p=0.95 across all tasks", so this model is sent those; the primary keeps the
-// 0.1 it has run on since v15.
-const FALLBACK_MODEL = "nvidia/nemotron-3-super-120b-a12b";
+// v33 (G543). The fallbacks, in the order they are tried when the primary does not answer. Each is named by
+// https://integrate.api.nvidia.com/v1/models (read 2026-11-13 13:25 UTC). The order is the probe's (db/checks/0489):
+// a model that answered the probe, smallest first, because a primary timeout leaves the fallback about 15 s; then
+// v23's nemotron-3-super, which that list still names and which has answered 404 since 2026-10-14.
+const SUPER_MODEL = "nvidia/nemotron-3-super-120b-a12b";
+const FALLBACK_MODELS = [
+  "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "nvidia/nemotron-4-340b-instruct",
+  SUPER_MODEL,
+];
+const MODELS = [MODEL, ...FALLBACK_MODELS];
+// Sampling per model. The primary keeps the 0.1 it has run on since v15. nemotron-3-super's model card
+// (https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8, v1.0 GA, read 2026-10-07) says to "use
+// temperature=1.0 and top_p=0.95 across all tasks". No card was read for the other two, so they are sent no
+// temperature and run on the endpoint's default.
+function samplingFor(model: string): Record<string, number> {
+  if (model === MODEL) return { temperature: 0.1 };
+  if (model === SUPER_MODEL) return { temperature: 1.0, top_p: 0.95 };
+  return {};
+}
 // v21 (G188). Live-era p95 agent latency is 66.6 s (CLAUDE.md 2.5, 0417), so 75 s keeps the calls
 // that answer and ends the ones that never will. Both bounds together stay under the runtime's
 // 150 s wall clock, so the decision below is always written.
@@ -303,6 +329,36 @@ serve(async (req) => {
   const tStart = Date.now();
   try {
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+    // ---- v33 (G543): WHICH MODELS ANSWER. No depot row is read, nothing is written and no tick is claimed. ----
+    if (body.probe_models === true) {
+      const probeKeys = NV_KEYS
+        .map((name) => ({ name, value: Deno.env.get(name) }))
+        .filter((candidate): candidate is { name: string; value: string } => Boolean(candidate.value));
+      const probe: unknown[] = [];
+      for (const model of MODELS) {
+        const r = await callModelWithRetry({
+          url: NV_URL,
+          keys: probeKeys,
+          models: [model],
+          body: (m) => ({
+            model: m, ...samplingFor(m), max_tokens: 60,
+            chat_template_kwargs: { enable_thinking: false },
+            response_format: { type: "json_object" },
+            messages: [{ role: "user", content: 'Return exactly this JSON object and nothing else: {"actions":[]}' }],
+          }),
+          parse: (content) => {
+            const candidate = extractJson(content) as any;
+            return candidate && Array.isArray(candidate.actions) ? candidate : null;
+          },
+          budgetMs: 25_000, attemptTimeoutMs: 20_000, minAttemptMs: 2_000,
+          triesPerModel: 1, maxAttempts: Math.max(probeKeys.length, 1),
+        });
+        probe.push({ model, answered: r.model != null, ms: r.ms, attempts: r.attempts,
+                     ...(r.model == null ? { last: r.raw.slice(0, 200) } : {}) });
+      }
+      return json({ ok: true, version: AGENT_VERSION, keys: probeKeys.map((k) => k.name), probe,
+        latency_ms: { total: Date.now() - tStart } });
+    }
     const requestedDepot = body.depot_id ?? "11111111-1111-1111-1111-111111111111";
     const requestedRun = typeof body.sim_run_id === "string" && body.sim_run_id.length > 0
       ? body.sim_run_id
@@ -528,10 +584,12 @@ serve(async (req) => {
     const call = await callModelWithRetry({
       url: NV_URL,
       keys,
-      models: [MODEL, FALLBACK_MODEL],
+      models: MODELS,
+      // v33: a model no key may call takes one attempt per key, so the cap counts every key for every model
+      maxAttempts: MODELS.length * Math.max(2, keys.length),
       body: (model) => ({
         model,
-        ...(model === MODEL ? { temperature: 0.1 } : { temperature: 1.0, top_p: 0.95 }),
+        ...samplingFor(model),
         max_tokens: maxTokens,
         chat_template_kwargs: { enable_thinking: false }, // fast structured output for the control loop
         response_format: { type: "json_object" },
@@ -770,9 +828,9 @@ serve(async (req) => {
     const evidenceError = await recordPass({
       consulted: true, outcome_class: decisionError ? "failed" : outcomeClass,
       board_text: bText, board_sha256_client: boardSha, prompt_sha256: promptSha,
-      models_requested: [MODEL, FALLBACK_MODEL], model_answered: modelUsed !== "none" ? modelUsed : null,
+      models_requested: MODELS, model_answered: modelUsed !== "none" ? modelUsed : null,
       response_model: call.responseModel ?? null, response_id: call.responseId ?? null,
-      sampling: { primary: { temperature: 0.1 }, fallback: { temperature: 1.0, top_p: 0.95 }, max_tokens: maxTokens,
+      sampling: { by_model: Object.fromEntries(MODELS.map((m) => [m, samplingFor(m)])), max_tokens: maxTokens,
                   enable_thinking: false, response_format: "json_object" },
       usage: call.usage ?? null, attempts: call.attempts,
       answer: modelUsed !== "none" ? { actions: parsed.actions ?? [], solver: parsed.solver ?? null,

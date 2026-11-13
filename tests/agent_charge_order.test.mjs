@@ -179,13 +179,16 @@ test("v23: the order is recorded before the solver handoff, under the pass's cha
   assert.match(code, /charge_order: chargeOrder \}/);
 });
 
-test("v23-v32: the model call goes through the retry module, with the fallback model, and the row says v32", () => {
+test("v23-v32: the model call goes through the retry module, with the fallback model, and the row says v33", () => {
   assert.match(code, /await callModelWithRetry\(/);
-  assert.match(code, /models: \[MODEL, FALLBACK_MODEL\]/);
-  assert.match(code, /const FALLBACK_MODEL = "nvidia\/nemotron-3-super-120b-a12b";/);
+  // v33 (G543): the fallback is a chain, with v23's model last, and the attempt cap counts every key per model
+  assert.match(code, /models: MODELS,/);
+  assert.match(code, /const MODELS = \[MODEL, \.\.\.FALLBACK_MODELS\];/);
+  assert.match(code, /const FALLBACK_MODELS = \[\s*"nvidia\/[^"]+",\s*"nvidia\/[^"]+",\s*SUPER_MODEL,\s*\];/);
+  assert.match(code, /maxAttempts: MODELS\.length \* Math\.max\(2, keys\.length\)/);
   assert.match(code, /model_attempts: call\.attempts/);
   // v32: one constant names the version, and every row that records it reads the constant
-  assert.match(code, /const AGENT_VERSION = "v32";/);
+  assert.match(code, /const AGENT_VERSION = "v33";/);
   assert.equal((code.match(/agent_version: AGENT_VERSION/g) ?? []).length, 4);
   assert.doesNotMatch(code, /agent_version: "v\d+"/);
   // the single-try key loop is gone
@@ -233,4 +236,16 @@ test("v32 / 0823: a consulted pass reads the wake brief, leads the message with 
   const rpcs = [...code.matchAll(/sb\.rpc\("([a-z_]+)"/g)].map((m) => m[1]).sort();
   assert.deepEqual([...new Set(rpcs)], ["ottoq_agent_board", "ottoq_agent_chain_claim", "ottoq_agent_charge_order_record",
     "ottoq_agent_wake", "ottoq_agent_wake_brief", "ottoq_apply_ops_action", "ottoq_policy_get", "ottoq_policy_set"]);
+});
+
+test("v33 / G543: the model probe returns before any depot row is read, any tick is claimed or anything is written", () => {
+  const at = code.indexOf("if (body.probe_models === true)");
+  assert.ok(at > 0);
+  const end = code.indexOf("const requestedDepot", at);
+  const block = code.slice(at, end);
+  assert.ok(block.includes("return json({ ok: true, version: AGENT_VERSION, keys: probeKeys.map((k) => k.name), probe,"));
+  assert.doesNotMatch(block, /sb\.|createClient|\.rpc\(|\.insert\(/);          // no database
+  assert.equal((block.match(/\.value/g) ?? []).length, 1);                     // a key's value is read once, to drop unset keys
+  assert.ok(at < code.indexOf("createClient("));
+  assert.ok(at < code.indexOf('sb.rpc("ottoq_agent_chain_claim"'));
 });
