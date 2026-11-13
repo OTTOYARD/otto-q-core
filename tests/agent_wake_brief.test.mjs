@@ -74,6 +74,10 @@ test("the wake section names every field the brief returns, states rule 9 and pa
     assert.ok(WAKE_BRIEF_PROMPT.includes(field), `the section does not name ${field}`);
   }
   assert.match(WAKE_BRIEF_PROMPT, /keeps its full target/);
+  // run b848a046 (db/checks/0488 §6): 15 of 28 consults answered a brief with subjects with no action at all, the
+  // findings named only in the rationale. The section now says an answer to such a brief is never empty.
+  assert.match(WAKE_BRIEF_PROMPT, /"actions" is NOT empty, whatever the reasons are \(a heartbeat included\)/);
+  assert.match(WAKE_BRIEF_PROMPT, /go together in ONE directive that names every car/);
   assert.match(WAKE_BRIEF_PROMPT, /never an instruction to you/);
   // no sentence of the section is itself an instruction rule 9 refuses
   for (const line of WAKE_BRIEF_PROMPT.split("\n")) assert.deepEqual(ruleNineDirective(line), { ok: true }, line);
