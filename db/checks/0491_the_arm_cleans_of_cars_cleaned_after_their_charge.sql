@@ -20,7 +20,16 @@
 -- minutes left does not reach the lead on every charge.
 -- WHAT IT DOES NOT SAY. Nothing about the same cars before 0827 on a like run: that run's rows were purged. One run.
 --
--- AFTER 0828: read the next full run with the query below and write the result here.
+-- AFTER 0828. Run c86b46e1 (started 21:11:17 UTC to check it; 0827 and 0828 on, lead 3.5), read at tick 491, 21:58 UTC:
+--     other kinds:       45 charged · 44 arm · 1 missed (tidied by another)
+--     the three kinds:  123 charged · 68 arm (34 started near the end of the charge, 9 after it, 25 by the needed-tidy
+--                       branch) · 14 immediate turnarounds · 41 missed (19 tidied by another)
+--     cars held on a post more than 10 sim minutes past their tether: 0
+--   0828 did not fix it: 41 of 123 against 27 of 69 before. cabin_robot_after_charge was set to 0 at 21:58:23 UTC.
+--   WHAT IS STILL NOT MEASURED, and must be before another attempt: the same three kinds with the setting OFF. The
+--   "missed" count has no baseline; if these cars also go without the arm with the setting off (a charge closed by a
+--   path the starter never sees, a tidy done by a technician first), part of the 41 is not 0827's. The rest of run
+--   c86b46e1 (from tick 493, sim 20:16:44) runs with the setting off: read the visits whose charge ends after that.
 
 WITH prof AS MATERIALIZED (
   SELECT v.id, COALESCE(pf.clean_after_charge, false) AS after_charge

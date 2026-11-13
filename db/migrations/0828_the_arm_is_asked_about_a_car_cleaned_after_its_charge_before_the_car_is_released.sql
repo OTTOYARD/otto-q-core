@@ -182,3 +182,12 @@ COMMIT;
 --   Run 7a08f52a was live at the apply, at tick 743 of its day. V3 at apply: cars_tested 120, awaiting_the_arm_now 0.
 --   Stored after the apply, md5(prosrc): ottoq_sim_advance_visit_atoms a29050986cb6920be7959618eab381c2,
 --   ottoq_release_expired_tethers 1037f381572a240a4548f75bf0b222b1.
+--
+-- IT DID NOT FIX IT. Read on run c86b46e1 (the whole run under 0827 and 0828, lead 3.5) at tick 491, 21:58 UTC: the
+--   three kinds of car, 123 charged visits: 68 with the arm (34 started near the end of the charge, 9 after it, 25 by
+--   the needed-tidy branch), 14 an owner's immediate turnaround, 41 with neither (19 of them tidied by another
+--   performer). The other kinds: 44 of 45. No car stood held more than 10 minutes. cabin_robot_after_charge was set
+--   back to 0 at the twin depot at 21:58:23 UTC and is OFF. The two bodies this file patched stay as patched: with the
+--   setting off, public.ottoq_awaits_arm_after_charge is false for every car and both patches change nothing.
+--   What is not known: why a car is still not started. Not yet read: the same cars' arm cleans with the setting off
+--   on a like run (db/checks/0491 says how).
