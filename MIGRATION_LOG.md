@@ -912,7 +912,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0819](db/migrations/0819_the_wash_triage_leaves_a_car_on_its_cabin_stop.sql) | `20261112141807` | yes — ledger | **The twin's wash triage leaves a car on its cabin stop.** |
 | [0820](db/migrations/0820_a_cabin_stop_may_use_a_post_whose_charger_is_faulted_and_a_car_to_charge_and_clean_waits_for_a_fast_charger.sql) | `20261112163417` | yes — ledger | **A cabin stop may use a post whose charger is faulted. A car with a charge and a cabin clean to do waits for |
 | [0821](db/migrations/0821_a_car_to_charge_has_its_cabin_clean_on_its_visit_before_it_is_seated_and_a_cabin_stop_records_its_posts_charger.sql) | `20261112202531` | yes — ledger | **A car to charge has its cabin clean on its visit before it is seated. A cabin stop's decision records its |
-| [0824](db/migrations/0824_a_car_is_charged_only_at_a_post_whose_arm_stands_on_its_charge_port_side.sql) | `PENDING` | no — pending | **A car is charged only at a post whose arm stands on its charge-port side. The twin tells the robots which |
+| [0824](db/migrations/0824_a_car_is_charged_only_at_a_post_whose_arm_stands_on_its_charge_port_side.sql) | `20261113044222` | yes — ledger | **A car is charged only at a post whose arm stands on its charge-port side. The twin tells the robots which |
 
 630 migrations indexed.
 

@@ -861,7 +861,7 @@ repo_manifest(version, name, file) AS (
     ('20261112141807'::text, '0819_the_wash_triage_leaves_a_car_on_its_cabin_stop'::text, '0819_the_wash_triage_leaves_a_car_on_its_cabin_stop.sql'::text),
     ('20261112163417'::text, '0820_a_cabin_stop_may_use_a_post_whose_charger_is_faulted_and_a_car_to_charge_and_clean_waits_for_a_fast_charger'::text, '0820_a_cabin_stop_may_use_a_post_whose_charger_is_faulted_and_a_car_to_charge_and_clean_waits_for_a_fast_charger.sql'::text),
     ('20261112202531'::text, '0821_a_car_to_charge_has_its_cabin_clean_on_its_visit_before_it_is_seated_and_a_cabin_stop_records_its_posts_charger'::text, '0821_a_car_to_charge_has_its_cabin_clean_on_its_visit_before_it_is_seated_and_a_cabin_stop_records_its_posts_charger.sql'::text),
-    ('PENDING'::text, '0824_a_car_is_charged_only_at_a_post_whose_arm_stands_on_its_charge_port_side'::text, '0824_a_car_is_charged_only_at_a_post_whose_arm_stands_on_its_charge_port_side.sql'::text)
+    ('20261113044222'::text, '0824_a_car_is_charged_only_at_a_post_whose_arm_stands_on_its_charge_port_side'::text, '0824_a_car_is_charged_only_at_a_post_whose_arm_stands_on_its_charge_port_side.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

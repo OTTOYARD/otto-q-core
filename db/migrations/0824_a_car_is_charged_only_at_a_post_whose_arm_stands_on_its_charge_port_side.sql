@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261113044222
 -- migration-name:    0824_a_car_is_charged_only_at_a_post_whose_arm_stands_on_its_charge_port_side
 --
 -- 0824  **A car is charged only at a post whose arm stands on its charge-port side. The twin tells the robots which
@@ -52,7 +52,7 @@
 --   service flow, or public.ottoq_promote_proposal_candidates: a post they pick is still checked by the charge step
 --   only where it passes through it. It does not move a cabin stop (0817): a car that is not plugged in needs no side.
 --
--- §5 PRECONDITIONS AND CHECKS. P0 nothing in flight, no run live. P1 the three bodies this file was written against
+-- §5 PRECONDITIONS AND CHECKS. P0 no certification in flight (a run may be live, as for 0819). P1 the three bodies this file was written against
 --   (md5 of prosrc, read 2026-11-13 03:5x UTC, after 0823). P2 once. V1 each patched body with its patches reversed is
 --   its pre-image. V2 every anchor matched once. V3 the facts: 15 right and 15 left posts at the twin depot, every
 --   autonomous car there resolves a profile, and the pure fit rule on its six cases. It reads and writes nothing else:
@@ -74,7 +74,8 @@ DO $pre$
 DECLARE r record;
 BEGIN
   IF public.ottoq_certification_in_flight(true) > 0 THEN RAISE EXCEPTION '0824 P0: a certification is in flight'; END IF;
-  IF EXISTS (SELECT 1 FROM public.ottoq_sim_runs WHERE status = 'running') THEN RAISE EXCEPTION '0824 P0: a run is live'; END IF;
+  /* A run may be live (as 0819 was applied): the new functions are read only from the patched doors, and a seat already
+     taken is not moved. The footer says which run was live. */
   FOR r IN SELECT * FROM (VALUES
       ('public.ottoq_l2_propose_stall_assignment(uuid,uuid,jsonb)', '5a6e4b5469103d79c8ea80f489a1a195'),
       ('public.ottoq_decide_tick(uuid)',                            '6b139ccf90d5e24b900f0eb87ab802ac'),
@@ -318,8 +319,13 @@ VALUES ('0824_a_car_is_charged_only_at_a_post_whose_arm_stands_on_its_charge_por
         || COALESCE((SELECT result::text FROM _0824_selftest LIMIT 1), 'no result'), now());
 COMMIT;
 
--- NOT APPLIED. Written 2026-11-12 (evening CT) against the live bodies after 0823. It was not sent because a run was
---   live (b848a046, P0) and another session was applying migrations the same evening (0822, 0823). Apply it through
---   apply_migration when no run is live; P1 refuses if any of the three bodies has changed since, and the anchors then
---   need re-reading. No part of this file has been run against a database: its three anchors were each counted once in
---   the live bodies (2026-11-13 03:5x UTC), and that is all that was checked.
+-- APPLIED 2026-11-13 at 04:42:22 UTC (2026-11-12, 10:42 PM CT), ledger 20261113044222, through apply_migration, on the
+--   first send. Before it, the same statements ran once against the live engine inside a transaction that was rolled
+--   back (04:1x UTC): every anchor matched once, V1 held, the snapshot's vehicle row carried `model` and `port`, and the
+--   fit rule read true and false where it should for all five vehicle kinds at both arm sides.
+--   A run was live at the apply (a95e51a3, operator_demo, busy_day, started 04:22:43 UTC). At that moment 11 left-port
+--   cars stood on right-arm posts, seated before the rule existed (9 I-PACE, 2 Model Y); the rule moves no seated car.
+--   V3 at apply: posts_right 15, posts_left 15, cars_left_only 78, cars_both_sides 38, cars_no_profile 0.
+--   Stored after the apply, md5(prosrc): ottoq_l2_propose_stall_assignment 98aff784671e488bd07ef5a546295023,
+--   ottoq_decide_tick 8454612c7529bbe9bba3c85ddc3bbf34, ottoq_twin_snapshot 7f961b8576f4c8dddea6f7d825f54a12.
+--   The first seats made under the rule are read in db/checks/0489.
