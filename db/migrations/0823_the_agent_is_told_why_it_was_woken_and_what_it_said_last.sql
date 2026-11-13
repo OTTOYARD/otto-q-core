@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261113030227
 -- migration-name:    0823_the_agent_is_told_why_it_was_woken_and_what_it_said_last
 --
 -- 0823  **The agent is told why it was woken, which cars and chargers are behind each reason, and what it said last.**
