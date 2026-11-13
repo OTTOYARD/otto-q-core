@@ -85,7 +85,33 @@
 --
 -- ══ (6) THE RUN'S END ═════════════════════════════════════════════════════════════════════════════════════════════════
 --
---   PENDING: the run was still live when this file was first committed.
+--   Run b848a046 completed at 04:20:00 UTC: 785 ticks, sim 23:16. 31 consults and 308 solver-only passes. No fallback,
+--   no failed pass, no brief error; 0 changed engine state (advisory, echo and no_effect, as before: the brief adds no
+--   lever). 814,701 model tokens; a consult took a mean 29.9 s (the longest 49.0 s).
+--   THE FIRST READ DID NOT HOLD, AND THE SECOND PROMPT IS WHY THERE ARE TWO ROWS:
+--                                                    prompt 0a36353c       prompt 85f8d441
+--                                                    (03:11-04:13 UTC)     (04:17 UTC)
+--     consults                                       30                    1
+--     of them, with a brief that named new subjects  24                    1
+--     of those, answered with NO action at all       17                    0
+--     new subjects named by applied directives       29 of 117             7 of 7
+--     actions                                        57                    3
+--   Under the first prompt the model answered 17 of 24 such briefs with an empty action list and named the findings in
+--   its rationale only ("Nine new scout findings (all hi…", pass 8272, actions []). The base prompt says "empty actions
+--   is a good answer when healthy", and the wake section said "say only what is new": together they read as licence to
+--   say nothing. By kind, from public.ottoq_agent_wake_brief_coverage at 04:06 UTC (28 consults): cut charges 11 of 19
+--   named, faulted posts 10 of 18, scout findings 8 of 62.
+--   The 5 rejected actions were all "action cap (16) reached" on one consult that wrote a directive per car past its
+--   contract wait. None was a rule-9 refusal.
+--   THE CHANGE (commit 17bbf1ea, deployed as ottoq-orchestrator-agent v45 during the run, eight of eight files equal
+--   to the repo's): the wake section now says that an answer to a brief with subjects is never empty, whatever the
+--   reasons, and that the scout findings of one kind share one directive naming every car. One consult of this run
+--   came after it: prompt 85f8d441 (the hash computed from the repo before the deploy), 7 of 7 named in 3 directives.
+--   ONE CONSULT IS NOT A RESULT. §7 is the next run, wholly under the second prompt.
+--
+-- ══ (7) RUN a95e51a3 (busy_day, operator_demo, live at 8x; started 04:22:43 UTC; edge v45 throughout) ═════════════════
+--
+--   PENDING: the run was live when this section was first committed.
 --
 -- ══ THE QUERIES ═══════════════════════════════════════════════════════════════════════════════════════════════════════
 
