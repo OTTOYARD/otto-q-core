@@ -179,13 +179,15 @@ test("v23: the order is recorded before the solver handoff, under the pass's cha
   assert.match(code, /charge_order: chargeOrder \}/);
 });
 
-test("v23-v31: the model call goes through the retry module, with the fallback model, and the row says v31", () => {
+test("v23-v32: the model call goes through the retry module, with the fallback model, and the row says v32", () => {
   assert.match(code, /await callModelWithRetry\(/);
   assert.match(code, /models: \[MODEL, FALLBACK_MODEL\]/);
   assert.match(code, /const FALLBACK_MODEL = "nvidia\/nemotron-3-super-120b-a12b";/);
   assert.match(code, /model_attempts: call\.attempts/);
-  assert.match(code, /agent_version: "v31"/);
-  assert.doesNotMatch(code, /agent_version: "v(2[23456789]|30)"/);
+  // v32: one constant names the version, and every row that records it reads the constant
+  assert.match(code, /const AGENT_VERSION = "v32";/);
+  assert.equal((code.match(/agent_version: AGENT_VERSION/g) ?? []).length, 4);
+  assert.doesNotMatch(code, /agent_version: "v\d+"/);
   // the single-try key loop is gone
   assert.doesNotMatch(code, /for \(const candidate of keys\)/);
   // an accepted order is an enacted action
@@ -216,4 +218,19 @@ test("v31 / 0781: the charge-line section says how the kernel orders a car the b
   assert.match(CHARGE_ORDER_PROMPT, /last_order\.projection\.owners says which operator an order cost \(cmp -1\)/);
   // it explains the order; it does not forbid an order (the check disposes)
   assert.doesNotMatch(CHARGE_ORDER_PROMPT, /never (move|name|rank) a car with yields/i);
+});
+
+test("v32 / 0823: a consulted pass reads the wake brief, leads the message with it and keeps it on its record", () => {
+  // `code` above is the function source with its comment lines removed
+  assert.match(code, /sb\.rpc\("ottoq_agent_wake_brief",\s*\{ p_sim_run_id: run\.sim_run_id, p_wake: wake \}\)/);
+  assert.match(code, /withWakeBrief\(withChargeOrder\(SYSTEM, board\), brief\)/);
+  assert.match(code, /const userMessage = userMessageOf\(brief, bText\);/);
+  assert.match(code, /if \(read\.record !== undefined\) wake = \{ \.\.\.wake, brief: read\.record \};/);
+  // the brief is read after the wake gate says wake and before the board, so a solver-only pass never reads one
+  assert.ok(code.indexOf("if (!wake.wake)") < code.indexOf('sb.rpc("ottoq_agent_wake_brief"'));
+  assert.ok(code.indexOf('sb.rpc("ottoq_agent_wake_brief"') < code.indexOf('sb.rpc("ottoq_agent_board"'));
+  // no new lever: the function still calls only the setters it called before
+  const rpcs = [...code.matchAll(/sb\.rpc\("([a-z_]+)"/g)].map((m) => m[1]).sort();
+  assert.deepEqual([...new Set(rpcs)], ["ottoq_agent_board", "ottoq_agent_chain_claim", "ottoq_agent_charge_order_record",
+    "ottoq_agent_wake", "ottoq_agent_wake_brief", "ottoq_apply_ops_action", "ottoq_policy_get", "ottoq_policy_set"]);
 });

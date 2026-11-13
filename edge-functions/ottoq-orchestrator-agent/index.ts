@@ -10,6 +10,19 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v32 (0823; db/checks/0488, G540): THE AGENT IS TOLD WHY IT WAS WOKEN, AND WHAT IT SAID LAST.
+//      Since 0795 the agent is consulted on exceptions, and the wake gate knows why each consult happened, but the
+//      model was sent its board alone. Of 286 answered consults at the twin depot from 2026-11-05 to 2026-11-13, none of
+//      the 5 woken by an emergency mentions one, all 286 chose the same solver objective and none changed engine state.
+//      With agent_wake_brief on, a consulted pass reads public.ottoq_agent_wake_brief (read-only: the gate's reasons,
+//      each count changed since the last answer, the cars and chargers behind each reason, the directives issued last),
+//      puts it ahead of the board in the model's message, appends the section that says how to answer it
+//      (_shared/agent_wake_brief.ts), and keeps it on the decision row and the evidence row as wake.brief, with how
+//      many of its subjects the directives named. A directive may carry "about". No new lever: the agent proposes
+//      what it could before. With no brief (the dial at 0, the function missing, an error) the message and the prompt
+//      are v31's, byte for byte.
+//      _shared/agent_rule_nine.ts: a charge a fault cut, described ("ended at 75% when the charger faulted"), is no
+//      longer refused as an instruction to end a charge.
 // v31 (0783, 0781; db/checks/0470 §5, G503): THE BOARD SAYS WHERE THE WALL IS, AND THE AGENT IS TOLD TO READ IT.
 //      On run 78c0624c the agent was consulted 266 times and named the chargers as the depot's constraint while the two
 //      service bays were the wall at 6.9 times their capacity: nothing on its board compared a resource's queued work
@@ -194,6 +207,8 @@ import { callModelWithRetry } from "../_shared/agent_model_call.ts";
 import { chargeOrderAccepted, chargeQueueOf, normalizeChargeOrder, withChargeOrder } from "../_shared/agent_charge_order.ts";
 import { boardText, classifyPass, leversOf, readWake, sha256Hex, standingObjective, type OutcomeClass, type Wake }
   from "../_shared/agent_pass_evidence.ts";
+import { briefCoverage, directiveAbout, readBrief, userMessageOf, withWakeBrief, type WakeBrief }
+  from "../_shared/agent_wake_brief.ts";
 import {
   KNOBS, WORK_SIDE_KEYS, OPS_ACTION_DIAL, INERT_KEYS, INERT_OPS,
   clampDial, currentDialValue, reversalDwellMin, admitDialChange, opsActionDirection, reversalHold,
@@ -203,6 +218,7 @@ const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers
 function json(o: unknown, s = 200) { return new Response(JSON.stringify(o), { status: s, headers: { ...cors, "Content-Type": "application/json" } }); }
 
 const OPS_WHITELIST = new Set(Object.keys(OPS_ACTION_DIAL));
+const AGENT_VERSION = "v32";
 
 const NV_KEYS = ["NVIDIA_API_KEY_NEMOTRON", "NVIDIA_API_KEY_CUOPT", "NVIDIA_API_KEY"];
 const NV_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
@@ -418,7 +434,7 @@ serve(async (req) => {
     async function recordPass(row: Record<string, unknown>): Promise<string | null> {
       try {
         const { error } = await sb.from("ottoq_agent_pass_evidence").insert({
-          chain_id: chainId, seat: "ottoq_prime", agent_version: "v31",
+          chain_id: chainId, seat: "ottoq_prime", agent_version: AGENT_VERSION,
           sim_run_id: run.sim_run_id, depot_id: depot, run_by: run.run_by ?? null,
           trigger_tick: chainTriggerTick, recorded_tick: run.tick_count, sim_clock: run.sim_clock_current,
           wake, ...row,
@@ -434,7 +450,7 @@ serve(async (req) => {
 
     // ---- v29 (0705): IS THERE ANYTHING NEW FOR THE AGENT TO LOOK AT? A missing or failing gate always wakes. ----
     const { data: wakeData, error: wakeErr } = await sb.rpc("ottoq_agent_wake", { p_sim_run_id: run.sim_run_id });
-    const wake: Wake = readWake(wakeData, wakeErr);
+    let wake: Wake = readWake(wakeData, wakeErr);
 
     if (!wake.wake) {
       // SOLVER-ONLY. Nothing the agent can act on has changed since it last answered: the solver runs on the
@@ -453,7 +469,7 @@ serve(async (req) => {
         depot_id: depot, action_context: "task_start", resolved_action_context: "orchestrator_agent",
         entity_type: "depot", entity_id: depot,
         context_frame: { lens: "wake_gate", fr4: true, agent_solver_chain_id: chainId,
-                         agent_chain_trigger_tick: chainTriggerTick, wake, agent_version: "v31" },
+                         agent_chain_trigger_tick: chainTriggerTick, wake, agent_version: AGENT_VERSION },
         proposed_action: { actions: [], solver: solverDirective, model: "kernel_regime", agent_solver_chain_id: chainId },
         enacted_action: { verb: solverAccepted ? "solve_on_standing_objective" : "no_op", applied: [], queued: [],
                           rejected: [], rationale, solver_handoff: solverHandoff, outcome_class: "solver_only", wake,
@@ -472,6 +488,19 @@ serve(async (req) => {
         evidence_error: evidenceError, latency_ms: { total: totalMs } });
     }
 
+    // ---- v32 (0823): WHY THIS PASS WAS WOKEN, from the run's own rows. Read-only; NULL while agent_wake_brief is 0.
+    // A missing function, an error or an unreadable answer is no brief (v31's message), recorded on the pass. ----
+    let brief: WakeBrief | null = null;
+    try {
+      const { data: briefData, error: briefErr } = await sb.rpc("ottoq_agent_wake_brief",
+        { p_sim_run_id: run.sim_run_id, p_wake: wake });
+      const read = readBrief(briefData, briefErr);
+      brief = read.brief;
+      if (read.record !== undefined) wake = { ...wake, brief: read.record };
+    } catch (error) {
+      wake = { ...wake, brief: { error: error instanceof Error ? error.message.slice(0, 300) : "brief read failed" } };
+    }
+
     const { data: board, error: bErr } = await sb.rpc("ottoq_agent_board", { p_sim_run_id: run.sim_run_id });
     if (bErr || !board) {
       await recordPass({ consulted: true, outcome_class: "failed", decision_written: false,
@@ -487,14 +516,15 @@ serve(async (req) => {
     const keys = NV_KEYS
       .map((name) => ({ name, value: Deno.env.get(name) }))
       .filter((candidate): candidate is { name: string; value: string } => Boolean(candidate.value));
-    const system = withChargeOrder(SYSTEM, board);
+    const system = withWakeBrief(withChargeOrder(SYSTEM, board), brief);
     // v29 (0703): the board text is computed once, so what is hashed and stored is exactly what the model reads
     const bText = boardText(board);
-    const userMessage = `BOARD DIGEST:\n${bText}\n\nReturn ONLY the JSON object.`;
+    const userMessage = userMessageOf(brief, bText);
     const boardSha = await sha256Hex(bText);
     const promptSha = await sha256Hex(system);
     // v23: a charge order is up to 12 cars with a reason each, so the answer needs room beyond v15's 1400
-    const maxTokens = chargeQueueOf(board) ? 2400 : 1400;
+    // v32: a brief asks for one directive per subject it names, so an answer to one gets 600 more
+    const maxTokens = (chargeQueueOf(board) ? 2400 : 1400) + (brief ? 600 : 0);
     const call = await callModelWithRetry({
       url: NV_URL,
       keys,
@@ -538,7 +568,10 @@ serve(async (req) => {
     }
 
     const dwellMin = reversalDwellMin(board);
-    for (const a of parsed.actions.slice(0, 6)) {
+    // v32: a brief can name up to 10 cut charges, 10 emergencies, 10 posts and 10 findings; an answer to one may carry
+    // more than six actions. The move cap (3) still bounds dial and ops actions.
+    const actionCap = brief ? 16 : 6;
+    for (const a of parsed.actions.slice(0, actionCap)) {
       if (a?.type === "set_policy" && Number.isFinite(Number(a.value))) {
         // v19: the work side's demand is not an agent actuator and not a question for the approval
         // queue either -- it is rejected with a reason the agent can read on its next board.
@@ -617,10 +650,16 @@ serve(async (req) => {
         // defers or shortens a service is refused here and kept, with its text, in the rejected list.
         const r9 = ruleNineDirective(a.text);
         if (!r9.ok) { rejected.push({ type: "directive", text: a.text.slice(0, 400), reason: r9.reason, matched: r9.matched }); continue; }
-        applied.push({ type: "directive", text: a.text.slice(0, 400), severity: a.severity === "warning" ? "warning" : "info" });
+        const about = directiveAbout(a);
+        applied.push({ type: "directive", text: a.text.slice(0, 400), severity: a.severity === "warning" ? "warning" : "info",
+                       ...(about ? { about } : {}) });
       } else {
         rejected.push({ ...a, reason: "unrecognized action shape" });
       }
+    }
+    // v32: an action past the cap used to be dropped with no record; it is now kept in the rejected list
+    for (const a of parsed.actions.slice(actionCap, actionCap + 20)) {
+      rejected.push({ ...(a && typeof a === "object" ? a : { value: a }), reason: `action cap (${actionCap}) reached` });
     }
 
 
@@ -685,6 +724,10 @@ serve(async (req) => {
     const levers = leversOf({ applied: applied as any[], queued, rejected, chargeOrderReceipt,
       solverHandoff, objective: (solverDirective as any)?.objective ?? null });
     const outcomeClass: OutcomeClass = classifyPass({ consulted: true, answered: modelUsed !== "none", levers });
+    // v32 (0823): how many of the brief's new subjects the applied directives name (the same rule as the view
+    // public.ottoq_agent_wake_brief_coverage, which reads the model's answer; this reads what was applied)
+    const wakeBriefCoverage = modelUsed !== "none"
+      ? briefCoverage(brief, (applied as any[]).filter((x) => x?.type === "directive")) : null;
     const { error: decisionError } = await sb.from("ottoq_decisions").insert({
       sim_run_id: run.sim_run_id, tick_seq: run.tick_count, sim_clock: run.sim_clock_current,
       depot_id: depot, action_context: "task_start", resolved_action_context: "orchestrator_agent",
@@ -694,10 +737,11 @@ serve(async (req) => {
                        // v19: which halves of the board the model actually saw, so an audit can
                        // separate a grounded decision from one made on counters alone.
                        board_blocks: { grounding: board.grounding != null, assets: board.assets != null,
-                                       review: board.review != null, charge_queue: board.charge_queue != null },
+                                       review: board.review != null, charge_queue: board.charge_queue != null,
+                                       wake_brief: brief != null },
                        // v23: how the model call went, attempt by attempt (model, status, ms, pause; never a key)
                        model_attempts: call.attempts,
-                       agent_version: "v31" },
+                       agent_version: AGENT_VERSION },
       proposed_action: { actions: parsed.actions, solver: solverDirective, model: modelUsed,
                          agent_solver_chain_id: chainId,
                          // v23: the order as sent to the door, with any name the board did not hold
@@ -711,6 +755,7 @@ serve(async (req) => {
                         charge_order: chargeOrderReceipt,
                         // v29: the honest class (0703); outcome_status below is left as v28 wrote it
                         outcome_class: outcomeClass,
+                        ...(wakeBriefCoverage ? { wake_brief_coverage: wakeBriefCoverage } : {}),
                         source: modelUsed !== "none" ? "nemotron" : "deterministic_fallback" },
       // v23: an order the kernel accepted is an enacted action, as a dial write is
       outcome_status: applied.length > 0 || solverAccepted || orderAccepted ? "enacted" : "noop_no_candidate",
@@ -719,7 +764,7 @@ serve(async (req) => {
     // v29 (0703): the prompt by hash, once, and this pass's evidence row
     try {
       await sb.from("ottoq_agent_prompts").upsert(
-        { prompt_sha256: promptSha, agent_version: "v31", prompt_text: system },
+        { prompt_sha256: promptSha, agent_version: AGENT_VERSION, prompt_text: system },
         { onConflict: "prompt_sha256", ignoreDuplicates: true });
     } catch { /* the pass's row names the hash either way */ }
     const evidenceError = await recordPass({
@@ -733,7 +778,8 @@ serve(async (req) => {
       answer: modelUsed !== "none" ? { actions: parsed.actions ?? [], solver: parsed.solver ?? null,
                                        rationale: String(parsed.rationale ?? "").slice(0, 1200),
                                        charge_order: parsed.charge_order ?? null } : null,
-      levers, decision_written: !decisionError, propose_ms: proposeMs, total_ms: totalMs,
+      levers: wakeBriefCoverage ? { ...levers, wake_brief: wakeBriefCoverage } : levers,
+      decision_written: !decisionError, propose_ms: proposeMs, total_ms: totalMs,
     });
     if (decisionError) {
       // v21 (G188): the audit row IS the agent's output. Losing it silently is how a live agent
@@ -745,7 +791,7 @@ serve(async (req) => {
 
     return json({ ok: true, run: run.sim_run_id, model: modelUsed, applied, queued, rejected,
       solver_handoff: solverHandoff, charge_order: chargeOrderReceipt, model_attempts: call.attempts,
-      outcome_class: outcomeClass, wake, evidence_error: evidenceError,
+      outcome_class: outcomeClass, wake, wake_brief_coverage: wakeBriefCoverage, evidence_error: evidenceError,
       latency_ms: { propose: proposeMs, total: totalMs }, rationale: parsed.rationale });
   } catch (e) {
     return json({ ok: false, error: e instanceof Error ? e.message : "unknown" }, 500);

@@ -85,3 +85,28 @@ test("v30: the prompt states the charge target and what the board's 80% figure i
   assert.match(agent, /CHARGE TARGET: every car charges to its owner's target, 100% unless the owner set less/);
   assert.match(agent, /any 80% figure on the board rank who is served first; they are never a charge target/);
 });
+
+// v32 (0823, G540): with the wake brief the agent reports the charges a charger fault cut, which is rule 9's own named
+// reason for a charge ending short. A description of one passes; an instruction does not, whatever it mentions.
+const FAULT_CUT_DESCRIBED = [
+  "Tesla-AV-055's charge ended at 75% when post NASH-DCFC-STALL-02 faulted (fault.thermal_emergency); it has waited 39 minutes at place 4 in line.",
+  "Zoox-AV-095 was cut by a fault at 48% on NASH-DCFC-STALL-24 and is charging again on NASH-DCFC-STALL-06.",
+  "Waymo-AV-005: charging stopped at 82% (fault.connector_cable). Charging again on NASH-DCFC-STALL-23 after 2 minutes; target 100%.",
+  "Waymo-AV-016 had charged to 61% when a communication dropout aborted the session.",
+  "Charging on post 5 halted at 62.5% after the charger tripped. The car keeps its full target.",
+];
+const STILL_REFUSED = [
+  "Charging ended at 80% for the Zoox cars.",                                  // past tense, no fault named
+  "Stop charging at 80% if a charger faults.",                                 // an instruction, whatever it mentions
+  "A charger faulted. End sessions once cars reach 85% to free the posts.",    // the fault is another sentence's
+  "After the fault on post 5, charge Tesla-AV-055 to 80% and release it.",     // an instruction after a fault
+  "Post 2 faulted; skip the rest of Tesla-AV-055's charge.",                   // the service test has no such pass
+];
+
+test("a charge a fault cut, described, passes", () => {
+  for (const t of FAULT_CUT_DESCRIBED) assert.deepEqual(ruleNineDirective(t), { ok: true }, t);
+});
+
+test("an instruction to end a charge short is refused, whatever fault it mentions", () => {
+  for (const t of STILL_REFUSED) assert.equal(ruleNineDirective(t).ok, false, t);
+});
