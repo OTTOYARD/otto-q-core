@@ -195,4 +195,6 @@ COMMIT;
 --   exception: the anchor matched once, V1 held, and the patched starter ran for one car without error.
 --   No run was live at the apply. V3 at apply: cars 116, cars_cleaned_after_their_charge 80.
 --   Stored after the apply, md5(prosrc): ottoq_start_concurrent_atoms 0da9732354f975a2cb54e8e78ae3d57d.
---   The first run under it (9a055337, started 19:54:36 UTC to check it) is read in db/checks/0491.
+--   The run started to check it (9a055337) was superseded 3 minutes later by an operator's run, 7a08f52a, which ran
+--   under it and is read in db/checks/0491: it MISSED about 4 in 10 of the arm cleans of the three kinds of car. The
+--   setting was turned off at 21:01:55 UTC and 0828 fixes the cause.
