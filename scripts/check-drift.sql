@@ -860,7 +860,8 @@ repo_manifest(version, name, file) AS (
     ('20261112140612'::text, '0818_the_twin_snapshot_names_the_post_of_a_cabin_stop'::text, '0818_the_twin_snapshot_names_the_post_of_a_cabin_stop.sql'::text),
     ('20261112141807'::text, '0819_the_wash_triage_leaves_a_car_on_its_cabin_stop'::text, '0819_the_wash_triage_leaves_a_car_on_its_cabin_stop.sql'::text),
     ('20261112163417'::text, '0820_a_cabin_stop_may_use_a_post_whose_charger_is_faulted_and_a_car_to_charge_and_clean_waits_for_a_fast_charger'::text, '0820_a_cabin_stop_may_use_a_post_whose_charger_is_faulted_and_a_car_to_charge_and_clean_waits_for_a_fast_charger.sql'::text),
-    ('20261112202531'::text, '0821_a_car_to_charge_has_its_cabin_clean_on_its_visit_before_it_is_seated_and_a_cabin_stop_records_its_posts_charger'::text, '0821_a_car_to_charge_has_its_cabin_clean_on_its_visit_before_it_is_seated_and_a_cabin_stop_records_its_posts_charger.sql'::text)
+    ('20261112202531'::text, '0821_a_car_to_charge_has_its_cabin_clean_on_its_visit_before_it_is_seated_and_a_cabin_stop_records_its_posts_charger'::text, '0821_a_car_to_charge_has_its_cabin_clean_on_its_visit_before_it_is_seated_and_a_cabin_stop_records_its_posts_charger.sql'::text),
+    ('20261113003556'::text, '0822_a_due_cabin_clean_is_done_during_the_charge_and_a_cabin_stop_takes_its_turn_in_the_charge_line'::text, '0822_a_due_cabin_clean_is_done_during_the_charge_and_a_cabin_stop_takes_its_turn_in_the_charge_line.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
