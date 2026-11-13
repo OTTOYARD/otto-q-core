@@ -30,6 +30,20 @@
 --   "missed" count has no baseline; if these cars also go without the arm with the setting off (a charge closed by a
 --   path the starter never sees, a tidy done by a technician first), part of the 41 is not 0827's. The rest of run
 --   c86b46e1 (from tick 493, sim 20:16:44) runs with the setting off: read the visits whose charge ends after that.
+--
+-- THE BASELINE, read at 22:26 UTC after run c86b46e1 ended (741 ticks), the three kinds, by when the charge ended:
+--     setting ON  (charge done by sim 20:16:44):  72 charged · 40 arm · 3 immediate · 29 missed (12 tidied by another;
+--                                                 none of the 29 carries an arm decision; 12 are immediate-dispatch visits)
+--     setting OFF (charge done after sim 20:22):  10 charged · 10 arm ·  0 missed
+--   So the misses are 0827's own: with the setting off these cars are cleaned by the arm as the others are. Ten visits
+--   is a small sample, and it is the same run and the same day.
+--   (The ON count here, 72, is lower than the 123 of the read at tick 491: superseded visits leave the table.)
+--
+-- WHERE THIS LEAVES IT. cabin_robot_after_charge is OFF at the twin depot. 0827 and 0828 stay applied and change
+-- nothing with it off. Before another attempt: write on the visit, each tick, why the starter did not start the arm
+-- for a car of these kinds (its state, the estimate, which door it took), so that a miss explains itself; and prefer a
+-- design that does not depend on catching a tick, such as starting the arm's atom at the moment the charge session
+-- is stopped, in the function that stops it.
 
 WITH prof AS MATERIALIZED (
   SELECT v.id, COALESCE(pf.clean_after_charge, false) AS after_charge
