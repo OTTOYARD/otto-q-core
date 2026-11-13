@@ -173,4 +173,5 @@ COMMIT;
 --   No run was live at the apply. V3 at apply: run_live null, left_port_cars_asked 0 (the structural checks held; the
 --   proposer was not asked, since it reads the setting from a live run).
 --   Stored after the apply, md5(prosrc): ottoq_decide_tick d09961121632e5374405eb51d7ab6ee7.
---   The first run under it is read in db/checks/0490.
+--   The first run under it (56642c31, 2026-11-13) is read in db/checks/0490 section 2: 98 wrong-side proposals
+--   replaced by the kernel's fitting post, 98 of 98 seated.

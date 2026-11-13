@@ -59,3 +59,39 @@ busy AS (SELECT k.tick_seq, k.cars, st.side,
 SELECT side, count(*) ticks, round(avg(taken), 2) mean_taken_of_15, count(*) FILTER (WHERE taken < 15) ticks_with_a_free_post,
        round(avg(cars), 2) mean_cars_declined
   FROM busy GROUP BY 1 ORDER BY 1;
+
+-- §2 AFTER THE FIX. Run 56642c31 (busy_day, started 2026-11-13 12:43 UTC by ottoq_operator_start_run to check 0825,
+--    ended 13:52:00 UTC at the 540 sim-minute ceiling, 747 ticks). The whole run is under 0825. Read 15:22 UTC.
+--
+--      stall_assignment decisions                     11,952
+--      proposals replaced for the side (0825's branch)    98   on 71 cars; 98 of 98 enacted
+--      declines waits_for_a_post_on_its_charge_port_side
+--                                                      5,842   on 76 cars, in 297 ticks, a mean 19.7 cars a tick
+--        by the proposer declined:  forward_lex 4,400 · cuopt 1,014 · greedy_constrained 428
+--      the kernel's own answer no_compatible_available_stall   5,887   on 84 cars
+--      seats on a post with an arm side                  223   (147 left-arm, 76 right-arm)
+--      of the 76 cars declined: seated later              75   mean 86.4 sim minutes after the first decline, max 229.4
+--      in the 297 decline ticks, posts taken by the calendar:  left-arm mean 10.78 of 15 · right-arm mean 4.38 of 15
+--
+--    WHAT IT SAYS. The new branch runs: 98 wrong-side proposals became the kernel's fitting post in the same tick and
+--    every one was seated. A decline that remains is, by the code, a tick in which the kernel was asked and had no
+--    fitting post to offer; the kernel said the same in its own words 5,887 times. 75 of 76 declined cars were seated
+--    (28 of 44 before the fix).
+--    WHAT IT DOES NOT SAY. It does not prove from the rows that no fitting post was free at each decline: the calendar
+--    shows a left-arm post free in all 297 decline ticks (a mean 4.2 of 15 free), and the calendar is one gate of three
+--    (CLAUDE.md Part 3); the pointer and the charger's fault state at each tick are not kept. What the kernel's proposer
+--    refused in those ticks, and why, is not written on the decline row: the next change to this branch should record
+--    the kernel's own reason there.
+--    AND THE COST THAT REMAINS IS THE DEPOT'S, NOT THE BRANCH'S. While a mean 19.7 left-port cars a tick were declined,
+--    a mean 10.6 of the 15 right-arm posts stood free. That is 78 cars on 15 posts. Migration 0826 (every post's arm
+--    on the car's left, with ottoyarddepot-sim #170) removes it. Two runs, one each side of the fix, different seeds:
+--    the waits are not a paired comparison.
+
+SELECT count(*) AS decisions,
+       count(*) FILTER (WHERE proposed_action->>'replaced_for' = 'charge_port_side') AS replaced,
+       count(*) FILTER (WHERE proposed_action->>'replaced_for' = 'charge_port_side' AND enacted_action->>'stall_id' IS NOT NULL) AS replaced_enacted,
+       count(*) FILTER (WHERE proposed_action->>'reason' = 'waits_for_a_post_on_its_charge_port_side') AS declines,
+       count(DISTINCT entity_id) FILTER (WHERE proposed_action->>'reason' = 'waits_for_a_post_on_its_charge_port_side') AS cars_declined,
+       count(*) FILTER (WHERE proposed_action->>'reason' = 'no_compatible_available_stall') AS kernel_no_post
+  FROM public.ottoq_decisions
+ WHERE sim_run_id = '56642c31-a301-472f-8fd5-db2b9bc7d447' AND action_context = 'stall_assignment';
