@@ -272,3 +272,9 @@ test("v33: the live pass and the replay build their request through one function
   assert.match(code, /const DIRECTIVE_MAX_CHARS = 1_200;/);
   assert.doesNotMatch(code, /a\.text\.slice\(0, 400\)/);
 });
+
+test("v33: the primary is bounded at 65 s so a fallback has 25, and a fallback's directive says which model wrote it", () => {
+  assert.match(code, /const MODEL_TIMEOUT_MS = 65_000;/);
+  assert.match(code, /const MODEL_BUDGET_MS = 90_000;/);
+  assert.match(code, /\.\.\.\(modelUsed !== MODEL \? \{ by_fallback_model: modelUsed \} : \{\}\)/);
+});

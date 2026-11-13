@@ -32,6 +32,8 @@
 //      * A directive is kept to 1,200 characters, not 400. v32 asks for the scout findings of one kind in ONE
 //        directive naming every car; on run 9085ca36 the model named 135 of the 136 subjects its briefs marked new
 //        and the applied directives, cut at 400, kept 101 of them (db/checks/0489).
+//      * The primary's attempt is bounded at 65 s, not 75, so a fallback has 25 s and not 15; and a directive a
+//        fallback model wrote carries by_fallback_model.
 // v32 (0823; db/checks/0488, G540): THE AGENT IS TOLD WHY IT WAS WOKEN, AND WHAT IT SAID LAST.
 //      Since 0795 the agent is consulted on exceptions, and the wake gate knows why each consult happened, but the
 //      model was sent its board alone. Of 286 answered consults at the twin depot from 2026-11-05 to 2026-11-13, none of
@@ -291,7 +293,11 @@ function samplingFor(model: string): Record<string, number> {
 // v21 (G188). Live-era p95 agent latency is 66.6 s (CLAUDE.md 2.5, 0417), so 75 s keeps the calls
 // that answer and ends the ones that never will. Both bounds together stay under the runtime's
 // 150 s wall clock, so the decision below is always written.
-const MODEL_TIMEOUT_MS = 75_000;
+// v33 (db/checks/0489): 65 s, not 75. Over the 14 days to 2026-11-13 the primary answered 438 of 458 attempts at the
+// twin depot: p95 40.1 s, p99 59.3 s, the slowest 67.9 s, and 15 timed out. Replayed on three real boards the first
+// fallback took 5.0, 11.5 and 14.1 s, and 75 s left it 15. At 65 s it has 25; the cost is the one or two primary
+// answers a fortnight that take longer than 65 s.
+const MODEL_TIMEOUT_MS = 65_000;
 const SOLVER_TIMEOUT_MS = 30_000;
 // v23. Every model attempt and every pause between them, together. 90 s + the 30 s handoff + the board read and
 // the inserts stay under the runtime's 150 s, as v21 required of the single call.
@@ -785,8 +791,10 @@ serve(async (req) => {
         const r9 = ruleNineDirective(a.text);
         if (!r9.ok) { rejected.push({ type: "directive", text: a.text.slice(0, DIRECTIVE_MAX_CHARS), reason: r9.reason, matched: r9.matched }); continue; }
         const about = directiveAbout(a);
+        // v33: a directive written by a fallback model says so. Replayed on three real boards the first fallback
+        // answered every time, gave no directive once and once paired the right cars with the wrong posts.
         applied.push({ type: "directive", text: a.text.slice(0, DIRECTIVE_MAX_CHARS), severity: a.severity === "warning" ? "warning" : "info",
-                       ...(about ? { about } : {}) });
+                       ...(about ? { about } : {}), ...(modelUsed !== MODEL ? { by_fallback_model: modelUsed } : {}) });
       } else {
         rejected.push({ ...a, reason: "unrecognized action shape" });
       }
