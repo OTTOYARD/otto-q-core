@@ -22,6 +22,9 @@
 //      * POST {"probe_models": true} asks each model of the chain for a six-token JSON answer on each key and returns
 //        what each said (status and milliseconds, never a key). It reads no depot row, writes nothing and claims no
 //        tick. It is how the chain's order was chosen and how a dead model is found before a run finds it.
+//      * POST {"fallback_only": true} (with a run) makes that one pass ask the fallbacks without the primary, so a
+//        fallback's answer to a real board can be read before a primary failure needs it. The pass is recorded like
+//        any other, with the models it asked.
 // v32 (0823; db/checks/0488, G540): THE AGENT IS TOLD WHY IT WAS WOKEN, AND WHAT IT SAID LAST.
 //      Since 0795 the agent is consulted on exceptions, and the wake gate knows why each consult happened, but the
 //      model was sent its board alone. Of 286 answered consults at the twin depot from 2026-11-05 to 2026-11-13, none of
@@ -359,6 +362,8 @@ serve(async (req) => {
       return json({ ok: true, version: AGENT_VERSION, keys: probeKeys.map((k) => k.name), probe,
         latency_ms: { total: Date.now() - tStart } });
     }
+    // v33: one pass on the fallbacks alone, when asked for by name
+    const passModels = body.fallback_only === true ? FALLBACK_MODELS : MODELS;
     const requestedDepot = body.depot_id ?? "11111111-1111-1111-1111-111111111111";
     const requestedRun = typeof body.sim_run_id === "string" && body.sim_run_id.length > 0
       ? body.sim_run_id
@@ -584,9 +589,9 @@ serve(async (req) => {
     const call = await callModelWithRetry({
       url: NV_URL,
       keys,
-      models: MODELS,
+      models: passModels,
       // v33: a model no key may call takes one attempt per key, so the cap counts every key for every model
-      maxAttempts: MODELS.length * Math.max(2, keys.length),
+      maxAttempts: passModels.length * Math.max(2, keys.length),
       body: (model) => ({
         model,
         ...samplingFor(model),
@@ -828,7 +833,7 @@ serve(async (req) => {
     const evidenceError = await recordPass({
       consulted: true, outcome_class: decisionError ? "failed" : outcomeClass,
       board_text: bText, board_sha256_client: boardSha, prompt_sha256: promptSha,
-      models_requested: MODELS, model_answered: modelUsed !== "none" ? modelUsed : null,
+      models_requested: passModels, model_answered: modelUsed !== "none" ? modelUsed : null,
       response_model: call.responseModel ?? null, response_id: call.responseId ?? null,
       sampling: { by_model: Object.fromEntries(MODELS.map((m) => [m, samplingFor(m)])), max_tokens: maxTokens,
                   enable_thinking: false, response_format: "json_object" },

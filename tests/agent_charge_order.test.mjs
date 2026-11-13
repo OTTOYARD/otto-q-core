@@ -182,10 +182,12 @@ test("v23: the order is recorded before the solver handoff, under the pass's cha
 test("v23-v32: the model call goes through the retry module, with the fallback model, and the row says v33", () => {
   assert.match(code, /await callModelWithRetry\(/);
   // v33 (G543): the fallback is a chain, with v23's model last, and the attempt cap counts every key per model
-  assert.match(code, /models: MODELS,/);
+  assert.match(code, /models: passModels,/);
+  assert.match(code, /const passModels = body\.fallback_only === true \? FALLBACK_MODELS : MODELS;/);
+  assert.match(code, /models_requested: passModels,/);
   assert.match(code, /const MODELS = \[MODEL, \.\.\.FALLBACK_MODELS\];/);
   assert.match(code, /const FALLBACK_MODELS = \[\s*"nvidia\/[^"]+",\s*"nvidia\/[^"]+",\s*SUPER_MODEL,\s*\];/);
-  assert.match(code, /maxAttempts: MODELS\.length \* Math\.max\(2, keys\.length\)/);
+  assert.match(code, /maxAttempts: passModels\.length \* Math\.max\(2, keys\.length\)/);
   assert.match(code, /model_attempts: call\.attempts/);
   // v32: one constant names the version, and every row that records it reads the constant
   assert.match(code, /const AGENT_VERSION = "v33";/);
