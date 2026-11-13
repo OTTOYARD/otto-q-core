@@ -301,6 +301,16 @@ When information is missing:
      name. The arm's three tick-counted dials are set for production's 120-second tick: no car is held
      at the gate for a proposer, and an agent's charge order stands 6 minutes, not 30. One self-applied
      setting is still in force at the twin depot and waits on a person (FINDINGS G370).
+   - **THE AGENT IS TOLD WHY IT WAS WOKEN (`0823`, edge v32; `db/checks/0488`, G540), 2026-11-13.** Read before it: 286
+     answered consults at the twin depot since `0795`, none changed engine state, all chose one solver objective, and
+     none of the 5 woken by an emergency mentions one, because the wake gate's reasons never reached the model. A
+     read-only brief (`public.ottoq_agent_wake_brief`, behind `agent_wake_brief`, on at the twin depot) now goes ahead
+     of the board: the reasons, what changed since its last answer, the cars and chargers behind each reason, what it
+     said last. On run `a95e51a3` its directives named 113 of the 114 subjects the briefs marked new. **It adds no
+     lever: the agent still changes no engine state.** Two rules from the build: **check a prompt change on a whole
+     run, not on its first consults** (the first wording read 12 of 14 at seven consults and 29 of 117 at thirty); and
+     **a deploy is verified by a hash computed before it** (the function records its prompt's sha256, and the repo's
+     source gives the same hash).
 
 **11. OTTO-COMMAND IS THE FILTER AND EXECUTOR FOR PERSONAL AGENTS — added 2026-10-14 in Chase's words.**
 

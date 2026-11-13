@@ -218,3 +218,46 @@ which on `57188f55` above is when CP-SAT's proposals started to be enacted.
 4. **Contracts to terms** (E8.3): an owner's SLA and price terms drafted from contract text, for a person to confirm.
 5. **Rule invention in the lab** (E6): the model proposes kernel priority rules, the lab proves them owner by owner against
    E5's bound before a person ships one. It needs the D3 budget for model calls.
+
+## 2026-11-13: the agent is told why it was woken
+
+*Written 2026-11-13 (the night of 11-12 CT), after Chase asked for a new pass of the agent layer: what training or
+fan-out it is missing, and one edge to build. Figures are from `db/checks/0488`; each is one run unless it says otherwise.*
+
+**What the pass found.** Since 0795 the agent is consulted on exceptions. Over 286 answered consults on 16 runs it changed
+no engine state, chose the same solver objective every time, and was never told which exception woke it: the wake gate's
+reasons stopped at the edge function, and the gate's fingerprint names no car or charger. None of the 5 consults woken
+by an emergency mentions one (G540).
+
+**What was built (0823, edge v32).** A read-only wake brief ahead of the board: the reasons, each count that changed
+since the agent's last answer, the cars and chargers behind each reason, and the directives it issued last. On run
+`a95e51a3` the agent's applied directives named 113 of the 114 subjects its briefs marked new, against 29 of 117 under a
+first wording of the prompt on run `b848a046`. It is the first build of E8's "exceptions" job in its smallest form: the
+agent reads the situation and says it to a person. It drafts no plan into `ottoq_external_proposals`, and it still
+changes no engine state.
+
+**Fan-out: where it stands against the four conditions above.**
+
+| Condition | 2026-10-13 | 2026-11-13 |
+|---|---|---|
+| 1. Recorded and replayable | built that day (0703) | 2,060 answered consults with their boards on 35 runs; from v32 the brief is on the record too |
+| 2. The disposer discriminates | no: AUC 0.534 [0.415, 0.653] | AUC 0.681 [0.621, 0.741] on 319 decisions, 27 runs, 25 keys; Brier 0.230 against 0.246 at the base rate. A lead, not a pass: 207 of the 319 are from three October days, and "won" is a site total that does not see one owner traded for another (G511, G512; rule 14) |
+| 3. An ablation beats the noise floor | not run | not run (rule 12: no pairs while building) |
+| 4. Registered | 0702 drafted | unchanged |
+
+So a second LLM seat is still not earned. The fan-out that is worth building next is narrower and needs no new seat:
+**one consult per exception, reading the brief and only the part of the board that exception touches.** A consult costs
+about 26,000 prompt tokens today, nearly all of it the board, whatever woke it.
+
+**Training: what exists and what does not.** The evidence set is 2,060 consults with the exact board each read, and
+1,845 hindsight grades of charge orders. That is enough to evaluate a prompt or a model offline and too thin, and too
+weakly labelled, to tune one: the charge-order label is a site total (see condition 2), and until 0823 nothing labelled
+a directive at all. `public.ottoq_agent_wake_brief_coverage` is the first such label: did the agent name what it was
+woken for. It says nothing yet about whether the directive was right. The honest order is: (a) replay stored boards
+through a candidate prompt or model in the lab and score them on coverage, which needs only the lab's model budget (D3);
+(b) grade directives against what happened next (a car said to be waiting: when was it seated); (c) only then consider
+tuning. Production stays as rule 10 has it: estimates refit overnight, no self-tuning.
+
+**Found on the way, open:** the fallback model has not answered since 2026-10-14 (G543); wash bays reported idle with a
+car ready on most boards (G541); a car whose charge a fault cut once waited 39 minutes (G542).
+

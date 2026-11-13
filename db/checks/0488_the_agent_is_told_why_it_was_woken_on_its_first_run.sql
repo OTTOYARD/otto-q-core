@@ -111,7 +111,40 @@
 --
 -- ══ (7) RUN a95e51a3 (busy_day, operator_demo, live at 8x; started 04:22:43 UTC; edge v45 throughout) ═════════════════
 --
---   PENDING: the run was live when this section was first committed.
+--   Read at 05:34:01 UTC, tick 787, sim 23:30, the run in its last minutes and still live (run b848a046 stopped at
+--   tick 785). Every consult carries prompt 85f8d441 and a brief; no brief error.
+--                                                    b848a046, first prompt     a95e51a3, second prompt
+--     consults / solver-only passes                  30 / (308 in the run)      29 / 292
+--     consults whose brief named new subjects        24                         20
+--     of those, answered with NO action at all       17                         0
+--     new subjects named by applied directives       29 of 117                  113 of 114
+--     actions                                        57                         114
+--     model tokens                                   796,856                    917,232
+--     mean seconds a consult                         29.9                       39.7
+--     changed engine state                           0                          0
+--   By kind, from public.ottoq_agent_wake_brief_coverage at 05:32 UTC (28 consults; it reads the model's answer, where
+--   the row above reads what was applied): cut charges 10 of 10, faulted posts 9 of 9, scout findings 89 of 89. The one
+--   subject not named by an applied directive was a scout finding (Zoox-AV-080) on a consult with five actions. No
+--   action was rejected, by the cap or by the rule-9 test.
+--   TWO DIFFERENT SEEDS, ONE RUN EACH. The comparison is of what the model wrote when handed a brief, which each pass's
+--   own record holds; it is not a comparison of the depot's day, and nothing here says the depot did better. The agent
+--   still changes no engine state: what changed is that an operator reading its directives is told which car and which
+--   post, and what the depot already did about it.
+--   THE COST: about 10 seconds and 19% more tokens a consult (31,629 against 26,562), for about twice the directives.
+--   G543, FOUND ON THIS RUN. One consult got no answer: the primary model timed out at 75 s, and the fallback model
+--   (nvidia/nemotron-3-super-120b-a12b) answered HTTP 404 on both keys. Over the last 30 days 85 passes carry a 404
+--   from that model and 5 carry an answer from it, the last on 2026-10-14 17:23 UTC. The fallback v23 added has not
+--   answered in a month; a primary timeout is now a pass with no answer. OPEN: which model the endpoint offers today
+--   is one read of its model list, not made here.
+--
+-- ══ (8) WHAT IS OPEN ══════════════════════════════════════════════════════════════════════════════════════════════════
+--
+--   (a) G543: the fallback model. (b) G541: whether a wash bay reported idle could have taken a car. (c) G542: whether
+--   a car whose charge a fault cut should take the next free post, owner by owner. (d) The brief is on at the twin
+--   depot only; a production depot needs the dial set by a person when it is configured. (e) The consult still reads
+--   the whole board (about 26,000 prompt tokens); a consult woken by one exception could read the brief and the part of
+--   the board that exception touches. Not built. (f) Nothing grades whether a directive was right, only whether it
+--   named its subject.
 --
 -- ══ THE QUERIES ═══════════════════════════════════════════════════════════════════════════════════════════════════════
 
