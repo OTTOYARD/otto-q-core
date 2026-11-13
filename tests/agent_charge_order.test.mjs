@@ -251,3 +251,24 @@ test("v33 / G543: the model probe returns before any depot row is read, any tick
   assert.ok(at < code.indexOf("createClient("));
   assert.ok(at < code.indexOf('sb.rpc("ottoq_agent_chain_claim"'));
 });
+
+test("v33: a replay of a stored pass claims no tick, calls no door and writes nothing", () => {
+  const at = code.indexOf("if (body.replay_pass_id != null)");
+  const end = code.indexOf('sb.rpc("ottoq_agent_chain_claim"');
+  assert.ok(at > 0 && at < end);                       // before the claim, so it never takes a tick
+  assert.ok(code.indexOf('if (!run) return json({ ok: true, skipped: "no running run" });') < at);   // only while a run is live
+  const block = code.slice(at, end);
+  assert.doesNotMatch(block, /\.rpc\(|\.insert\(|\.upsert\(|\.update\(|\.delete\(/);
+  assert.equal((block.match(/sb\.from\(/g) ?? []).length, 1);
+  assert.match(block, /sb\.from\("ottoq_agent_pass_evidence"\)\s*\.select\(/);
+  // it sends what the pass sent: the stored board text and the stored brief, through the one message builder
+  assert.match(block, /userMessageOf\(storedBrief, ev\.board_text\)/);
+  assert.match(block, /withWakeBrief\(withChargeOrder\(SYSTEM, storedBoard\), storedBrief\)/);
+});
+
+test("v33: the live pass and the replay build their request through one function, and a directive keeps 1,200 characters", () => {
+  assert.equal((code.match(/chatBody\(model, /g) ?? []).length, 2);
+  assert.equal((code.match(/parse: parseAnswer,/g) ?? []).length, 2);
+  assert.match(code, /const DIRECTIVE_MAX_CHARS = 1_200;/);
+  assert.doesNotMatch(code, /a\.text\.slice\(0, 400\)/);
+});

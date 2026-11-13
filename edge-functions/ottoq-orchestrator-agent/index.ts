@@ -25,6 +25,13 @@
 //      * POST {"fallback_only": true} (with a run) makes that one pass ask the fallbacks without the primary, so a
 //        fallback's answer to a real board can be read before a primary failure needs it. The pass is recorded like
 //        any other, with the models it asked.
+//      * POST {"replay_pass_id": N} (while a run is live) sends a stored pass's own board and brief, exactly as that
+//        pass sent them, to the models again and returns the answer, its timing and how many of the brief's subjects
+//        its directives name. It claims no tick, reaches no door and writes nothing: the depot cannot tell it ran.
+//        With "fallback_only" it asks the fallbacks, which is how a fallback's answer to a real board is read.
+//      * A directive is kept to 1,200 characters, not 400. v32 asks for the scout findings of one kind in ONE
+//        directive naming every car; on run 9085ca36 the model named 135 of the 136 subjects its briefs marked new
+//        and the applied directives, cut at 400, kept 101 of them (db/checks/0489).
 // v32 (0823; db/checks/0488, G540): THE AGENT IS TOLD WHY IT WAS WOKEN, AND WHAT IT SAID LAST.
 //      Since 0795 the agent is consulted on exceptions, and the wake gate knows why each consult happened, but the
 //      model was sent its board alone. Of 286 answered consults at the twin depot from 2026-11-05 to 2026-11-13, none of
@@ -253,6 +260,29 @@ const MODELS = [MODEL, ...FALLBACK_MODELS];
 // (https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8, v1.0 GA, read 2026-10-07) says to "use
 // temperature=1.0 and top_p=0.95 across all tasks". No card was read for the other two, so they are sent no
 // temperature and run on the endpoint's default.
+const DIRECTIVE_MAX_CHARS = 1_200;
+
+/** The request body for one model: the same for a live pass and for a replay of one. */
+function chatBody(model: string, system: string, userMessage: string, maxTokens: number): Record<string, unknown> {
+  return {
+    model,
+    ...samplingFor(model),
+    max_tokens: maxTokens,
+    chat_template_kwargs: { enable_thinking: false }, // fast structured output for the control loop
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: userMessage },
+    ],
+  };
+}
+
+/** The model's answer, or null when it does not parse into an object with an actions array. */
+function parseAnswer(content: string): unknown | null {
+  const candidate = extractJson(content) as any;
+  return candidate && Array.isArray(candidate.actions) ? candidate : null;
+}
+
 function samplingFor(model: string): Record<string, number> {
   if (model === MODEL) return { temperature: 0.1 };
   if (model === SUPER_MODEL) return { temperature: 1.0, top_p: 0.95 };
@@ -378,6 +408,60 @@ serve(async (req) => {
       : runQuery.eq("depot_id", requestedDepot).order("started_at", { ascending: false }).limit(1);
     const { data: run } = await runQuery.maybeSingle();
     if (!run) return json({ ok: true, skipped: "no running run" });
+
+    // ---- v33: REPLAY A STORED PASS. Only while a run is live (the condition under which this function already
+    // spends a model call for its caller). It claims no tick, calls no door and writes nothing. ----
+    if (body.replay_pass_id != null) {
+      const passId = Number(body.replay_pass_id);
+      if (!Number.isSafeInteger(passId) || passId <= 0) return json({ ok: false, error: "replay_pass_id must be a pass id" }, 400);
+      const { data: ev, error: evErr } = await sb.from("ottoq_agent_pass_evidence")
+        .select("pass_id, sim_run_id, agent_version, board_text, board_sha256, prompt_sha256, wake, model_answered")
+        .eq("pass_id", passId).maybeSingle();
+      if (evErr || !ev || typeof ev.board_text !== "string" || ev.board_text === "") {
+        return json({ ok: false, error: evErr?.message ?? "no such pass, or it kept no board" }, 404);
+      }
+      let storedBoard: unknown = null;
+      try { storedBoard = JSON.parse(ev.board_text); } catch { /* the text is still what the model read */ }
+      const storedBrief = readBrief((ev.wake as any)?.brief ?? null, null).brief;
+      const replaySystem = withWakeBrief(withChargeOrder(SYSTEM, storedBoard), storedBrief);
+      const replayKeys = NV_KEYS
+        .map((name) => ({ name, value: Deno.env.get(name) }))
+        .filter((candidate): candidate is { name: string; value: string } => Boolean(candidate.value));
+      const replayMaxTokens = (chargeQueueOf(storedBoard) ? 2400 : 1400) + (storedBrief ? 600 : 0);
+      const replayCall = await callModelWithRetry({
+        url: NV_URL, keys: replayKeys, models: passModels,
+        maxAttempts: passModels.length * Math.max(2, replayKeys.length),
+        body: (model) => chatBody(model, replaySystem, userMessageOf(storedBrief, ev.board_text), replayMaxTokens),
+        parse: parseAnswer,
+        budgetMs: MODEL_BUDGET_MS, attemptTimeoutMs: MODEL_TIMEOUT_MS, minAttemptMs: MIN_ATTEMPT_MS,
+      });
+      const replayed = replayCall.parsed as any;
+      const directives = Array.isArray(replayed?.actions)
+        ? replayed.actions.filter((a: any) => a?.type === "directive" && typeof a.text === "string") : [];
+      const kept = directives
+        .filter((a: any) => ruleNineDirective(a.text).ok)
+        .map((a: any) => ({ text: a.text.slice(0, DIRECTIVE_MAX_CHARS), about: directiveAbout(a) }));
+      return json({
+        ok: true, version: AGENT_VERSION,
+        replay_of: { pass_id: ev.pass_id, sim_run_id: ev.sim_run_id, agent_version: ev.agent_version,
+                     model_answered: ev.model_answered, prompt_sha256: ev.prompt_sha256 },
+        prompt_sha256: await sha256Hex(replaySystem),
+        board_sha256_matches: (await sha256Hex(ev.board_text)) === ev.board_sha256,
+        had_brief: storedBrief != null,
+        models_requested: passModels, model: replayCall.model, attempts: replayCall.attempts,
+        usage: replayCall.usage ?? null, ms: replayCall.ms,
+        answer: replayCall.model ? {
+          actions: Array.isArray(replayed.actions) ? replayed.actions.length : 0,
+          directives: directives.length, rule_nine_refused: directives.length - kept.length,
+          solver_objective: replayed.solver?.objective ?? null,
+          charge_order_cars: Array.isArray(replayed.charge_order?.cars) ? replayed.charge_order.cars.length : null,
+          rationale: String(replayed.rationale ?? "").slice(0, 600),
+          first_directives: kept.slice(0, 3),
+        } : null,
+        wake_brief_coverage: replayCall.model ? briefCoverage(storedBrief, kept) : null,
+        ...(replayCall.model ? {} : { last: replayCall.raw.slice(0, 300) }),
+      });
+    }
     const depot = run.depot_id;
     // 0332: multiple clocks can request an agent pass at the same run tick.
     // Claim the tick atomically before spending a model call or changing policy.
@@ -592,21 +676,8 @@ serve(async (req) => {
       models: passModels,
       // v33: a model no key may call takes one attempt per key, so the cap counts every key for every model
       maxAttempts: passModels.length * Math.max(2, keys.length),
-      body: (model) => ({
-        model,
-        ...samplingFor(model),
-        max_tokens: maxTokens,
-        chat_template_kwargs: { enable_thinking: false }, // fast structured output for the control loop
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userMessage },
-        ],
-      }),
-      parse: (content) => {
-        const candidate = extractJson(content) as any;
-        return candidate && Array.isArray(candidate.actions) ? candidate : null;
-      },
+      body: (model) => chatBody(model, system, userMessage, maxTokens),
+      parse: parseAnswer,
       budgetMs: MODEL_BUDGET_MS,
       attemptTimeoutMs: MODEL_TIMEOUT_MS,
       minAttemptMs: MIN_ATTEMPT_MS,
@@ -712,9 +783,9 @@ serve(async (req) => {
         // v30 (AV-9, rule 9): an operator reads a directive, so one that sets a charge target under 100% or skips,
         // defers or shortens a service is refused here and kept, with its text, in the rejected list.
         const r9 = ruleNineDirective(a.text);
-        if (!r9.ok) { rejected.push({ type: "directive", text: a.text.slice(0, 400), reason: r9.reason, matched: r9.matched }); continue; }
+        if (!r9.ok) { rejected.push({ type: "directive", text: a.text.slice(0, DIRECTIVE_MAX_CHARS), reason: r9.reason, matched: r9.matched }); continue; }
         const about = directiveAbout(a);
-        applied.push({ type: "directive", text: a.text.slice(0, 400), severity: a.severity === "warning" ? "warning" : "info",
+        applied.push({ type: "directive", text: a.text.slice(0, DIRECTIVE_MAX_CHARS), severity: a.severity === "warning" ? "warning" : "info",
                        ...(about ? { about } : {}) });
       } else {
         rejected.push({ ...a, reason: "unrecognized action shape" });
