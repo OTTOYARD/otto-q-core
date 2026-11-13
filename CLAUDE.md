@@ -245,6 +245,14 @@ When information is missing:
      type of service stalls (charging/interior cleaning)."* Built by `0820`: a cabin stop takes a post whose charger is
      faulted first; a car with a charge and a deep clean to do is seated only on a fast-charger post
      (`public.ottoq_charge_needs_cleaning_post`), waiting in the charge line for one. That wait is the trade Chase chose.
+     **CORRECTED THE SAME AFTERNOON (`0821`, `db/checks/0486`), ON CHASE'S QUESTION ("I thought we switched all chargers
+     from L2 to DCFC Robotic arm chargers?"): THE TWIN DEPOT HAS NO L2, SO THERE IS NO SUCH WAIT AND NO SUCH TRADE THERE.**
+     `0763` retired them (read 2026-11-12: 30 fast-charger posts, 0 L2). `0820`, `0485` and both PRs spoke of a car "that
+     would have taken a free L2"; I wrote that from `0820`'s source and never read the depot's stalls. **Read the depot's
+     hardware before naming a cost on it.** What the run did show, read to its end (`0e3cc3c2`): 6 of 10 cabin stops were a
+     second trip. Each car went from the gate straight to a charger with no clean on its visit, because `0820` wrote the
+     clean only for a parked car and only after the charge step. `0821` writes it before the charge step, for a car at
+     the gate, parked or already charging, and records each stop's charger state on its decision row.
 
 **10. OTTO-Q DOES NOT EXPERIMENT IN PRODUCTION. HYPOTHESES AND TESTS BELONG TO THE RESEARCH WING, IN THE TWIN — added 2026-09-27 in Chase's words.**
 
