@@ -44,6 +44,31 @@
 -- for a car of these kinds (its state, the estimate, which door it took), so that a miss explains itself; and prefer a
 -- design that does not depend on catching a tick, such as starting the arm's atom at the moment the charge session
 -- is stopped, in the function that stops it.
+--
+-- THE CAUSE, read 2026-11-14 00:3x UTC on run c86b46e1 (its rows were still in the tables), and 0830.
+--   Of the 124 completed fast-charger sessions of the three kinds while the setting was on, the car's state left
+--   `charge_complete_holding` at the SAME sim clock as the session's end in 121, later in 3. (The count is of
+--   vehicle.state_changed events whose diff reads current_state from charge_complete_holding, within 30 minutes of the
+--   session's ended_at.) One car event by event, 091fa637, session ended sim 16:02:53: charging_dcfc ->
+--   charge_complete_holding -> staged_awaiting_service at 16:02:53, tether cleared and stall left at 16:03:22. 0827's
+--   second door and 0828's test both need `charge_complete_holding` when the starter is asked, later in the tick, so
+--   they almost never applied. And of the 29 misses, 12 were tidied by a technician during the charge: the starter's
+--   technician branch took a needed tidy the arm was waiting to do.
+--   0830 (applied 2026-11-14 00:52:09 UTC, setting still off) asks the starter inside the function that stops the
+--   charge, records the outcome under meta.arm_after_charge, and keeps a needed tidy for the arm.
+--   TRIED ON LIVE CARS INSIDE A TRANSACTION THAT WAS ROLLED BACK (run 14d6eda7, sim 14:44:47; setting on inside the
+--   transaction only; four charging cars of the three kinds, their visits first stripped of arm work and decision):
+--     3 immediate-dispatch visits: why asked, result decided:immediate_turnaround, released by the sweep 2 minutes on
+--     1 standard visit:            why asked, result arm_started (interior_tidy to sim 14:50:35), still on its post
+--                                  under its tether 2 minutes on
+--   Four cars, one moment; not a run. The first run with the setting on is read below when it exists.
+--   NOTE FOR A PERSON: under clean-after-charge an owner's immediate turnaround of these three kinds gets no routine
+--   arm clean at all (0765's rule: it is not held past its charge for a clean it did not need). With the setting off
+--   it is cleaned during its charge, right side only in the twin. A needed tidy is still done.
+--
+-- TO READ THE STOP DOOR ON A RUN:
+--   SELECT n.meta->'arm_after_charge'->>'why' why, n.meta->'arm_after_charge'->>'result' result, count(*)
+--     FROM ottoq_visit_needs n WHERE n.sim_run_id = :'run' AND n.meta ? 'arm_after_charge' GROUP BY 1, 2;
 
 WITH prof AS MATERIALIZED (
   SELECT v.id, COALESCE(pf.clean_after_charge, false) AS after_charge
