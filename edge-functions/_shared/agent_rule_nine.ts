@@ -9,6 +9,12 @@
 // at 13%", "48 cars below 45%", "never stop a charge at 80%".
 //
 // The test is deliberately narrow and errs toward passing a description; the prompt (index.ts) states the rule too.
+//
+// v32 (0823, G540): A CHARGE A FAULT CUT IS A DESCRIPTION. With the wake brief the agent reports the cars whose charge a
+// charger fault cut ("its charge ended at 75% when the charger faulted"), which is rule 9's own named reason for a
+// charge ending short, and the two charge tests read "ended at 75%" as an instruction. A match is passed when its verb
+// is in the past tense (ended, stopped, halted, charged ...) AND its sentence names a fault. An instruction stays
+// refused: "stop charging at 80% if a charger faults" is imperative, and "charging ended at 80%" names no fault.
 
 export type RuleNineVerdict = { ok: true } | { ok: false; reason: string; matched: string };
 
@@ -29,6 +35,28 @@ function negated(text: string, at: number): boolean {
   return NEGATED.test(text.slice(Math.max(0, at - 40), at));
 }
 
+// v32: the past tense of the verbs the two charge tests begin with, and the words that name a charger fault
+const PAST_VERB = /^(?:charged|topped|filled|capped|stopped|ended|limited|unplugged|halted)\b/i;
+const FAULT_WORD = /\b(?:fault\w*|tripped|aborted|dropout)\b/i;
+
+/** The sentence around a match: from the previous sentence end to the next. A dot inside a number or a fault code
+ *  ("fault.connector_cable", "62.5%") does not end a sentence; a dot followed by white space or the end does. */
+function sentenceAround(text: string, at: number, length: number): string {
+  const ends = /[.;!?](?=\s|$)/g;
+  let from = 0, to = text.length;
+  for (const m of text.matchAll(ends)) {
+    const i = m.index ?? 0;
+    if (i < at) from = i + 1;
+    else if (i >= at + length - 1) { to = i; break; }
+  }
+  return text.slice(from, to);
+}
+
+/** A charge a fault cut, described: the match's verb is past tense and its sentence names a fault. */
+function describesFaultCut(text: string, match: RegExpMatchArray): boolean {
+  return PAST_VERB.test(match[0]) && FAULT_WORD.test(sentenceAround(text, match.index ?? 0, match[0].length));
+}
+
 export function ruleNineDirective(text: string): RuleNineVerdict {
   const t = String(text ?? "");
   for (const re of [CHARGE_TARGET, CHARGE_CUT]) {
@@ -36,6 +64,7 @@ export function ruleNineDirective(text: string): RuleNineVerdict {
     for (const m of t.matchAll(re)) {
       const pct = Number(m[1]);
       if (!Number.isFinite(pct) || pct >= 100 || negated(t, m.index ?? 0)) continue;
+      if (describesFaultCut(t, m)) continue;
       return { ok: false,
                reason: "rule_9_charge_target: a directive may not set or imply a charge target below 100%; every car charges to its owner's target",
                matched: m[0].trim() };

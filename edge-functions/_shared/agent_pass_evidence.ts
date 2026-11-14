@@ -112,6 +112,8 @@ export type Wake = {
   fingerprint?: Record<string, unknown>;
   standing_objective?: string;
   error?: string;
+  /** v32 (0823): the wake brief the model was shown, or {error} when there was none to show. Absent with the dial off. */
+  brief?: Record<string, unknown>;
 };
 
 export function readWake(data: unknown, error: { message?: string } | null | undefined): Wake {

@@ -912,15 +912,18 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0819](db/migrations/0819_the_wash_triage_leaves_a_car_on_its_cabin_stop.sql) | `20261112141807` | yes — ledger | **The twin's wash triage leaves a car on its cabin stop.** |
 | [0820](db/migrations/0820_a_cabin_stop_may_use_a_post_whose_charger_is_faulted_and_a_car_to_charge_and_clean_waits_for_a_fast_charger.sql) | `20261112163417` | yes — ledger | **A cabin stop may use a post whose charger is faulted. A car with a charge and a cabin clean to do waits for |
 | [0821](db/migrations/0821_a_car_to_charge_has_its_cabin_clean_on_its_visit_before_it_is_seated_and_a_cabin_stop_records_its_posts_charger.sql) | `20261112202531` | yes — ledger | **A car to charge has its cabin clean on its visit before it is seated. A cabin stop's decision records its |
+| [0822](db/migrations/0822_a_due_cabin_clean_is_done_during_the_charge_and_a_cabin_stop_takes_its_turn_in_the_charge_line.sql) | `20261113003556` | yes — ledger | **A cabin clean that is due is done during the charge. A car waiting for a cabin stop takes its turn in the |
+| [0823](db/migrations/0823_the_agent_is_told_why_it_was_woken_and_what_it_said_last.sql) | `20261113030227` | yes — ledger | **The agent is told why it was woken, which cars and chargers are behind each reason, and what it said last.** |
 | [0824](db/migrations/0824_a_car_is_charged_only_at_a_post_whose_arm_stands_on_its_charge_port_side.sql) | `20261113044222` | yes — ledger | **A car is charged only at a post whose arm stands on its charge-port side. The twin tells the robots which |
 | [0825](db/migrations/0825_a_car_declined_for_its_charge_port_side_takes_the_kernels_own_post.sql) | `20261113054256` | yes — ledger | **A car whose proposed post is on the wrong side of it takes the kernel's own post in the same tick.** |
 | [0826](db/migrations/0826_every_fast_charger_arm_stands_on_the_cars_left.sql) | `PENDING` | no — pending | **Every fast-charger post's arm stands on the car's left.** |
 | [0827](db/migrations/0827_a_car_whose_open_door_meets_its_connector_is_cleaned_after_its_charge.sql) | `20261113195431` | yes — ledger | **A car whose open door meets its charge connector is cleaned by the post's arm after its charge, on the same |
 | [0828](db/migrations/0828_the_arm_is_asked_about_a_car_cleaned_after_its_charge_before_the_car_is_released.sql) | `20261113210428` | yes — ledger | **The arm is asked about a car cleaned after its charge before that car is released.** |
+| [0829](db/migrations/0829_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line.sql) | `20261114004743` | yes — ledger | **A car whose cabin clean is done at a charging post is in no bay's line, so it no longer yields its place in |
 | [0830](db/migrations/0830_the_arm_of_a_car_cleaned_after_its_charge_starts_where_the_charge_is_stopped.sql) | `20261114005209` | yes — ledger | **The arm of a car cleaned after its charge starts where the charge is stopped, and every such stop says on |
 | [0831](db/migrations/0831_a_car_cleaned_after_its_charge_is_cleaned_on_an_immediate_turnaround_too.sql) | `20261114031206` | yes — ledger | **A car cleaned after its charge is cleaned by its post's arm on an owner's immediate turnaround too.** |
 | [0832](db/migrations/0832_a_clean_cut_short_by_a_charger_fault_is_asked_for_again_where_the_next_charge_is_stopped.sql) | `20261114034649` | yes — ledger | **An arm clean cut short by a charger fault is asked for again where the car's next charge is stopped.** |
 
-637 migrations indexed.
+640 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

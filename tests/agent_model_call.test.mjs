@@ -22,7 +22,8 @@ function answer(obj) {
 }
 
 /** A scripted endpoint: each call takes the next reply; a reply may advance the clock (`ms`) or time out. */
-function rig(replies, { budgetMs = 90_000, attemptTimeoutMs = 75_000, minAttemptMs = 12_000, keys = KEYS } = {}) {
+function rig(replies, { budgetMs = 90_000, attemptTimeoutMs = 75_000, minAttemptMs = 12_000, keys = KEYS,
+                        models = [PRIMARY, FALLBACK], maxAttempts = undefined } = {}) {
   let clock = 1_000_000;
   const calls = [];
   const sleeps = [];
@@ -44,7 +45,7 @@ function rig(replies, { budgetMs = 90_000, attemptTimeoutMs = 75_000, minAttempt
   const run = () => callModelWithRetry({
     url: "https://example.invalid/v1/chat/completions",
     keys,
-    models: [PRIMARY, FALLBACK],
+    models, maxAttempts,
     body: (model) => ({ model, ...(model === PRIMARY ? { temperature: 0.1 } : { temperature: 1.0, top_p: 0.95 }) }),
     parse: (content) => { try { const o = JSON.parse(content); return Array.isArray(o.actions) ? o : null; } catch { return null; } },
     budgetMs, attemptTimeoutMs, minAttemptMs,
@@ -195,4 +196,49 @@ test("backoff doubles with jitter inside 0.75-1.25x, and Retry-After reads secon
   assert.equal(retryAfterMs("soon", 0), null);
   const now = Date.parse("2026-10-07T18:00:00Z");
   assert.equal(retryAfterMs("Wed, 07 Oct 2026 18:00:04 GMT", now), 4_000);
+});
+
+// v33 (G543). Run a95e51a3, 2026-11-13: the primary timed out at 75 s and the one fallback answered 404 on both keys,
+// so the pass had no answer. The chain walks past a model no key may call.
+const LIGHT = "nvidia/nemotron-3.5-lightning-30b-a3b";
+const CHAIN = [PRIMARY, LIGHT, FALLBACK];
+
+test("G543: a fallback that every key answers 404 for is walked past, and the next model answers", async () => {
+  const r = rig([{ timeout: true, ms: 75_000 }, { status: 404, ms: 40 }, { status: 404, ms: 55 }, answer({ actions: [] })],
+    { models: [PRIMARY, FALLBACK, LIGHT], maxAttempts: 3 * 2 });
+  const out = await r.run();
+  assert.equal(out.model, LIGHT);
+  assert.deepEqual(out.attempts.map((a) => [a.model, a.status]),
+    [[PRIMARY, "timeout"], [FALLBACK, 404], [FALLBACK, 404], [LIGHT, "ok"]]);
+  assert.deepEqual(r.sleeps, []);                       // a 404 is the next key at once, never a pause
+});
+
+test("G543: with the default cap of two attempts a model, the same walk ran out before the model that answers", async () => {
+  const r = rig([{ status: 503, ms: 100 }, { status: 503, ms: 100 }, { status: 404, ms: 40 }, { status: 404, ms: 55 },
+                 { status: 404, ms: 40 }, { status: 404, ms: 40 }, answer({ actions: [] })],
+    { models: [PRIMARY, FALLBACK, "nvidia/also-gone", LIGHT] });        // default cap: 4 models x 2 = 8, enough here
+  assert.equal((await r.run()).model, LIGHT);
+  const capped = rig([{ status: 404, ms: 40 }, { status: 404, ms: 55 }, { status: 404, ms: 40 }, answer({ actions: [] })],
+    { models: [FALLBACK, LIGHT], keys: [...KEYS, { name: "NVIDIA_API_KEY_CUOPT", value: "secret-three" }] });
+  const out = await capped.run();                       // three keys, two models: the default cap of 4 ends on the first answer
+  assert.equal(out.model, LIGHT);
+  assert.equal(out.attempts.length, 4);
+});
+
+test("G543: a model's key refusals are counted for that model, wherever the key index stands", async () => {
+  // a 429 moves the key index to the second key; the fallback must still be tried on BOTH keys before it is given up
+  const r = rig([{ status: 429, ms: 100 }, { status: 503, ms: 100 }, { status: 404, ms: 40 }, answer({ actions: [] })],
+    { models: [PRIMARY, FALLBACK] });
+  const out = await r.run();
+  assert.equal(out.model, FALLBACK);
+  assert.deepEqual(out.attempts.map((a) => [a.model, a.key, a.status]),
+    [[PRIMARY, "NVIDIA_API_KEY_NEMOTRON", 429], [PRIMARY, "NVIDIA_API_KEY", 503],
+     [FALLBACK, "NVIDIA_API_KEY", 404], [FALLBACK, "NVIDIA_API_KEY_NEMOTRON", "ok"]]);
+});
+
+test("G543: the chain keeps the dead model last, so it costs nothing while it is dead and answers if it returns", async () => {
+  const r = rig([{ timeout: true, ms: 75_000 }, answer({ actions: [] })], { models: CHAIN, maxAttempts: 6 });
+  const out = await r.run();
+  assert.equal(out.model, LIGHT);
+  assert.equal(out.attempts.length, 2);
 });

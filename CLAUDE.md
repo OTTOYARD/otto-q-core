@@ -253,6 +253,12 @@ When information is missing:
      second trip. Each car went from the gate straight to a charger with no clean on its visit, because `0820` wrote the
      clean only for a parked car and only after the charge step. `0821` writes it before the charge step, for a car at
      the gate, parked or already charging, and records each stop's charger state on its decision row.
+     **AND `0822` (`db/checks/0487`), 2026-11-12 evening:** a clean that is DUE on the needs card (its full interval has
+     passed; the card forces it only 8% later) is written before the charge, so the charging post's arm does it
+     (`cabin_clean_when_due_at_charge`). And a car waiting for a cabin stop takes the place the charge line's own ratio
+     gives it, never ahead of immediate dispatch or the 90-minute floor (`cabin_stop_in_charge_line`). Both dials are 1 at
+     the twin depot. First run (`cce21ff2`): 0 cabin stops, 46 cleans during a charge, against 10 and 31 two runs before.
+     Three seeds, not pairs. **The second dial was not exercised on that run: no car waited for a stop.**
 
 **10. OTTO-Q DOES NOT EXPERIMENT IN PRODUCTION. HYPOTHESES AND TESTS BELONG TO THE RESEARCH WING, IN THE TWIN — added 2026-09-27 in Chase's words.**
 
@@ -295,6 +301,27 @@ When information is missing:
      name. The arm's three tick-counted dials are set for production's 120-second tick: no car is held
      at the gate for a proposer, and an agent's charge order stands 6 minutes, not 30. One self-applied
      setting is still in force at the twin depot and waits on a person (FINDINGS G370).
+   - **THE AGENT IS TOLD WHY IT WAS WOKEN (`0823`, edge v32; `db/checks/0488`, G540), 2026-11-13.** Read before it: 286
+     answered consults at the twin depot since `0795`, none changed engine state, all chose one solver objective, and
+     none of the 5 woken by an emergency mentions one, because the wake gate's reasons never reached the model. A
+     read-only brief (`public.ottoq_agent_wake_brief`, behind `agent_wake_brief`, on at the twin depot) now goes ahead
+     of the board: the reasons, what changed since its last answer, the cars and chargers behind each reason, what it
+     said last. On run `a95e51a3` its directives named 113 of the 114 subjects the briefs marked new. **It adds no
+     lever: the agent still changes no engine state.** Two rules from the build: **check a prompt change on a whole
+     run, not on its first consults** (the first wording read 12 of 14 at seven consults and 29 of 117 at thirty); and
+     **a deploy is verified by a hash computed before it** (the function records its prompt's sha256, and the repo's
+     source gives the same hash).
+     **THE DAY AFTER (`db/checks/0492`, G543, G544; agent v33, `0829`).** The agent's fallback model had answered 404
+     since 2026-10-14 while the provider's public list still named it: **a listing is not proof a key may call a
+     model; the function's own probe is** (`POST {"probe_models": true}`). The fallback is now a chain, and a stored
+     pass can be replayed through any of it with no effect on the depot (`replay_pass_id`). Replayed on three real
+     boards the fallback answered every time, once with no directive and once naming the right cars with the wrong
+     posts, so **"named its subject" is not "was right"**, and a fallback's directive is marked as one. And checking
+     the agent's own report of an idle wash bay found a kernel defect, not an idle bay: `0781`'s yield-to-the-bay-line
+     read a line that still held the cabin cleans `0817` had moved to the posts, and 11 of 15 yielding cars on run
+     `7a08f52a` were held for a bay they would never enter. `0829` takes those atoms out of the line. **When one
+     change moves where work is done, read every function that asks where the work is.** And a migration's number is
+     free only if the ledger says so that day: another branch had applied its own 0824-0828.
 
 **11. OTTO-COMMAND IS THE FILTER AND EXECUTOR FOR PERSONAL AGENTS — added 2026-10-14 in Chase's words.**
 
