@@ -136,6 +136,11 @@
 --   longest 255 -> 179, over 60 min 65 of 214 -> 129 of 267). The table and its caveats are in 0826's footer.
 --   The posts charged 214 of 270 post-hours on a7345255: with all 30 open the depot is close to charger-bound.
 --
+-- AFTER 0839 (an arm routine cut short is owed as a needed tidy). Runs 5ea96a57 (stopped by an operator at tick 138)
+--   and 6f9a1b0e (763 ticks): 5 and 19 faulted sessions, every car re-seated (median 1 and 5 minutes, longest 14 and
+--   24); 92 and 332 departures, none below 99%; no visit in the table with a cancelled arm atom or an owed tidy. So
+--   0839 was not exercised by either run; its footer has the detail.
+--
 -- TO READ THE STOP DOOR ON A RUN:
 --   SELECT n.meta->'arm_after_charge'->>'why' why, n.meta->'arm_after_charge'->>'result' result, count(*)
 --     FROM ottoq_visit_needs n WHERE n.sim_run_id = :'run' AND n.meta ? 'arm_after_charge' GROUP BY 1, 2;
