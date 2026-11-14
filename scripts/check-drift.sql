@@ -863,7 +863,7 @@ repo_manifest(version, name, file) AS (
     ('20261112202531'::text, '0821_a_car_to_charge_has_its_cabin_clean_on_its_visit_before_it_is_seated_and_a_cabin_stop_records_its_posts_charger'::text, '0821_a_car_to_charge_has_its_cabin_clean_on_its_visit_before_it_is_seated_and_a_cabin_stop_records_its_posts_charger.sql'::text),
     ('20261113003556'::text, '0822_a_due_cabin_clean_is_done_during_the_charge_and_a_cabin_stop_takes_its_turn_in_the_charge_line'::text, '0822_a_due_cabin_clean_is_done_during_the_charge_and_a_cabin_stop_takes_its_turn_in_the_charge_line.sql'::text),
     ('20261113030227'::text, '0823_the_agent_is_told_why_it_was_woken_and_what_it_said_last'::text, '0823_the_agent_is_told_why_it_was_woken_and_what_it_said_last.sql'::text),
-    ('PENDING'::text, '0824_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line'::text, '0824_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line.sql'::text)
+    ('PENDING'::text, '0829_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line'::text, '0829_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

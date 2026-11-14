@@ -1,7 +1,7 @@
 -- migration-version: PENDING
--- migration-name:    0824_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line
+-- migration-name:    0829_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line
 --
--- 0824  **A car whose cabin clean is done at a charging post is in no bay's line, so it no longer yields its place in
+-- 0829  **A car whose cabin clean is done at a charging post is in no bay's line, so it no longer yields its place in
 --       the charge line for one.** (G544)
 --
 -- ══ §1 WHY (measured 2026-11-13 19:59-20:01 UTC, 1:59-2:01 PM CT, on run 7a08f52a, busy_day, the twin depot) ═══════════
@@ -43,7 +43,7 @@
 --
 --   P0 nothing in flight and no run running (the line orders live cars). P1 the definition is the one read on live
 --   (pg_get_functiondef md5 e894dd4d…) and 0817 and 0781 are classified. P2 once. The pre-image to
---   ottoq_schema_snapshots as '0824_pre'. Each anchor matches once. V1 ACL, security, volatility, settings and owner
+--   ottoq_schema_snapshots as '0829_pre'. Each anchor matches once. V1 ACL, security, volatility, settings and owner
 --   unchanged. V2 on every run this database holds where the wash bay is not exterior only, the line is row for row
 --   the pre-image's; where it is, the line is the pre-image's without the cars that owe only cabin work in the wash
 --   lane, and holds no such car. V3 the body is the one the tests ran (md5).
@@ -55,8 +55,8 @@
 --   and certification arms run at the defaults. forces_dial_restart FALSE: no dial is added; rule 12 holds the dial
 --   program closed.
 --
--- ROLLBACK: EXECUTE the `definition` in ottoq_schema_snapshots WHERE label = '0824_pre'; DELETE FROM
---   public.ottoq_cert_lineage WHERE name = '0824_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line'.
+-- ROLLBACK: EXECUTE the `definition` in ottoq_schema_snapshots WHERE label = '0829_pre'; DELETE FROM
+--   public.ottoq_cert_lineage WHERE name = '0829_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line'.
 
 BEGIN;
 
@@ -66,10 +66,10 @@ SET LOCAL lock_timeout = '5s';
 DO $p0$
 BEGIN
   IF public.ottoq_certification_in_flight(true) > 0 THEN
-    RAISE EXCEPTION '0824 P0: a pair, the recert runner, a dial pair or a sweep is running right now';
+    RAISE EXCEPTION '0829 P0: a pair, the recert runner, a dial pair or a sweep is running right now';
   END IF;
   IF EXISTS (SELECT 1 FROM public.ottoq_sim_runs WHERE status = 'running') THEN
-    RAISE EXCEPTION '0824 P0: a run is running; the bay line orders its cars. Apply between runs';
+    RAISE EXCEPTION '0829 P0: a run is running; the bay line orders its cars. Apply between runs';
   END IF;
 END $p0$;
 
@@ -77,8 +77,8 @@ END $p0$;
 DO $once$
 BEGIN
   IF EXISTS (SELECT 1 FROM public.ottoq_cert_lineage
-              WHERE name = '0824_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line') THEN
-    RAISE EXCEPTION '0824 P2: already applied';
+              WHERE name = '0829_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line') THEN
+    RAISE EXCEPTION '0829 P2: already applied';
   END IF;
 END $once$;
 
@@ -87,24 +87,24 @@ DO $p1$
 BEGIN
   IF md5(pg_get_functiondef('public.ottoq_bay_line(uuid,uuid,timestamp with time zone)'::regprocedure))
        IS DISTINCT FROM 'e894dd4dcfd03fb7e5758b8956b2eda2' THEN
-    RAISE EXCEPTION '0824 P1: public.ottoq_bay_line is not the definition this file was written against';
+    RAISE EXCEPTION '0829 P1: public.ottoq_bay_line is not the definition this file was written against';
   END IF;
   IF to_regprocedure('public.ottoq_wash_bay_exterior_only(uuid)') IS NULL
      OR NOT EXISTS (SELECT 1 FROM public.ottoq_cert_lineage
                      WHERE name = '0817_the_wash_bay_is_exterior_only_and_cabin_work_is_done_at_a_fast_charger_post')
      OR NOT EXISTS (SELECT 1 FROM public.ottoq_cert_lineage
                      WHERE name = '0781_the_charge_line_serves_first_the_cars_a_charge_sends_home') THEN
-    RAISE EXCEPTION '0824 P1: 0781 or 0817 is not applied; apply in order';
+    RAISE EXCEPTION '0829 P1: 0781 or 0817 is not applied; apply in order';
   END IF;
 END $p1$;
 
 -- ── the pre-image, the attributes V1 holds the function to, and the pre-image as a callable for V2 ──
 INSERT INTO public.ottoq_schema_snapshots (label, object_kind, schema_name, object_name, definition, def_md5)
-SELECT '0824_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
+SELECT '0829_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
  WHERE p.oid = 'public.ottoq_bay_line(uuid,uuid,timestamp with time zone)'::regprocedure;
 
-CREATE TEMP TABLE _0824_attrs ON COMMIT DROP AS
+CREATE TEMP TABLE _0829_attrs ON COMMIT DROP AS
 SELECT p.proacl::text AS acl, p.prosecdef, p.provolatile, p.proconfig::text AS config, p.proowner
   FROM pg_proc p WHERE p.oid = 'public.ottoq_bay_line(uuid,uuid,timestamp with time zone)'::regprocedure;
 
@@ -112,9 +112,9 @@ DO $pre$
 DECLARE v_def text := pg_get_functiondef('public.ottoq_bay_line(uuid,uuid,timestamp with time zone)'::regprocedure);
 BEGIN
   IF position('FUNCTION public.ottoq_bay_line(' IN v_def) = 0 THEN
-    RAISE EXCEPTION '0824: the definition does not name the function as expected';
+    RAISE EXCEPTION '0829: the definition does not name the function as expected';
   END IF;
-  EXECUTE replace(v_def, 'FUNCTION public.ottoq_bay_line(', 'FUNCTION pg_temp._0824_pre(');
+  EXECUTE replace(v_def, 'FUNCTION public.ottoq_bay_line(', 'FUNCTION pg_temp._0829_pre(');
 END $pre$;
 
 -- ── the three substitutions, each matched once, read with bare newlines whatever line endings the paste carried ──
@@ -132,7 +132,7 @@ $a3$       AND a.value ->> 'requires_bay' IN ('service_bay', 'wash_bay', 'detail
 $a3$];
   v_news text[] := ARRAY[
 $b1$  WITH x AS MATERIALIZED (
-    --: 0824 (G544): with the wash bay exterior only (0817) cabin work is done at a charging post, by the post's arm,
+    --: 0829 (G544): with the wash bay exterior only (0817) cabin work is done at a charging post, by the post's arm,
     --: during the charge or on a cabin stop. Such an atom is in no bay's line. Read once for the run.
     SELECT public.ottoq_wash_bay_exterior_only(p_sim_run_id) AS ext
   ), owed AS (
@@ -142,13 +142,13 @@ $b2$      FROM ottoq_visit_needs vn
       CROSS JOIN x
 $b2$,
 $b3$       AND a.value ->> 'requires_bay' IN ('service_bay', 'wash_bay', 'detail')
-       AND NOT (a.value ->> 'requires_bay' = 'detail' AND COALESCE(x.ext, false))   --: 0824
+       AND NOT (a.value ->> 'requires_bay' = 'detail' AND COALESCE(x.ext, false))   --: 0829
 $b3$];
 BEGIN
   FOR i IN 1..3 LOOP
     v_old := replace(v_olds[i], E'\r', ''); v_new := replace(v_news[i], E'\r', '');
     IF (length(v_def) - length(replace(v_def, v_old, ''))) / length(v_old) <> 1 THEN
-      RAISE EXCEPTION '0824: anchor % does not match exactly once', i;
+      RAISE EXCEPTION '0829: anchor % does not match exactly once', i;
     END IF;
     v_def := replace(v_def, v_old, v_new);
   END LOOP;
@@ -158,11 +158,11 @@ END $patch$;
 -- ── V1: nothing about the function but its body moved ──
 DO $v1$
 BEGIN
-  IF EXISTS (SELECT 1 FROM _0824_attrs a, pg_proc p
+  IF EXISTS (SELECT 1 FROM _0829_attrs a, pg_proc p
               WHERE p.oid = 'public.ottoq_bay_line(uuid,uuid,timestamp with time zone)'::regprocedure
                 AND (p.proacl::text, p.prosecdef, p.provolatile, p.proconfig::text, p.proowner)
                     IS DISTINCT FROM (a.acl, a.prosecdef, a.provolatile, a.config, a.proowner)) THEN
-    RAISE EXCEPTION '0824 V1 FAILED: the function''s ACL, security, volatility, settings or owner moved';
+    RAISE EXCEPTION '0829 V1 FAILED: the function''s ACL, security, volatility, settings or owner moved';
   END IF;
 END $v1$;
 
@@ -176,12 +176,12 @@ BEGIN
     IF NOT v_ext THEN
       SELECT count(*) INTO v_bad FROM (
         (SELECT * FROM public.ottoq_bay_line(r.sim_run_id, r.depot_id, r.c)
-         EXCEPT SELECT * FROM pg_temp._0824_pre(r.sim_run_id, r.depot_id, r.c))
+         EXCEPT SELECT * FROM pg_temp._0829_pre(r.sim_run_id, r.depot_id, r.c))
         UNION ALL
-        (SELECT * FROM pg_temp._0824_pre(r.sim_run_id, r.depot_id, r.c)
+        (SELECT * FROM pg_temp._0829_pre(r.sim_run_id, r.depot_id, r.c)
          EXCEPT SELECT * FROM public.ottoq_bay_line(r.sim_run_id, r.depot_id, r.c))) d;
       IF v_bad > 0 THEN
-        RAISE EXCEPTION '0824 V2 FAILED: run % (wash bay not exterior only) differs from the pre-image in % rows', r.sim_run_id, v_bad;
+        RAISE EXCEPTION '0829 V2 FAILED: run % (wash bay not exterior only) differs from the pre-image in % rows', r.sim_run_id, v_bad;
       END IF;
       v_same := v_same + 1;
     ELSE
@@ -189,11 +189,11 @@ BEGIN
       --: pre-image had in the wash lane that owes a wash-bay atom is still there
       SELECT count(*) INTO v_bad FROM (
         (SELECT vehicle_id, lane, pos, open_min, ahead_min, bays, eta_min FROM public.ottoq_bay_line(r.sim_run_id, r.depot_id, r.c) WHERE lane = 'service_bay'
-         EXCEPT SELECT vehicle_id, lane, pos, open_min, ahead_min, bays, eta_min FROM pg_temp._0824_pre(r.sim_run_id, r.depot_id, r.c) WHERE lane = 'service_bay')
+         EXCEPT SELECT vehicle_id, lane, pos, open_min, ahead_min, bays, eta_min FROM pg_temp._0829_pre(r.sim_run_id, r.depot_id, r.c) WHERE lane = 'service_bay')
         UNION ALL
-        (SELECT vehicle_id, lane, pos, open_min, ahead_min, bays, eta_min FROM pg_temp._0824_pre(r.sim_run_id, r.depot_id, r.c) WHERE lane = 'service_bay'
+        (SELECT vehicle_id, lane, pos, open_min, ahead_min, bays, eta_min FROM pg_temp._0829_pre(r.sim_run_id, r.depot_id, r.c) WHERE lane = 'service_bay'
          EXCEPT SELECT vehicle_id, lane, pos, open_min, ahead_min, bays, eta_min FROM public.ottoq_bay_line(r.sim_run_id, r.depot_id, r.c) WHERE lane = 'service_bay')) d;
-      IF v_bad > 0 THEN RAISE EXCEPTION '0824 V2 FAILED: run % service lane moved (% rows)', r.sim_run_id, v_bad; END IF;
+      IF v_bad > 0 THEN RAISE EXCEPTION '0829 V2 FAILED: run % service lane moved (% rows)', r.sim_run_id, v_bad; END IF;
       SELECT count(*) INTO v_bad
         FROM public.ottoq_bay_line(r.sim_run_id, r.depot_id, r.c) l
        WHERE l.lane = 'wash_bay'
@@ -202,9 +202,9 @@ BEGIN
                          WHERE vn.sim_run_id = r.sim_run_id AND vn.vehicle_id = l.vehicle_id AND vn.status IN ('open', 'in_progress')
                            AND a.value ->> 'requires_bay' = 'wash_bay'
                            AND COALESCE(a.value ->> 'status', 'pending') NOT IN ('done', 'cancelled', 'skipped', 'in_progress'));
-      IF v_bad > 0 THEN RAISE EXCEPTION '0824 V2 FAILED: run % wash lane still holds % car(s) owing no wash-bay work', r.sim_run_id, v_bad; END IF;
+      IF v_bad > 0 THEN RAISE EXCEPTION '0829 V2 FAILED: run % wash lane still holds % car(s) owing no wash-bay work', r.sim_run_id, v_bad; END IF;
       SELECT count(*) INTO v_bad
-        FROM pg_temp._0824_pre(r.sim_run_id, r.depot_id, r.c) o
+        FROM pg_temp._0829_pre(r.sim_run_id, r.depot_id, r.c) o
        WHERE o.lane = 'wash_bay'
          AND EXISTS (SELECT 1 FROM public.ottoq_visit_needs vn
                       CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(vn.atoms) = 'array' THEN vn.atoms ELSE '[]'::jsonb END) a
@@ -213,28 +213,28 @@ BEGIN
                        AND COALESCE(a.value ->> 'status', 'pending') NOT IN ('done', 'cancelled', 'skipped', 'in_progress'))
          AND NOT EXISTS (SELECT 1 FROM public.ottoq_bay_line(r.sim_run_id, r.depot_id, r.c) l
                           WHERE l.lane = 'wash_bay' AND l.vehicle_id = o.vehicle_id);
-      IF v_bad > 0 THEN RAISE EXCEPTION '0824 V2 FAILED: run % lost % car(s) that owe a wash from the wash lane', r.sim_run_id, v_bad; END IF;
-      v_gone := v_gone + (SELECT count(*) FROM pg_temp._0824_pre(r.sim_run_id, r.depot_id, r.c) WHERE lane = 'wash_bay')
+      IF v_bad > 0 THEN RAISE EXCEPTION '0829 V2 FAILED: run % lost % car(s) that owe a wash from the wash lane', r.sim_run_id, v_bad; END IF;
+      v_gone := v_gone + (SELECT count(*) FROM pg_temp._0829_pre(r.sim_run_id, r.depot_id, r.c) WHERE lane = 'wash_bay')
                        - (SELECT count(*) FROM public.ottoq_bay_line(r.sim_run_id, r.depot_id, r.c) WHERE lane = 'wash_bay');
       v_cut := v_cut + 1;
     END IF;
   END LOOP;
-  RAISE NOTICE '0824 V2 PASSED: % run(s) unchanged, % run(s) with the wash bay exterior only (% car(s) out of the wash line)', v_same, v_cut, v_gone;
+  RAISE NOTICE '0829 V2 PASSED: % run(s) unchanged, % run(s) with the wash bay exterior only (% car(s) out of the wash line)', v_same, v_cut, v_gone;
 END $v2$;
 
 -- ── V3: the body is the one the scratch PostgreSQL ran ──
 DO $v3$
 BEGIN
   IF (SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.ottoq_bay_line(uuid,uuid,timestamp with time zone)'::regprocedure)
-       IS DISTINCT FROM 'afbf05ac9c326c414fc054e78739d057' THEN
-    RAISE EXCEPTION '0824 V3 FAILED: the body is not the one the tests ran';
+       IS DISTINCT FROM '0c04c0d28c269bf9c6abf085f350d6e2' THEN
+    RAISE EXCEPTION '0829 V3 FAILED: the body is not the one the tests ran';
   END IF;
 END $v3$;
 
-DROP FUNCTION pg_temp._0824_pre(uuid, uuid, timestamp with time zone);
+DROP FUNCTION pg_temp._0829_pre(uuid, uuid, timestamp with time zone);
 
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, forces_dial_restart, note, classified_at)
-VALUES ('0824_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line', false, false,
+VALUES ('0829_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line', false, false,
         'G544. public.ottoq_bay_line: while public.ottoq_wash_bay_exterior_only(run) is true (0817), an atom with '
         'requires_bay = ''detail'' is in no bay''s line, so a car held only for a charging post''s cabin clean no longer '
         'yields its place in the charge line (0781) and the wash bays'' queue on the agent''s board (0783) is the cars '
