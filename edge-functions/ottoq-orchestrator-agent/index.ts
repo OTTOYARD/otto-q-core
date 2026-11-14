@@ -10,6 +10,8 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v34 (0833, G541): the prompt names held_for_car_due, the bays a booked car is about to reach, which the board no
+// longer counts idle with a car ready. One sentence of the prompt and the version; nothing else moved.
 // v33 (db/checks/0489, G543): THE FALLBACK IS A CHAIN, AND THE FUNCTION CAN SAY WHICH MODELS ANSWER.
 //      v23's one fallback model, nvidia/nemotron-3-super-120b-a12b, last answered on 2026-10-14. Since then it has
 //      returned HTTP 404 on every key (85 passes in 30 days), so a primary timeout was a pass with no answer; the
@@ -242,7 +244,7 @@ const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers
 function json(o: unknown, s = 200) { return new Response(JSON.stringify(o), { status: s, headers: { ...cors, "Content-Type": "application/json" } }); }
 
 const OPS_WHITELIST = new Set(Object.keys(OPS_ACTION_DIAL));
-const AGENT_VERSION = "v33";
+const AGENT_VERSION = "v34";
 
 const NV_KEYS = ["NVIDIA_API_KEY_NEMOTRON", "NVIDIA_API_KEY_CUOPT", "NVIDIA_API_KEY"];
 const NV_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
@@ -344,7 +346,7 @@ READ THE BOARD THIS WAY:
 - grounding.energy_limits.battery_plan (when energy_reserve_shave = 1) is the battery's plan for the rest of the day: mode, the grid level it defends (level_kw), the billed peak (ratchet_kw), the DR reserve it holds (reserve_now_kwh), and whether it is charging and why.
 - "assets" (when present): SoC distribution, hard constraints with their causes (dcfc blocked by pack_temp_high clears by waiting; cell_balance_overdue needs service; soh_derate is permanent), deadline pressure, and a named attention list. Use it to choose the solver objective and to write directives about named vehicles.
 - grounding.planner_learning is what the planners learned in THIS run: free chargers by type, cars waiting for one, the solver's batch (it plans only as many cars as there are free chargers, in the kernel's own order), its recent offers by outcome (used, moved to an equal free charger, refused by reason) and lesson {code, text}. A refusal for stall_occupied or stall_reserved while lesson.code is more_cars_than_chargers is a capacity finding, not a planner fault: the charger went to a car ahead in line. Say so in one directive that cites the numbers; do not move an energy dial for it, and never hold a vehicle back or shorten a charge because of it. When lesson.code is offers_lost_their_charger, name it in a directive as well.
-- "constraint" (when present) says where the depot's wall is. For each resource (service_bay, wash_bay, posts): units_up and busy_now, the cars queued for it and the minutes of work they owe there (queued_min), the work under way (in_progress_min), hours_to_clear, and idle_with_car_ready (units standing idle while a car they could take waits). exit_decided_by counts the waiting cars by the resource their exit waits on longest; posts.queued_min_bays_decide is the minutes of charge the line owes to cars whose exit a bay decides; "wall" is the resource with the most hours to clear and "lesson" says it in one line. When the wall is not the posts, name the wall with its numbers in a directive about capacity, not the chargers: a charger does not move a car whose exit a bay decides. A unit idle with a car ready is a finding to name. Never propose holding a vehicle back, shortening a charge or skipping a service because of the wall.
+- "constraint" (when present) says where the depot's wall is. For each resource (service_bay, wash_bay, posts): units_up and busy_now, the cars queued for it and the minutes of work they owe there (queued_min), the work under way (in_progress_min), hours_to_clear, held_for_car_due (bays not busy that a booked car reaches within 10 minutes: they are that car's, not idle capacity), and idle_with_car_ready (units neither busy nor held, standing idle while a car they could take waits). exit_decided_by counts the waiting cars by the resource their exit waits on longest; posts.queued_min_bays_decide is the minutes of charge the line owes to cars whose exit a bay decides; "wall" is the resource with the most hours to clear and "lesson" says it in one line. When the wall is not the posts, name the wall with its numbers in a directive about capacity, not the chargers: a charger does not move a car whose exit a bay decides. A unit idle with a car ready is a finding to name. Never propose holding a vehicle back, shortening a charge or skipping a service because of the wall.
 
 DIALS (the only keys set_policy accepts; value in [min, max]). Each grounding.actuators[dial].live says whether the dial does anything right now, and why not:
   energy_reserve_shave 0|1 — 1 = the battery follows its day plan (price- and demand-charge-aware to midnight, holding a demand-response reserve through the afternoon); 0 = a fixed grid-draw target set by the two factors below.

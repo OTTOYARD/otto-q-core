@@ -179,7 +179,7 @@ test("v23: the order is recorded before the solver handoff, under the pass's cha
   assert.match(code, /charge_order: chargeOrder \}/);
 });
 
-test("v23-v32: the model call goes through the retry module, with the fallback model, and the row says v33", () => {
+test("v23-v32: the model call goes through the retry module, with the fallback model, and the row says v34", () => {
   assert.match(code, /await callModelWithRetry\(/);
   // v33 (G543): the fallback is a chain, with v23's model last, and the attempt cap counts every key per model
   assert.match(code, /models: passModels,/);
@@ -190,7 +190,7 @@ test("v23-v32: the model call goes through the retry module, with the fallback m
   assert.match(code, /maxAttempts: passModels\.length \* Math\.max\(2, keys\.length\)/);
   assert.match(code, /model_attempts: call\.attempts/);
   // v32: one constant names the version, and every row that records it reads the constant
-  assert.match(code, /const AGENT_VERSION = "v33";/);
+  assert.match(code, /const AGENT_VERSION = "v34";/);
   assert.equal((code.match(/agent_version: AGENT_VERSION/g) ?? []).length, 4);
   assert.doesNotMatch(code, /agent_version: "v\d+"/);
   // the single-try key loop is gone
@@ -205,7 +205,7 @@ test("v31 / 0783: the prompt reads the depot's constraint and names the wall, ne
   assert.match(orchestrator, /LENS 1 — DEPOT ORCHESTRATION & FLOW: [^\n]*where the wall is \(constraint\)/);
   const bullet = orchestrator.slice(orchestrator.indexOf('- "constraint" (when present)'));
   assert.ok(bullet.length > 0 && orchestrator.indexOf('- "constraint" (when present)') > orchestrator.indexOf("READ THE BOARD THIS WAY:"));
-  for (const key of ["units_up", "busy_now", "queued_min", "in_progress_min", "hours_to_clear", "idle_with_car_ready",
+  for (const key of ["units_up", "busy_now", "queued_min", "in_progress_min", "hours_to_clear", "held_for_car_due", "idle_with_car_ready",
                      "exit_decided_by", "posts.queued_min_bays_decide", '"wall"', '"lesson"']) {
     assert.ok(bullet.slice(0, bullet.indexOf("\n")).includes(key), key);
   }
