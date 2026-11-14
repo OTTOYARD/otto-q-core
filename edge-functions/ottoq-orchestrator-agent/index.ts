@@ -10,7 +10,7 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
-// v34 (0833, G541): the prompt names held_for_car_due, the bays a booked car is about to reach, which the board no
+// v34 (0835, G541): the prompt names held_for_car_due, the bays a booked car is about to reach, which the board no
 // longer counts idle with a car ready. One sentence of the prompt and the version; nothing else moved.
 // v33 (db/checks/0489, G543): THE FALLBACK IS A CHAIN, AND THE FUNCTION CAN SAY WHICH MODELS ANSWER.
 //      v23's one fallback model, nvidia/nemotron-3-super-120b-a12b, last answered on 2026-10-14. Since then it has

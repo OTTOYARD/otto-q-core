@@ -1,11 +1,11 @@
-"""db/migrations/0833, EXECUTED: a bay held for a car on its way in is not "idle with a car ready" (G541, second half).
+"""db/migrations/0835, EXECUTED: a bay held for a car on its way in is not "idle with a car ready" (G541, second half).
 
 WHY THIS EXISTS. The agent's board (0783, public.ottoq_depot_constraint) counted a bay busy by the cars whose state is
 in that bay, and a ready car as any car in the bay's line that owes no charge. On 16 of 81 consulted boards on three
 runs the wash bays read idle with a car ready; on 9 of the 16 a booking already on the calendar began within 1.1
 minutes. Executed here on 0783's own harness (tests/test_depot_constraint_sql.py: the miniature depot through 0642 and
-0781, 0783 applied from its file, so the function is the live definition, md5 pinned by 0833's P1):
-  - 0833 applies, its checks run, it is classified FALSE/FALSE, the function's attributes hold, it refuses a second
+0781, 0783 applied from its file, so the function is the live definition, md5 pinned by 0835's P1):
+  - 0835 applies, its checks run, it is classified FALSE/FALSE, the function's attributes hold, it refuses a second
     apply, a running run, a changed definition and a world without 0783, and CRLF line endings give the same body;
   - with nothing held and no car out of place, every count is what 0783 gave;
   - a bay a booking brings a car to within 10 minutes is held, not idle with a car ready, and that car is not ready;
@@ -30,8 +30,8 @@ import test_depot_constraint_sql as tc  # noqa: E402  (0783's harness, shared on
 from test_depot_constraint_sql import db, template  # noqa: F401,E402
 
 ROOT = base.ROOT
-NAME = "0833_a_bay_held_for_a_car_on_its_way_in_is_not_idle_with_a_car_ready"
-M0833 = os.path.join(ROOT, "db", "migrations", NAME + ".sql")
+NAME = "0835_a_bay_held_for_a_car_on_its_way_in_is_not_idle_with_a_car_ready"
+M0835 = os.path.join(ROOT, "db", "migrations", NAME + ".sql")
 FN = "public.ottoq_depot_constraint(uuid,uuid,timestamp with time zone)"
 DEPOT, RUN, T = base.DEPOT, base.RUN, base.T
 _vid = base._vid
@@ -48,8 +48,8 @@ def _ready(d):
 
 
 def _apply(d):
-    rc, err = d.file(M0833)
-    assert rc == 0, f"0833 did not apply: {err}"
+    rc, err = d.file(M0835)
+    assert rc == 0, f"0835 did not apply: {err}"
     return err
 
 
@@ -75,22 +75,22 @@ def _attrs(d):
 
 # ── it applies ────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-def test_0833_applies_keeps_the_functions_attributes_and_refuses_twice(db):
+def test_0835_applies_keeps_the_functions_attributes_and_refuses_twice(db):
     _ready(db)
     before = _attrs(db)
     err = _apply(db)
-    assert "0833 V2 PASSED" in err, err
+    assert "0835 V2 PASSED" in err, err
     assert db.val(f"SELECT forces_recert::text || forces_dial_restart::text FROM public.ottoq_cert_lineage "
                   f"WHERE name = '{NAME}'") == "falsefalse"
     assert _attrs(db) == before
-    assert db.val("SELECT count(*) FROM public.ottoq_schema_snapshots WHERE label = '0833_pre'") == "1"
-    rc, err = db.file(M0833)
-    assert rc != 0 and "0833 P2: already applied" in err
+    assert db.val("SELECT count(*) FROM public.ottoq_schema_snapshots WHERE label = '0835_pre'") == "1"
+    rc, err = db.file(M0835)
+    assert rc != 0 and "0835 P2: already applied" in err
 
 
-def test_0833_applies_with_windows_line_endings_to_the_same_body(db):
+def test_0835_applies_with_windows_line_endings_to_the_same_body(db):
     _ready(db)
-    with open(M0833, newline="") as f:
+    with open(M0835, newline="") as f:
         sql = f.read()
     with tempfile.NamedTemporaryFile("w", suffix=".sql", delete=False, newline="") as t:
         t.write(sql.replace("\n", "\r\n"))
@@ -101,18 +101,18 @@ def test_0833_applies_with_windows_line_endings_to_the_same_body(db):
         os.unlink(t.name)
 
 
-def test_0833_refuses_a_world_without_0783_a_running_run_and_a_changed_definition(db):
-    rc, err = db.file(M0833)                                             # 0783 is not applied here yet
-    assert rc != 0 and "0833 P1: 0783 is not applied" in err
+def test_0835_refuses_a_world_without_0783_a_running_run_and_a_changed_definition(db):
+    rc, err = db.file(M0835)                                             # 0783 is not applied here yet
+    assert rc != 0 and "0835 P1: 0783 is not applied" in err
     tc._apply(db)
     db.val(f"UPDATE public.ottoq_sim_runs SET status = 'running' WHERE sim_run_id = '{RUN}'")
-    rc, err = db.file(M0833)
-    assert rc != 0 and "0833 P0: a run is running" in err
+    rc, err = db.file(M0835)
+    assert rc != 0 and "0835 P0: a run is running" in err
     db.val(f"UPDATE public.ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{RUN}'")
     db.val(f"ALTER FUNCTION {FN} COST 101")
-    rc, err = db.file(M0833)
-    assert rc != 0 and "0833 P1: public.ottoq_depot_constraint is not the definition" in err
-    assert db.val("SELECT count(*) FROM public.ottoq_schema_snapshots WHERE label = '0833_pre'") == "0"
+    rc, err = db.file(M0835)
+    assert rc != 0 and "0835 P1: public.ottoq_depot_constraint is not the definition" in err
+    assert db.val("SELECT count(*) FROM public.ottoq_schema_snapshots WHERE label = '0835_pre'") == "0"
 
 
 # ── the counts, by hand ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -239,6 +239,6 @@ def test_the_pre_image_restores_the_function(db):
     before = xf._md5(db, FN)
     _apply(db)
     assert xf._md5(db, FN) != before
-    rc, out, err = db.run(db.json("SELECT to_json(definition) FROM public.ottoq_schema_snapshots WHERE label = '0833_pre'"))
+    rc, out, err = db.run(db.json("SELECT to_json(definition) FROM public.ottoq_schema_snapshots WHERE label = '0835_pre'"))
     assert rc == 0, err
     assert xf._md5(db, FN) == before
