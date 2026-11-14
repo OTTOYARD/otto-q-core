@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261114160047
 -- migration-name:    0826_every_fast_charger_arm_stands_on_the_cars_left
 --
 -- 0826  **Every fast-charger post's arm stands on the car's left.**
@@ -85,3 +85,9 @@ VALUES ('0826_every_fast_charger_arm_stands_on_the_cars_left', true, false,
         'Every fast-charger post reads arm side left. V3 at apply: '
         || COALESCE((SELECT result::text FROM _0826_selftest LIMIT 1), 'no result'), now());
 COMMIT;
+
+-- APPLIED 2026-11-14 at 16:00:47 UTC (10:00 AM CT), ledger 20261114160047, through apply_migration, on the first send.
+--   Before it: ottoyarddepot-sim#170 was merged (05:26 UTC), and the live app (otto-twin.lovable.app) was read at
+--   15:5x UTC and carried that build (the per-opening card text was in its bundle; it was not at 05:3x UTC).
+--   No run was live. V3 at apply: posts 30, posts_left 30, cars 116, cars_that_fit_no_post 0.
+--   The run started to check it: a7345255.

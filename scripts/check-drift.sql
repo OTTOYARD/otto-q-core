@@ -865,7 +865,7 @@ repo_manifest(version, name, file) AS (
     ('20261113030227'::text, '0823_the_agent_is_told_why_it_was_woken_and_what_it_said_last'::text, '0823_the_agent_is_told_why_it_was_woken_and_what_it_said_last.sql'::text),
     ('20261113044222'::text, '0824_a_car_is_charged_only_at_a_post_whose_arm_stands_on_its_charge_port_side'::text, '0824_a_car_is_charged_only_at_a_post_whose_arm_stands_on_its_charge_port_side.sql'::text),
     ('20261113054256'::text, '0825_a_car_declined_for_its_charge_port_side_takes_the_kernels_own_post'::text, '0825_a_car_declined_for_its_charge_port_side_takes_the_kernels_own_post.sql'::text),
-    ('PENDING'::text, '0826_every_fast_charger_arm_stands_on_the_cars_left'::text, '0826_every_fast_charger_arm_stands_on_the_cars_left.sql'::text),
+    ('20261114160047'::text, '0826_every_fast_charger_arm_stands_on_the_cars_left'::text, '0826_every_fast_charger_arm_stands_on_the_cars_left.sql'::text),
     ('20261113195431'::text, '0827_a_car_whose_open_door_meets_its_connector_is_cleaned_after_its_charge'::text, '0827_a_car_whose_open_door_meets_its_connector_is_cleaned_after_its_charge.sql'::text),
     ('20261113210428'::text, '0828_the_arm_is_asked_about_a_car_cleaned_after_its_charge_before_the_car_is_released'::text, '0828_the_arm_is_asked_about_a_car_cleaned_after_its_charge_before_the_car_is_released.sql'::text),
     ('20261114004743'::text, '0829_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line'::text, '0829_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line.sql'::text),
