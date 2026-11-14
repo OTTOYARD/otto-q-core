@@ -264,7 +264,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0828 — GENERATED, not a log
+## Index, 0134–0830 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0559, 0560, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0603, 0604, 0605, 0606, 0607, 0608, 0609, 0610, 0611, 0612, 0613, 0614, 0615, 0616, 0617, 0618, 0619, 0620, 0621, 0622, 0623, 0624, 0625, 0626, 0627, 0628, 0629, 0630, 0631, 0632, 0633, 0634, 0635, 0636, 0637, 0638, 0639, 0640, 0641, 0642, 0643, 0644, 0647, 0648, 0649, 0650, 0651, 0652, 0653, 0654, 0655, 0656, 0657, 0658, 0659, 0690, 0691, 0692, 0693, 0694, 0695, 0696, 0698, 0699, 0701, 0714, 0720, 0738, 0749, 0755, 0759, 0760, 0761, 0762, 0763, 0764, 0765, 0766, 0767, 0768, 0769, 0780, 0781, 0782, 0783, 0784, 0785, 0791, 0792, 0793, 0794, 0795, 0796, 0797, 0798, 0799, 0800, 0801, 0802, 0803, 0804, 0805, 0806, 0807, 0808, 0809, 0814, 0815 — which are indexed below as well as logged above; the log row is
@@ -917,7 +917,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0826](db/migrations/0826_every_fast_charger_arm_stands_on_the_cars_left.sql) | `PENDING` | no — pending | **Every fast-charger post's arm stands on the car's left.** |
 | [0827](db/migrations/0827_a_car_whose_open_door_meets_its_connector_is_cleaned_after_its_charge.sql) | `20261113195431` | yes — ledger | **A car whose open door meets its charge connector is cleaned by the post's arm after its charge, on the same |
 | [0828](db/migrations/0828_the_arm_is_asked_about_a_car_cleaned_after_its_charge_before_the_car_is_released.sql) | `20261113210428` | yes — ledger | **The arm is asked about a car cleaned after its charge before that car is released.** |
+| [0830](db/migrations/0830_the_arm_of_a_car_cleaned_after_its_charge_starts_where_the_charge_is_stopped.sql) | `20261114005209` | yes — ledger | **The arm of a car cleaned after its charge starts where the charge is stopped, and every such stop says on |
 
-634 migrations indexed.
+635 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

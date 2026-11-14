@@ -865,7 +865,8 @@ repo_manifest(version, name, file) AS (
     ('20261113054256'::text, '0825_a_car_declined_for_its_charge_port_side_takes_the_kernels_own_post'::text, '0825_a_car_declined_for_its_charge_port_side_takes_the_kernels_own_post.sql'::text),
     ('PENDING'::text, '0826_every_fast_charger_arm_stands_on_the_cars_left'::text, '0826_every_fast_charger_arm_stands_on_the_cars_left.sql'::text),
     ('20261113195431'::text, '0827_a_car_whose_open_door_meets_its_connector_is_cleaned_after_its_charge'::text, '0827_a_car_whose_open_door_meets_its_connector_is_cleaned_after_its_charge.sql'::text),
-    ('20261113210428'::text, '0828_the_arm_is_asked_about_a_car_cleaned_after_its_charge_before_the_car_is_released'::text, '0828_the_arm_is_asked_about_a_car_cleaned_after_its_charge_before_the_car_is_released.sql'::text)
+    ('20261113210428'::text, '0828_the_arm_is_asked_about_a_car_cleaned_after_its_charge_before_the_car_is_released'::text, '0828_the_arm_is_asked_about_a_car_cleaned_after_its_charge_before_the_car_is_released.sql'::text),
+    ('20261114005209'::text, '0830_the_arm_of_a_car_cleaned_after_its_charge_starts_where_the_charge_is_stopped'::text, '0830_the_arm_of_a_car_cleaned_after_its_charge_starts_where_the_charge_is_stopped.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
