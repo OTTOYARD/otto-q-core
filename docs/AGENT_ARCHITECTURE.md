@@ -261,3 +261,13 @@ tuning. Production stays as rule 10 has it: estimates refit overnight, no self-t
 **Found on the way, open:** the fallback model has not answered since 2026-10-14 (G543); wash bays reported idle with a
 car ready on most boards (G541); a car whose charge a fault cut once waited 39 minutes (G542).
 
+**Added 2026-11-13, later the same day (`db/checks/0492`).** Three things changed what is written above.
+(1) The fallback model is fixed (G543): a chain, a probe that says which models answer, and a replay that sends a
+stored pass's own board and brief to any model of the chain with no effect on the depot. That replay is step (a) of the
+training order above, built: it needs a run live, and a candidate prompt still needs a deploy. (2) Its first use
+measured the fallback against the primary on three real boards and found the first directive on record that names its
+subjects and is wrong, so step (b), grading directives against what happened next, is now the gap that matters.
+(3) The agent's own unread report (G541) led to a kernel ordering defect (G544, fixed by 0829). That is the agent
+earning its place in the way E8 describes: it named something on its board that did not add up, and a person followed
+it. Nothing consumed that report automatically, and nothing does yet.
+

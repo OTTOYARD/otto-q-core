@@ -311,6 +311,17 @@ When information is missing:
      run, not on its first consults** (the first wording read 12 of 14 at seven consults and 29 of 117 at thirty); and
      **a deploy is verified by a hash computed before it** (the function records its prompt's sha256, and the repo's
      source gives the same hash).
+     **THE DAY AFTER (`db/checks/0492`, G543, G544; agent v33, `0829`).** The agent's fallback model had answered 404
+     since 2026-10-14 while the provider's public list still named it: **a listing is not proof a key may call a
+     model; the function's own probe is** (`POST {"probe_models": true}`). The fallback is now a chain, and a stored
+     pass can be replayed through any of it with no effect on the depot (`replay_pass_id`). Replayed on three real
+     boards the fallback answered every time, once with no directive and once naming the right cars with the wrong
+     posts, so **"named its subject" is not "was right"**, and a fallback's directive is marked as one. And checking
+     the agent's own report of an idle wash bay found a kernel defect, not an idle bay: `0781`'s yield-to-the-bay-line
+     read a line that still held the cabin cleans `0817` had moved to the posts, and 11 of 15 yielding cars on run
+     `7a08f52a` were held for a bay they would never enter. `0829` takes those atoms out of the line. **When one
+     change moves where work is done, read every function that asks where the work is.** And a migration's number is
+     free only if the ledger says so that day: another branch had applied its own 0824-0828.
 
 **11. OTTO-COMMAND IS THE FILTER AND EXECUTOR FOR PERSONAL AGENTS — added 2026-10-14 in Chase's words.**
 
