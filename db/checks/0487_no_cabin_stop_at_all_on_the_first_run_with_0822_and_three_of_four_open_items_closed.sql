@@ -1,0 +1,52 @@
+-- 0487  **No cabin stop at all on the first run with 0822; and three of db/checks/0486's four open items closed.**
+--        Production, 2026-11-13, 00:24-01:46 UTC (6:24 to 7:46 PM CT on 2026-11-12). Rule 8: the twin depot.
+--        Rule 12: one demo run to show a finished change working; no pair, no sweep. Single runs: readings, not ranges.
+--
+-- ══ (1) 0486 §6 (b), CLOSED BY MEASUREMENT: A CLEAN THAT OUTLASTS ITS CHARGE FINISHES ON ITS POST ═════════════════════
+--
+--   Run 02ca304f: 39 deep cleans were done by a charging post's arm with no cabin stop. Each began a mean 1.8 minutes
+--   after the plug (the latest 32.4). 4 ended after their charge did, by at most 5.4 minutes, and all 4 finished on
+--   the same post. None became a second trip.
+--
+-- ══ (2) 0486 §6 (a), THE TWO SECOND TRIPS: THE CALENDAR, AND 0822 (a) ═════════════════════════════════════════════════
+--
+--   Cars c3333333-0003 (charge 16:53 to 17:52, stop 19:46) and c8c7cd10 (charge 19:11 to 20:09, stop 21:43) had no
+--   clean on the visit during the charge. Read from the source: a cabin's condition is written only at a run's start
+--   and by a finished clean (ottoq_seed_vehicle_need_profiles, ottoq_wear_mark_serviced), so a clean that appears in
+--   mid-run is the interval passing the card's must-do line (1.08 of 336 hours). At that run's end 2 of 116 cars would
+--   pass the line in the next 9 hours, the rate seen. NOT ESTABLISHED for the two cars themselves: their profiles were
+--   rewritten when the clean was done. 0822 (a) writes a clean that is DUE (1.00 of the interval) before the charge.
+--
+-- ══ (3) 0486 §6 (c), THE LONG WAITS, AND 0822 (b) ══════════════════════════════════════════════════════════════════════
+--
+--   On 02ca304f six stops waited 29.8 to 112.7 minutes. The charge step took every free working post each tick, and
+--   the waiting cabin cars shared the one faulted post. 0822 (b) seats a waiting cabin car before the charge step when
+--   the charge line's own ratio puts it first.
+--
+-- ══ (4) RUN cce21ff2 (busy_day, operator_demo, live at 8x; started 00:36 UTC after 0822; read at sim 23:11) ═══════════
+--
+--                                               0e3cc3c2      02ca304f      cce21ff2
+--                                               (0820)        (0821)        (0822)
+--     cabin stops seated                        10            8             0
+--     of them a second trip after a charge      6             2             0
+--     cabin cleans done during the charge       31            39            46
+--     cabin cleans not done at the read         -             5             1
+--     cabin work seated in a wash bay           0             0             0
+--   Three different seeds. Not a series of pairs. The direction is what each change was built for.
+--   WHAT THIS RUN DOES NOT SHOW. With no cabin stop, 0822 (b) was NOT exercised live: no car waited for a stop, so no
+--   car was seated in its turn in the charge line. Its only evidence is the staged test at apply (a parked car at
+--   ratio 3.78 seated ahead of a charge line at 1.10). And a run with no stop is one seed: earlier seeds began with
+--   full cars that had a clean to do, and this one did not.
+--
+-- ══ (5) 0486 §6 (d), THE LIVE VIEW ON A FAULTED-POST STOP: STILL NOT SEEN ═════════════════════════════════════════════
+--
+--   A watcher on the live view ran for the run's last 50 minutes. The run had no cabin stop, so there was nothing to
+--   see. The twin's test for it fails with its change removed (db/checks/0486 §5). OPEN.
+--   ALSO OPEN FROM THAT WATCH: on run 02ca304f the watcher logged no car on a faulted post during six such stops. Not
+--   read whether the headless view lagged the run or the view did not draw them.
+--
+-- ══ (6) WHAT IS OPEN ═══════════════════════════════════════════════════════════════════════════════════════════════════
+--
+--   (a) 0822 (b) on a live run, and its cost to a car waiting to charge when no faulted post is free. Not measured.
+--   (b) The live view on a faulted-post stop (§5).
+--   (c) The check's futures (0620) do not hold cabin stops in the charge line.

@@ -253,6 +253,12 @@ When information is missing:
      second trip. Each car went from the gate straight to a charger with no clean on its visit, because `0820` wrote the
      clean only for a parked car and only after the charge step. `0821` writes it before the charge step, for a car at
      the gate, parked or already charging, and records each stop's charger state on its decision row.
+     **AND `0822` (`db/checks/0487`), 2026-11-12 evening:** a clean that is DUE on the needs card (its full interval has
+     passed; the card forces it only 8% later) is written before the charge, so the charging post's arm does it
+     (`cabin_clean_when_due_at_charge`). And a car waiting for a cabin stop takes the place the charge line's own ratio
+     gives it, never ahead of immediate dispatch or the 90-minute floor (`cabin_stop_in_charge_line`). Both dials are 1 at
+     the twin depot. First run (`cce21ff2`): 0 cabin stops, 46 cleans during a charge, against 10 and 31 two runs before.
+     Three seeds, not pairs. **The second dial was not exercised on that run: no car waited for a stop.**
 
 **10. OTTO-Q DOES NOT EXPERIMENT IN PRODUCTION. HYPOTHESES AND TESTS BELONG TO THE RESEARCH WING, IN THE TWIN — added 2026-09-27 in Chase's words.**
 
