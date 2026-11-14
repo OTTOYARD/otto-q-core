@@ -322,6 +322,18 @@ When information is missing:
      `7a08f52a` were held for a bay they would never enter. `0829` takes those atoms out of the line. **When one
      change moves where work is done, read every function that asks where the work is.** And a migration's number is
      free only if the ledger says so that day: another branch had applied its own 0824-0828.
+     **A DIRECTIVE IS NOW GRADED AGAINST ITS BRIEF (`db/checks/0493`, G545-G547; `0834`, `0835`), 2026-11-14.**
+     `public.ottoq_agent_directive_grades` checks four kinds of claim about a charge a fault cut (the post, the
+     percentage at the cut, charging again or not, the place in the line) against the wake brief of the same pass,
+     only where a sentence's subject is certain. Read at the apply, at the twin depot: the primary model's 494
+     directives on 11 runs hold 0 contradictions; the fallback, which has now answered 24 live passes, holds 4 in its
+     10 graded directives on 3 runs. **Group by `model_answered` before quoting it, and "consistent" is not "right":**
+     339 of 550 directives make no claim it reads. It is read-only and moves nothing; what the edge function does
+     with a contradicted directive is not decided (G546). Two rules from the build: **run a text rule over the stored
+     passes before applying it** (its first draft read the order "Check charging again on available DCFC." as a claim
+     16 times); and **a cause written in a check file is a hypothesis until it is rebuilt from the events**: 0492 had
+     the bay the board calls idle held by a car on its way in, and three of three on run `7435e685` were cars on
+     their way out, in their last tick (G547, no change made).
 
 **11. OTTO-COMMAND IS THE FILTER AND EXECUTOR FOR PERSONAL AGENTS — added 2026-10-14 in Chase's words.**
 

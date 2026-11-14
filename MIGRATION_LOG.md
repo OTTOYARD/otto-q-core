@@ -264,7 +264,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0829 — GENERATED, not a log
+## Index, 0134–0835 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0559, 0560, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0603, 0604, 0605, 0606, 0607, 0608, 0609, 0610, 0611, 0612, 0613, 0614, 0615, 0616, 0617, 0618, 0619, 0620, 0621, 0622, 0623, 0624, 0625, 0626, 0627, 0628, 0629, 0630, 0631, 0632, 0633, 0634, 0635, 0636, 0637, 0638, 0639, 0640, 0641, 0642, 0643, 0644, 0647, 0648, 0649, 0650, 0651, 0652, 0653, 0654, 0655, 0656, 0657, 0658, 0659, 0690, 0691, 0692, 0693, 0694, 0695, 0696, 0698, 0699, 0701, 0714, 0720, 0738, 0749, 0755, 0759, 0760, 0761, 0762, 0763, 0764, 0765, 0766, 0767, 0768, 0769, 0780, 0781, 0782, 0783, 0784, 0785, 0791, 0792, 0793, 0794, 0795, 0796, 0797, 0798, 0799, 0800, 0801, 0802, 0803, 0804, 0805, 0806, 0807, 0808, 0809, 0814, 0815 — which are indexed below as well as logged above; the log row is
@@ -915,7 +915,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0822](db/migrations/0822_a_due_cabin_clean_is_done_during_the_charge_and_a_cabin_stop_takes_its_turn_in_the_charge_line.sql) | `20261113003556` | yes — ledger | **A cabin clean that is due is done during the charge. A car waiting for a cabin stop takes its turn in the |
 | [0823](db/migrations/0823_the_agent_is_told_why_it_was_woken_and_what_it_said_last.sql) | `20261113030227` | yes — ledger | **The agent is told why it was woken, which cars and chargers are behind each reason, and what it said last.** |
 | [0829](db/migrations/0829_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line.sql) | `20261114004743` | yes — ledger | **A car whose cabin clean is done at a charging post is in no bay's line, so it no longer yields its place in |
+| [0834](db/migrations/0834_an_agents_directive_is_graded_against_the_brief_it_answered.sql) | `20261114062710` | yes — ledger | **An agent's directive is graded against the wake brief it answered.** (db/checks/0492 (6)(b), G545) |
+| [0835](db/migrations/0835_the_grades_view_drops_a_mark_a_stored_answer_never_carries.sql) | `20261114062842` | yes — ledger | **The grades view drops a column that is NULL on every row by construction.** (G545; my own correction of 0834) |
 
-632 migrations indexed.
+634 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
