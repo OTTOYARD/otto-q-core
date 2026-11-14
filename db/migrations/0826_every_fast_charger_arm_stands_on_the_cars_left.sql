@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261114160047
 -- migration-name:    0826_every_fast_charger_arm_stands_on_the_cars_left
 --
 -- 0826  **Every fast-charger post's arm stands on the car's left.**
@@ -85,3 +85,24 @@ VALUES ('0826_every_fast_charger_arm_stands_on_the_cars_left', true, false,
         'Every fast-charger post reads arm side left. V3 at apply: '
         || COALESCE((SELECT result::text FROM _0826_selftest LIMIT 1), 'no result'), now());
 COMMIT;
+
+-- APPLIED 2026-11-14 at 16:00:47 UTC (10:00 AM CT), ledger 20261114160047, through apply_migration, on the first send.
+--   Before it: ottoyarddepot-sim#170 was merged (05:26 UTC), and the live app (otto-twin.lovable.app) was read at
+--   15:5x UTC and carried that build (the per-opening card text was in its bundle; it was not at 05:3x UTC).
+--   No run was live. V3 at apply: posts 30, posts_left 30, cars 116, cars_that_fit_no_post 0.
+--   The run started to check it: a7345255.
+--   RUN a7345255 AT ITS END (744 ticks, ended 2026-11-14 17:10:00 UTC, read 17:12 UTC), beside run 7435e685 (the
+--   same fleet, the night before, with the west column's arms still read as right). Twin depot, fast-charger posts:
+--                                       7435e685 (before)     a7345255 (after)
+--     sessions, east / west column        164 / 85             159 / 165
+--     of them cars with a left inlet      155 / 0              107 / 114
+--     post-hours charging, east / west    108 / 40             111 / 103     (of 135 a column over the 9-hour day)
+--     charge sessions in the run          249                  324
+--     departures (state to deployed)      159                  304
+--     sim_tick_failed                     53                   1
+--   So left-inlet cars now charge in the west column, and the posts charged 214 post-hours against 148.
+--   The wait from a visit's arrived_at to its first session did NOT fall: 267 visits, median 47 min, 90th 160, longest
+--   179, 129 over 60 min, against 214 visits, median 10, 90th 224, longest 255, 65 over 60. There were more visits and
+--   nearly twice the departures, so more cars came back for a charger; and arrived_at is rewritten when a visit is
+--   remade, so both are upper readings. Two runs on two seeds: single readings, not a pair.
+--   NOT EXPLAINED: why the decide-half deadlocks fell from 53 to 1. Nothing in this file was written to change them.
