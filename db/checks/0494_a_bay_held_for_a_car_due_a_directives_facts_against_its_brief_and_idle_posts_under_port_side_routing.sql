@@ -23,6 +23,10 @@
 --    WHAT IT DOES NOT SAY. That any car waited for a wash bay: on a95e51a3 cars entered one a median 1.9 minutes
 --    after staging (0492 §4). The three boards left are not explained here.
 --    FIX: db/migrations/0836 (public.ottoq_depot_constraint, the bays only). §7 has its apply and its first run.
+--    AGAINST G547. Another branch read the same open item the same night (its db/checks/0493 §1) and answered it "not
+--    a defect": where the board's busy count is under the STALL POINTERS, the pointer is a car that finished and left
+--    27 to 126 sim-seconds later. That is the pointer gate; this section is the CALENDAR gate (CLAUDE.md Part 3: no
+--    one gate dominates). Both hold. 0836 was first written to read the pointer too; it does not, for G547's reason.
 --
 -- §2 MEASURED AWAY: THE WASH BAYS' "detail" BOOKINGS BLOCK NOTHING.
 --
@@ -49,6 +53,12 @@
 --    another part of the brief. Those five are not established as the model's error.
 --    The fallback's: minutes copied from its own last answer ("cut 46 min ago" at 72 and at 102 minutes), a post the
 --    brief never gave the car, a place in line.
+--    THE SAME NIGHT, APART: another branch applied 0834 and 0835 (06:27 and 06:28 UTC), a database grader of stored
+--    passes (public.ottoq_agent_directive_grade, the view ottoq_agent_directive_grades; its G545), and left open what
+--    the edge function should do with a contradicted directive (its G546). It reads 4 contradictions in the
+--    fallback's 10 graded directives and none in the primary's 201; it grades "charging again" and does not read
+--    minutes. This section's module reads minutes and does not grade "charging again". The two were not written
+--    against each other. Owed once both are on main: one test holding both to the same cases.
 --    WHAT WAS BUILT. edge-functions/_shared/agent_directive_facts.ts. Every miss is counted on the pass
 --    (levers.directive_facts and the decision row). A directive a FALLBACK model wrote that contradicts the brief is
 --    not applied; it is kept, with what it said and what the brief holds, in the rejected list. The primary's are
@@ -150,3 +160,14 @@ SELECT left(e.sim_run_id::text, 8) run, to_char(min(e.recorded_at), 'MM-DD HH24:
  WHERE e.consulted AND e.board_text LIKE '{%' AND p.r ->> 'resource' = 'posts'
    AND e.depot_id = '11111111-1111-1111-1111-111111111111' AND e.recorded_at > '2026-11-12 00:00+00'
  GROUP BY e.sim_run_id HAVING count(*) >= 12 ORDER BY min(e.recorded_at);
+
+-- §7 0836 AT THE APPLY, AGENT v34 ON ITS FIRST CONSULTS.
+--
+--    0836 applied 2026-11-14 07:23:52 UTC (1:23 AM CT), ledger 20261114072352, between runs, P0-P2 and V1-V3 passing
+--    inside the file; the live body's md5 is b53c0da0…, the one tests/test_depot_constraint_held_bay_sql.py ran
+--    (13 tests on 0783's harness; 12 of 12 hand mutations caught).
+--    Agent v34 deployed as function version 50 at 06:27:19 UTC, nine of nine files equal to the repo's bytes fetched
+--    back. On run 7435e685 from then to its end (07:00:00 UTC): 16 consults, each recording prompt hash 067422dd…,
+--    the hash computed from the repo before the deploy; 88 of 88 subjects named; 6 passes with a directive about a
+--    cut car, 11 facts read, 0 wrong, 0 refused; every one answered by the primary. So the refusal of a fallback's
+--    contradicted directive has not yet been seen on a live pass.

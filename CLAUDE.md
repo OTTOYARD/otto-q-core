@@ -322,6 +322,13 @@ When information is missing:
      `7a08f52a` were held for a bay they would never enter. `0829` takes those atoms out of the line. **When one
      change moves where work is done, read every function that asks where the work is.** And a migration's number is
      free only if the ledger says so that day: another branch had applied its own 0824-0828.
+     **AND THE NIGHT AFTER (`db/checks/0494`, G548, G549; agent v34, `0836`).** A directive's facts about a cut car
+     are read against the brief the model was sent: the primary had 7 wrong of 478, the first fallback 10 of 32, and
+     a fallback's directive with a wrong fact is no longer applied. The board (0836) no longer calls a bay idle with a
+     car ready when the calendar has a car reaching it within 10 minutes. **Three sessions worked the same open items
+     that night and two built a directive grader apart; before building an open item, fetch every branch and read
+     the ledger's last names, not only main.** And the reading that mattered most was not the agent's: under
+     charge-port-side routing 7 to 11 posts stand idle while 35 to 43 cars queue (G549).
 
 **11. OTTO-COMMAND IS THE FILTER AND EXECUTOR FOR PERSONAL AGENTS — added 2026-10-14 in Chase's words.**
 
