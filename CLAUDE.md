@@ -325,7 +325,10 @@ When information is missing:
      **AND THE NIGHT AFTER (`db/checks/0494`, G548, G549; agent v34, `0836`).** A directive's facts about a cut car
      are read against the brief the model was sent: the primary had 7 wrong of 478, the first fallback 10 of 32, and
      a fallback's directive with a wrong fact is no longer applied. The board (0836) no longer calls a bay idle with a
-     car ready when the calendar has a car reaching it within 10 minutes. **Three sessions worked the same open items
+     car ready when the calendar has a car reaching it within 10 minutes; on its first run that was 4 boards of 29, and
+     the rate of "idle with a car ready" did not visibly move, because my evidence for it read each booking's window as
+     stored afterwards. **A stored range that functions rewrite (`ottoq_stall_bookings.during`, ten writers) is not what
+     it was at an earlier clock: read `ottoq_bay_binding_witness` before saying what the calendar held.** **Three sessions worked the same open items
      that night and two built a directive grader apart; before building an open item, fetch every branch and read
      the ledger's last names, not only main.** And the reading that mattered most was not the agent's: under
      charge-port-side routing 7 to 11 posts stand idle while 35 to 43 cars queue (G549).

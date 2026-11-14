@@ -15,6 +15,11 @@
 --   So on most of those boards the idle bay was already a car's: the calendar had seated it and the car was on its way
 --   in. The agent wrote a directive about an idle wash bay each time (G541). Three boards remain (the next wash began
 --   11.2, 16.8 and 23.0 minutes later); they are left to read as they are.
+--   CORRECTION 2026-11-14, after the first run (db/checks/0494 §8): the bookings above were read as the table held
+--   them afterwards. `during` is rewritten at activation, so "already on the calendar" at the board's clock is not
+--   established for them. This file's function reads the calendar as it stands at the clock it is given, which is
+--   right; on run 7c967d67 that was a bay held on 4 boards of 29, and the rate of "idle with a car ready" did not
+--   visibly move.
 --   Also read: the wash bays' busy count was under the calendar's on 5 of the 81 boards (a booking running, the car's
 --   state not yet in the bay).
 --

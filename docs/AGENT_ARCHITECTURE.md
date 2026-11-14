@@ -284,11 +284,13 @@ Read in `db/checks/0494`. Two open items from the day before, and one reading th
   test holding the two to the same cases is owed.
 - **The fallback answers live passes**: 24 since 2026-11-13, 70 directives.
 - **The board's bay count** (0836): a bay a held or active booking covers is busy, a bay a booked car reaches within
-  10 minutes is `held_for_car_due`, and neither is "idle with a car ready". On 13 of the 16 boards that still read
-  an idle wash bay with a car ready after 0829, the calendar had already seated a car there.
+  10 minutes is `held_for_car_due`, and neither is "idle with a car ready". First run (`7c967d67`): held on 4 of 29
+  boards, and wash bays still read idle with a car ready on 5 of 29. The evidence it was built on read each
+  booking's window as stored afterwards, and `during` is rewritten at activation, so the count is correct and the
+  rate did not visibly move (0494 §8).
 - **Not the agent's, and larger than both**: under charge-port-side routing (0824) the stored boards read 7 to 11
   posts idle while 35 to 43 cars queue (G549). The agent names the queue; it has no lever on it, and should not.
 
 What the agent still cannot do: nothing checks the brief against the depot, the fact check reads cut cars only, and
-no fallback directive has yet been refused on a live pass.
+no fallback directive has yet been refused on a live pass (first whole run: 29 consults, 38 facts, 0 wrong).
 

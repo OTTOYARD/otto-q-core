@@ -171,3 +171,36 @@ SELECT left(e.sim_run_id::text, 8) run, to_char(min(e.recorded_at), 'MM-DD HH24:
 --    the hash computed from the repo before the deploy; 88 of 88 subjects named; 6 passes with a directive about a
 --    cut car, 11 facts read, 0 wrong, 0 refused; every one answered by the primary. So the refusal of a fallback's
 --    contradicted directive has not yet been seen on a live pass.
+
+-- §8 THE FIRST WHOLE RUN (7c967d67, busy_day, started 07:24:03 UTC, ended 08:32:00 UTC at 725 ticks; read 08:39 to
+--    08:45 UTC), AND A CORRECTION TO §1.
+--
+--    AGENT v34. 29 consults, each recording prompt hash 067422dd…; 28 answered by the primary, 1 unanswered, none by
+--    a fallback. 109 of 109 subjects named. 22 directives about a cut car on 13 passes, 38 facts read, 0 wrong,
+--    0 refused. The refusal of a fallback's contradicted directive is still not seen on a live pass.
+--
+--    THE BOARD UNDER 0836. All 29 boards carry held_for_car_due. It was above 0 on 4 (3 wash-bay boards, 1
+--    service-bay board), and on those "idle with a car ready" read 0. busy + held never exceeded the bays up, and
+--    busy_now was never under the bookings covering the clock.
+--    "Idle with a car ready" was still above 0 on 7 boards (5 wash-bay, 2 service-bay). On 4 of the 7 a reservation
+--    booked 40 to 422 sim minutes before the board became active 0.4, 0.5, 2.1 and 6.4 minutes after it.
+--
+--    THE CORRECTION. §1 read each booking's window as the table holds it NOW and called that "already on the
+--    calendar". It is not what the calendar held at the board's clock: ten functions rewrite `during`
+--    (ottoq.ottoq_activate_due_bay_reservations, ottoq_reconcile_bay_reservations, ottoq_yield_bay_holds and seven
+--    more), and public.ottoq_bay_binding_witness shows it for these four: at held>active the window's start IS the
+--    moment of activation. So the reservation existed at the board's clock with a window somewhere else, and 0836,
+--    which reads the calendar as it stands at the board's clock, rightly did not count it within 10 minutes.
+--    So §1's "on 13 of the 16 the idle bay was a booked car's and the car was on its way in" is NOT ESTABLISHED. What
+--    is: on 13 of the 16 a booking that existed before the board began within 10 minutes of it. Where its window
+--    stood at the board is not recoverable from the booking row.
+--    WHAT 0836 IS, THEN. It counts a bay busy when a booking is running on it and held when the calendar, as it
+--    stands, brings a car within 10 minutes: 4 boards of 29 on this run. It does not remove the common case, a ready
+--    car holding a reservation for later that the engine moves up a tick or a few later. Wash bays read idle with a
+--    car ready on 5 of 29 boards here against 16 of 81 on the three runs before: unpaired, and no change shown.
+--    WHAT IS LEFT, AND NOT BUILT. A bay idle with a ready car for one tick is the engine's own lag; for 2.1 and 6.4
+--    minutes it is a reservation not moved up for several ticks. Widening `held` to any reservation at any horizon
+--    would hide exactly the car that is never moved up, which is what the count exists to show. The honest next read
+--    is how long each such moment lasts, from the witness, before anything else is changed.
+--    THE RULE. A stored range that functions rewrite is not what it was at an earlier clock. Read the witness of its
+--    transitions before saying what a calendar held.
