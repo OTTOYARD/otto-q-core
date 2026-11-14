@@ -867,7 +867,8 @@ repo_manifest(version, name, file) AS (
     ('20261113195431'::text, '0827_a_car_whose_open_door_meets_its_connector_is_cleaned_after_its_charge'::text, '0827_a_car_whose_open_door_meets_its_connector_is_cleaned_after_its_charge.sql'::text),
     ('20261113210428'::text, '0828_the_arm_is_asked_about_a_car_cleaned_after_its_charge_before_the_car_is_released'::text, '0828_the_arm_is_asked_about_a_car_cleaned_after_its_charge_before_the_car_is_released.sql'::text),
     ('20261114005209'::text, '0830_the_arm_of_a_car_cleaned_after_its_charge_starts_where_the_charge_is_stopped'::text, '0830_the_arm_of_a_car_cleaned_after_its_charge_starts_where_the_charge_is_stopped.sql'::text),
-    ('20261114031206'::text, '0831_a_car_cleaned_after_its_charge_is_cleaned_on_an_immediate_turnaround_too'::text, '0831_a_car_cleaned_after_its_charge_is_cleaned_on_an_immediate_turnaround_too.sql'::text)
+    ('20261114031206'::text, '0831_a_car_cleaned_after_its_charge_is_cleaned_on_an_immediate_turnaround_too'::text, '0831_a_car_cleaned_after_its_charge_is_cleaned_on_an_immediate_turnaround_too.sql'::text),
+    ('20261114034649'::text, '0832_a_clean_cut_short_by_a_charger_fault_is_asked_for_again_where_the_next_charge_is_stopped'::text, '0832_a_clean_cut_short_by_a_charger_fault_is_asked_for_again_where_the_next_charge_is_stopped.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

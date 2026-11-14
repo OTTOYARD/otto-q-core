@@ -117,3 +117,6 @@ COMMIT;
 --   first send. No run was live. cabin_robot_after_charge was 1 at the twin depot at the apply.
 --   Stored after the apply, md5(prosrc): ottoq_start_concurrent_atoms 945eb1352d036d62aeabcd34526b0df5.
 --   The run started to check it: 1902d13b (read in db/checks/0491 when it has run).
+--   READ at tick 349 of run 1902d13b (03:46 UTC): the three kinds, 88 charged visits: 87 cleaned by the arm, 27 of
+--   them an owner's immediate turnaround, 0 left for being one; 1 not cleaned (a charger fault cut the arm's clean
+--   short: 0832). No car under a demate tether more than 12 sim minutes past its end.

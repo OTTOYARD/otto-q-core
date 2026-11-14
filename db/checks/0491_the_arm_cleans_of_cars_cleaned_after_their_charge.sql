@@ -82,6 +82,17 @@
 --   The 28 immediate turnarounds had no routine arm clean (0765's rule; see the note above). Put to Chase 2026-11-13
 --   evening CT; not changed.
 --
+-- AFTER 0831 (an immediate turnaround of the three kinds is cleaned too; Chase, 2026-11-13: charge then clean is one
+--   stop). Run 1902d13b, read at tick 349 (2026-11-14 03:46 UTC):
+--     the three kinds  88 charged · 87 arm (27 of them immediate turnarounds) · 0 immediate not cleaned · 1 missed
+--     other kinds       29 charged · 29 arm (15 immediate)
+--   meta.arm_after_charge, 90 stops: arm_at_work 75, asked -> arm_started 15. No error. No car under a demate tether
+--   more than 12 sim minutes past its end.
+--   The 1 missed (d9d2a011): the arm started with 1.8 minutes of charge left, the charger faulted
+--   (fault.session_aborted_other), the car left the post and the routine was cancelled as interrupted. The visit had no
+--   later stop. 0832 (applied 03:46:49 UTC) lets a later stop on the same visit ask again; that case is not yet seen.
+--   Mid-run read; the run's end is not read here yet.
+--
 -- TO READ THE STOP DOOR ON A RUN:
 --   SELECT n.meta->'arm_after_charge'->>'why' why, n.meta->'arm_after_charge'->>'result' result, count(*)
 --     FROM ottoq_visit_needs n WHERE n.sim_run_id = :'run' AND n.meta ? 'arm_after_charge' GROUP BY 1, 2;
