@@ -103,6 +103,25 @@
 --               visit was superseded. This is 0817's path, not 0827's; whether the newer visit carried the deep clean
 --               on is NOT read here.
 --   So no visit of the three kinds went without the arm unless a charger fault was on it. One run.
+--   5ea53696 TRACED (2026-11-14 04:4x UTC): nothing was dropped. The car stood in the depot from sim 14:06
+--   (staged_awaiting_service) to 17:34, charged 17:34-17:42 (faulted), again 18:23-18:38, and its deep clean was done
+--   by the arm 18:38-18:49 on the visit made at the fault (989216e9: asked -> arm_started, 2 atoms). It left at 18:49.
+--   It waited 3 h 28 min for a post first.
+--
+-- HOW LONG A CAR OF THE THREE KINDS HELD ITS POST AFTER ITS CHARGE, run 1902d13b (arm work's end less the stop):
+--     routine, arm already at work at the stop   83 visits · median 2.1 min · 4.0 post-hours
+--     routine, started at the stop               16 visits · median 5.8 min · 1.6 post-hours
+--     deep clean, arm already at work            15 visits · median 8.2 min · 2.1 post-hours
+--     deep clean, started at the stop            15 visits · 10.8 min       · 2.7 post-hours
+--   10.4 post-hours in all, of 30 posts over a 9-hour day (270). So 0827's lead (3.5 min) already starts most routine
+--   cleans during the charge. A two-step engine clean (start early, hold only what waited) was weighed and NOT built:
+--   it could give back about 4 of those post-hours. The deep clean is the larger part: its 10.8-minute program starts
+--   at most 3.5 minutes before the charge ends. A longer lead for a visit with a deep clean is the small change left.
+--   NOT ESTABLISHED: why cars waited long for a post on this run (visits with a charge done: 27 of 144 waited more
+--   than 60 min from arrived_at to their first session, the longest 377 min; arrived_at is also written when a visit
+--   is remade, so this is an upper reading). charge_port_side_routing confines 78 of 116 cars to the 15 posts whose
+--   arm reads left until 0826 is applied, which waits on ottoyarddepot-sim#170. Two reads of post-hours by arm side
+--   for sim 18:00-22:00 did not agree with each other (61 against 85 post-hours in all), so no split is quoted.
 --
 -- TO READ THE STOP DOOR ON A RUN:
 --   SELECT n.meta->'arm_after_charge'->>'why' why, n.meta->'arm_after_charge'->>'result' result, count(*)
