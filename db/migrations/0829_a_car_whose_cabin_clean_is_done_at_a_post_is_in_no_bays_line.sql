@@ -231,7 +231,7 @@ BEGIN
   END IF;
 END $v3$;
 
-DROP FUNCTION pg_temp._0829_pre(uuid, uuid, timestamp with time zone);
+-- pg_temp._0829_pre is the session's own and goes with it: no statement here drops anything.
 
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, forces_dial_restart, note, classified_at)
 VALUES ('0829_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line', false, false,
