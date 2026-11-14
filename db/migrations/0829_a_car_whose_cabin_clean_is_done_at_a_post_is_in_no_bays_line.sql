@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261114004743
 -- migration-name:    0829_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line
 --
 -- 0829  **A car whose cabin clean is done at a charging post is in no bay's line, so it no longer yields its place in

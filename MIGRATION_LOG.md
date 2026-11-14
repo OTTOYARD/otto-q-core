@@ -914,7 +914,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0821](db/migrations/0821_a_car_to_charge_has_its_cabin_clean_on_its_visit_before_it_is_seated_and_a_cabin_stop_records_its_posts_charger.sql) | `20261112202531` | yes — ledger | **A car to charge has its cabin clean on its visit before it is seated. A cabin stop's decision records its |
 | [0822](db/migrations/0822_a_due_cabin_clean_is_done_during_the_charge_and_a_cabin_stop_takes_its_turn_in_the_charge_line.sql) | `20261113003556` | yes — ledger | **A cabin clean that is due is done during the charge. A car waiting for a cabin stop takes its turn in the |
 | [0823](db/migrations/0823_the_agent_is_told_why_it_was_woken_and_what_it_said_last.sql) | `20261113030227` | yes — ledger | **The agent is told why it was woken, which cars and chargers are behind each reason, and what it said last.** |
-| [0829](db/migrations/0829_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line.sql) | `PENDING` | no — pending | **A car whose cabin clean is done at a charging post is in no bay's line, so it no longer yields its place in |
+| [0829](db/migrations/0829_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line.sql) | `20261114004743` | yes — ledger | **A car whose cabin clean is done at a charging post is in no bay's line, so it no longer yields its place in |
 
 632 migrations indexed.
 
