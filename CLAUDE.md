@@ -429,6 +429,35 @@ When information is missing:
    - **What an owner asks for is the owner's requirement** and is honored as asked (rule 9). When every car at a depot is
      one owner's, the rule changes nothing.
 
+**15. A SERVICE BAY VISIT IS RARE. MORE THAN TWO OR THREE CARS A DAY IN THE SERVICE BAYS IS A DEFECT TO FIND, NOT A LINE TO MANAGE — added 2026-11-14 in Chase's words.**
+
+   *"a service bay should be extremely rare or even quarterly from an annual perspective unless there's a major issue
+   with the vehicle like flat tire or malfunction of some sort. So for more than two or three vehicles a day to visit
+   the service bay would be way too much. ... They should also be the type of logic that you should catch as a fleet
+   expert."*
+
+   - **A car goes to a service bay about once a quarter for scheduled work, and otherwise only for a real fault** (a
+     flat tire, a malfunction). At the twin depot's 116 cars that is one or two scheduled visits a day.
+   - **A day that sends more than two or three cars to the service bays is read as wrong before it is read as busy.**
+     Find what generated the visits (a scenario's scale, a draw, a rule that raises a service) before measuring the
+     line, ordering it or naming it a capacity finding. Rule 9 holds every car until its service is done, so a
+     service nobody would ask for holds a car for nothing.
+   - **This was missed for months, and it had two generators** (`db/checks/0494`, G548, G549). The busy_day scenario
+     multiplied every car's maintenance interval by 0.01 and its calibration interval by 0.02, and the twin drew
+     maintenance, calibration, a cosmetic repair and a fault repair on every arrival, whatever the car's mileage. On
+     run `7c967d67`, 102 of 116 cars owed a `mechanical_pm` in 9.1 sim-hours. On 2026-11-14 I read 75 cars in that
+     line and filed it as the known wall. `0837` sets both scales to 1. `0838` promotes version 2 of the
+     `service_manifest` plan: scheduled service comes only from a car's own interval falling due (`0715`), and a fault
+     (0.2% of arrivals) and a cosmetic repair (0.05%) are rare; those two rates are assumptions. The same seed read 20
+     cars with service-bay work after `0837` and 6 after both (3 intervals due, 2 faults, 1 calibration from a
+     failed-clean escalation). **Six is still above the bound, on one seed.** Open, and Chase's: the intervals (about
+     42 and 68 days at this fleet's driving, not quarterly) and the two rates.
+   - **Every busy_day figure from before `0837` describes a depot with that line in it:** the service bays' wall
+     (G500-G503), the cars a bay held, the charge line's yield to the bay line (`0781`), the recalls for service.
+     Re-read one on a run after `0838` before quoting it.
+   - **The general test, for any number the twin makes:** would a fleet manager believe a real depot did this in a
+     day? If not, the number is the simulator's, and the cause comes before the analysis.
+
 ---
 
 # PART 2 — THE KERNEL BRIEF
