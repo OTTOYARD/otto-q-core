@@ -66,6 +66,22 @@
 --   arm clean at all (0765's rule: it is not held past its charge for a clean it did not need). With the setting off
 --   it is cleaned during its charge, right side only in the twin. A needed tidy is still done.
 --
+-- THE FIRST RUN UNDER 0830, c8913ea2 (busy_day, started 2026-11-14 01:56:5x UTC; cabin_robot_after_charge set to 1 at
+--   the twin depot at 01:56:50 UTC, before the run; lead 3.5). Visits with a charge done:
+--     at tick 296 (02:24 UTC):   the three kinds  81 charged ·  63 arm · 18 immediate turnarounds · 0 missed
+--                                other kinds       30 charged ·  30 arm
+--     at its end, 682 ticks (read 03:10 UTC; run ended 03:02:00 UTC):
+--                                the three kinds 135 charged · 107 arm · 28 immediate turnarounds · 0 missed
+--                                other kinds       59 charged ·  59 arm
+--   meta.arm_after_charge at the end, 141 stops: arm_at_work 81 (the arm had started in the last minutes of the
+--   charge), asked -> arm_started 32, asked -> decided:immediate_turnaround 12, decided:immediate_turnaround 16 (decided
+--   before the stop). No error recorded. No visit of the three kinds was tidied by another performer.
+--   At tick 296 no car stood under a demate tether more than 12 sim minutes past its end.
+--   Against 29 missed of 72 with the setting on before 0830 (run c86b46e1). One run; superseded visits had left the
+--   table at each read, so the counts are of the visits still in it.
+--   The 28 immediate turnarounds had no routine arm clean (0765's rule; see the note above). Put to Chase 2026-11-13
+--   evening CT; not changed.
+--
 -- TO READ THE STOP DOOR ON A RUN:
 --   SELECT n.meta->'arm_after_charge'->>'why' why, n.meta->'arm_after_charge'->>'result' result, count(*)
 --     FROM ottoq_visit_needs n WHERE n.sim_run_id = :'run' AND n.meta ? 'arm_after_charge' GROUP BY 1, 2;

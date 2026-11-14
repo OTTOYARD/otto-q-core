@@ -257,3 +257,7 @@ COMMIT;
 --   ottoq_sim_stop_charge_session 9a77b89af1c864f69cae788498fe367b, ottoq_arm_after_charge_at_stop
 --   acfc71471598f0e7959cca7f0cc29d38.
 --   cabin_robot_after_charge at the twin depot: 0 at the apply (off since 2026-11-13 21:58:23 UTC).
+--   SET TO 1 at the twin depot on 2026-11-14 at 01:56:50 UTC (2026-11-13, 7:56 PM CT), after run 14d6eda7 ended
+--   (01:56:00 UTC), under 'Chase (delegated to Claude Code: 0830)'.
+--   THE FIRST RUN UNDER IT, c8913ea2 (db/checks/0491): the three kinds, 135 charged visits at its end: 107 cleaned by
+--   the arm, 28 an owner's immediate turnaround, 0 missed. 32 arm cleans were started at the stop of the charge.
