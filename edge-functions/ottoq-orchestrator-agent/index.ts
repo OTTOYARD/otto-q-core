@@ -10,6 +10,43 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v33 (db/checks/0489, G543): THE FALLBACK IS A CHAIN, AND THE FUNCTION CAN SAY WHICH MODELS ANSWER.
+//      v23's one fallback model, nvidia/nemotron-3-super-120b-a12b, last answered on 2026-10-14. Since then it has
+//      returned HTTP 404 on every key (85 passes in 30 days), so a primary timeout was a pass with no answer; the
+//      endpoint's public model list still names it (read 2026-11-13), which is why nothing looked wrong.
+//      * The fallback is now FALLBACK_MODELS, tried in order after the primary. A model no key may call (404 on
+//        every key, in about 50 ms each) costs nothing but the attempts, so the old name stays last in case it
+//        returns. The attempt cap counts every key for every model.
+//      * _shared/agent_model_call.ts counts a model's key refusals per model (it used to test whether the key index
+//        had wrapped, which gave a model up early once a 429 had moved the index).
+//      * POST {"probe_models": true} asks each model of the chain for a six-token JSON answer on each key and returns
+//        what each said (status and milliseconds, never a key). It reads no depot row, writes nothing and claims no
+//        tick. It is how the chain's order was chosen and how a dead model is found before a run finds it.
+//      * POST {"fallback_only": true} (with a run) makes that one pass ask the fallbacks without the primary, so a
+//        fallback's answer to a real board can be read before a primary failure needs it. The pass is recorded like
+//        any other, with the models it asked.
+//      * POST {"replay_pass_id": N} (while a run is live) sends a stored pass's own board and brief, exactly as that
+//        pass sent them, to the models again and returns the answer, its timing and how many of the brief's subjects
+//        its directives name. It claims no tick, reaches no door and writes nothing: the depot cannot tell it ran.
+//        With "fallback_only" it asks the fallbacks, which is how a fallback's answer to a real board is read.
+//      * A directive is kept to 1,200 characters, not 400. v32 asks for the scout findings of one kind in ONE
+//        directive naming every car; on run 9085ca36 the model named 135 of the 136 subjects its briefs marked new
+//        and the applied directives, cut at 400, kept 101 of them (db/checks/0489).
+//      * The primary's attempt is bounded at 65 s, not 75, so a fallback has 25 s and not 15; and a directive a
+//        fallback model wrote carries by_fallback_model.
+// v32 (0823; db/checks/0488, G540): THE AGENT IS TOLD WHY IT WAS WOKEN, AND WHAT IT SAID LAST.
+//      Since 0795 the agent is consulted on exceptions, and the wake gate knows why each consult happened, but the
+//      model was sent its board alone. Of 286 answered consults at the twin depot from 2026-11-05 to 2026-11-13, none of
+//      the 5 woken by an emergency mentions one, all 286 chose the same solver objective and none changed engine state.
+//      With agent_wake_brief on, a consulted pass reads public.ottoq_agent_wake_brief (read-only: the gate's reasons,
+//      each count changed since the last answer, the cars and chargers behind each reason, the directives issued last),
+//      puts it ahead of the board in the model's message, appends the section that says how to answer it
+//      (_shared/agent_wake_brief.ts), and keeps it on the decision row and the evidence row as wake.brief, with how
+//      many of its subjects the directives named. A directive may carry "about". No new lever: the agent proposes
+//      what it could before. With no brief (the dial at 0, the function missing, an error) the message and the prompt
+//      are v31's, byte for byte.
+//      _shared/agent_rule_nine.ts: a charge a fault cut, described ("ended at 75% when the charger faulted"), is no
+//      longer refused as an instruction to end a charge.
 // v31 (0783, 0781; db/checks/0470 §5, G503): THE BOARD SAYS WHERE THE WALL IS, AND THE AGENT IS TOLD TO READ IT.
 //      On run 78c0624c the agent was consulted 266 times and named the chargers as the depot's constraint while the two
 //      service bays were the wall at 6.9 times their capacity: nothing on its board compared a resource's queued work
@@ -194,6 +231,8 @@ import { callModelWithRetry } from "../_shared/agent_model_call.ts";
 import { chargeOrderAccepted, chargeQueueOf, normalizeChargeOrder, withChargeOrder } from "../_shared/agent_charge_order.ts";
 import { boardText, classifyPass, leversOf, readWake, sha256Hex, standingObjective, type OutcomeClass, type Wake }
   from "../_shared/agent_pass_evidence.ts";
+import { briefCoverage, directiveAbout, readBrief, userMessageOf, withWakeBrief, type WakeBrief }
+  from "../_shared/agent_wake_brief.ts";
 import {
   KNOBS, WORK_SIDE_KEYS, OPS_ACTION_DIAL, INERT_KEYS, INERT_OPS,
   clampDial, currentDialValue, reversalDwellMin, admitDialChange, opsActionDirection, reversalHold,
@@ -203,20 +242,62 @@ const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers
 function json(o: unknown, s = 200) { return new Response(JSON.stringify(o), { status: s, headers: { ...cors, "Content-Type": "application/json" } }); }
 
 const OPS_WHITELIST = new Set(Object.keys(OPS_ACTION_DIAL));
+const AGENT_VERSION = "v33";
 
 const NV_KEYS = ["NVIDIA_API_KEY_NEMOTRON", "NVIDIA_API_KEY_CUOPT", "NVIDIA_API_KEY"];
 const NV_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 const MODEL = "nvidia/nemotron-3-ultra-550b-a55b";
-// v23. The fallback when the primary refuses twice. Listed by https://integrate.api.nvidia.com/v1/models on
-// 2026-10-07. Its model card (https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8, v1.0 GA,
-// released 2026-03-11; read 2026-10-07) documents reasoning off via chat_template_kwargs enable_thinking=false and
-// says to "use temperature=1.0 and top_p=0.95 across all tasks", so this model is sent those; the primary keeps the
-// 0.1 it has run on since v15.
-const FALLBACK_MODEL = "nvidia/nemotron-3-super-120b-a12b";
+// v33 (G543). The fallbacks, in the order they are tried when the primary does not answer. Each is named by
+// https://integrate.api.nvidia.com/v1/models (read 2026-11-13 13:25 UTC). The order is the probe's (db/checks/0489):
+// a model that answered the probe, smallest first, because a primary timeout leaves the fallback about 15 s; then
+// v23's nemotron-3-super, which that list still names and which has answered 404 since 2026-10-14.
+const SUPER_MODEL = "nvidia/nemotron-3-super-120b-a12b";
+const FALLBACK_MODELS = [
+  "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "nvidia/nemotron-4-340b-instruct",
+  SUPER_MODEL,
+];
+const MODELS = [MODEL, ...FALLBACK_MODELS];
+// Sampling per model. The primary keeps the 0.1 it has run on since v15. nemotron-3-super's model card
+// (https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8, v1.0 GA, read 2026-10-07) says to "use
+// temperature=1.0 and top_p=0.95 across all tasks". No card was read for the other two, so they are sent no
+// temperature and run on the endpoint's default.
+const DIRECTIVE_MAX_CHARS = 1_200;
+
+/** The request body for one model: the same for a live pass and for a replay of one. */
+function chatBody(model: string, system: string, userMessage: string, maxTokens: number): Record<string, unknown> {
+  return {
+    model,
+    ...samplingFor(model),
+    max_tokens: maxTokens,
+    chat_template_kwargs: { enable_thinking: false }, // fast structured output for the control loop
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: userMessage },
+    ],
+  };
+}
+
+/** The model's answer, or null when it does not parse into an object with an actions array. */
+function parseAnswer(content: string): unknown | null {
+  const candidate = extractJson(content) as any;
+  return candidate && Array.isArray(candidate.actions) ? candidate : null;
+}
+
+function samplingFor(model: string): Record<string, number> {
+  if (model === MODEL) return { temperature: 0.1 };
+  if (model === SUPER_MODEL) return { temperature: 1.0, top_p: 0.95 };
+  return {};
+}
 // v21 (G188). Live-era p95 agent latency is 66.6 s (CLAUDE.md 2.5, 0417), so 75 s keeps the calls
 // that answer and ends the ones that never will. Both bounds together stay under the runtime's
 // 150 s wall clock, so the decision below is always written.
-const MODEL_TIMEOUT_MS = 75_000;
+// v33 (db/checks/0489): 65 s, not 75. Over the 14 days to 2026-11-13 the primary answered 438 of 458 attempts at the
+// twin depot: p95 40.1 s, p99 59.3 s, the slowest 67.9 s, and 15 timed out. Replayed on three real boards the first
+// fallback took 5.0, 11.5 and 14.1 s, and 75 s left it 15. At 65 s it has 25; the cost is the one or two primary
+// answers a fortnight that take longer than 65 s.
+const MODEL_TIMEOUT_MS = 65_000;
 const SOLVER_TIMEOUT_MS = 30_000;
 // v23. Every model attempt and every pause between them, together. 90 s + the 30 s handoff + the board read and
 // the inserts stay under the runtime's 150 s, as v21 required of the single call.
@@ -287,6 +368,38 @@ serve(async (req) => {
   const tStart = Date.now();
   try {
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+    // ---- v33 (G543): WHICH MODELS ANSWER. No depot row is read, nothing is written and no tick is claimed. ----
+    if (body.probe_models === true) {
+      const probeKeys = NV_KEYS
+        .map((name) => ({ name, value: Deno.env.get(name) }))
+        .filter((candidate): candidate is { name: string; value: string } => Boolean(candidate.value));
+      const probe: unknown[] = [];
+      for (const model of MODELS) {
+        const r = await callModelWithRetry({
+          url: NV_URL,
+          keys: probeKeys,
+          models: [model],
+          body: (m) => ({
+            model: m, ...samplingFor(m), max_tokens: 60,
+            chat_template_kwargs: { enable_thinking: false },
+            response_format: { type: "json_object" },
+            messages: [{ role: "user", content: 'Return exactly this JSON object and nothing else: {"actions":[]}' }],
+          }),
+          parse: (content) => {
+            const candidate = extractJson(content) as any;
+            return candidate && Array.isArray(candidate.actions) ? candidate : null;
+          },
+          budgetMs: 25_000, attemptTimeoutMs: 20_000, minAttemptMs: 2_000,
+          triesPerModel: 1, maxAttempts: Math.max(probeKeys.length, 1),
+        });
+        probe.push({ model, answered: r.model != null, ms: r.ms, attempts: r.attempts,
+                     ...(r.model == null ? { last: r.raw.slice(0, 200) } : {}) });
+      }
+      return json({ ok: true, version: AGENT_VERSION, keys: probeKeys.map((k) => k.name), probe,
+        latency_ms: { total: Date.now() - tStart } });
+    }
+    // v33: one pass on the fallbacks alone, when asked for by name
+    const passModels = body.fallback_only === true ? FALLBACK_MODELS : MODELS;
     const requestedDepot = body.depot_id ?? "11111111-1111-1111-1111-111111111111";
     const requestedRun = typeof body.sim_run_id === "string" && body.sim_run_id.length > 0
       ? body.sim_run_id
@@ -301,6 +414,60 @@ serve(async (req) => {
       : runQuery.eq("depot_id", requestedDepot).order("started_at", { ascending: false }).limit(1);
     const { data: run } = await runQuery.maybeSingle();
     if (!run) return json({ ok: true, skipped: "no running run" });
+
+    // ---- v33: REPLAY A STORED PASS. Only while a run is live (the condition under which this function already
+    // spends a model call for its caller). It claims no tick, calls no door and writes nothing. ----
+    if (body.replay_pass_id != null) {
+      const passId = Number(body.replay_pass_id);
+      if (!Number.isSafeInteger(passId) || passId <= 0) return json({ ok: false, error: "replay_pass_id must be a pass id" }, 400);
+      const { data: ev, error: evErr } = await sb.from("ottoq_agent_pass_evidence")
+        .select("pass_id, sim_run_id, agent_version, board_text, board_sha256, prompt_sha256, wake, model_answered")
+        .eq("pass_id", passId).maybeSingle();
+      if (evErr || !ev || typeof ev.board_text !== "string" || ev.board_text === "") {
+        return json({ ok: false, error: evErr?.message ?? "no such pass, or it kept no board" }, 404);
+      }
+      let storedBoard: unknown = null;
+      try { storedBoard = JSON.parse(ev.board_text); } catch { /* the text is still what the model read */ }
+      const storedBrief = readBrief((ev.wake as any)?.brief ?? null, null).brief;
+      const replaySystem = withWakeBrief(withChargeOrder(SYSTEM, storedBoard), storedBrief);
+      const replayKeys = NV_KEYS
+        .map((name) => ({ name, value: Deno.env.get(name) }))
+        .filter((candidate): candidate is { name: string; value: string } => Boolean(candidate.value));
+      const replayMaxTokens = (chargeQueueOf(storedBoard) ? 2400 : 1400) + (storedBrief ? 600 : 0);
+      const replayCall = await callModelWithRetry({
+        url: NV_URL, keys: replayKeys, models: passModels,
+        maxAttempts: passModels.length * Math.max(2, replayKeys.length),
+        body: (model) => chatBody(model, replaySystem, userMessageOf(storedBrief, ev.board_text), replayMaxTokens),
+        parse: parseAnswer,
+        budgetMs: MODEL_BUDGET_MS, attemptTimeoutMs: MODEL_TIMEOUT_MS, minAttemptMs: MIN_ATTEMPT_MS,
+      });
+      const replayed = replayCall.parsed as any;
+      const directives = Array.isArray(replayed?.actions)
+        ? replayed.actions.filter((a: any) => a?.type === "directive" && typeof a.text === "string") : [];
+      const kept = directives
+        .filter((a: any) => ruleNineDirective(a.text).ok)
+        .map((a: any) => ({ text: a.text.slice(0, DIRECTIVE_MAX_CHARS), about: directiveAbout(a) }));
+      return json({
+        ok: true, version: AGENT_VERSION,
+        replay_of: { pass_id: ev.pass_id, sim_run_id: ev.sim_run_id, agent_version: ev.agent_version,
+                     model_answered: ev.model_answered, prompt_sha256: ev.prompt_sha256 },
+        prompt_sha256: await sha256Hex(replaySystem),
+        board_sha256_matches: (await sha256Hex(ev.board_text)) === ev.board_sha256,
+        had_brief: storedBrief != null,
+        models_requested: passModels, model: replayCall.model, attempts: replayCall.attempts,
+        usage: replayCall.usage ?? null, ms: replayCall.ms,
+        answer: replayCall.model ? {
+          actions: Array.isArray(replayed.actions) ? replayed.actions.length : 0,
+          directives: directives.length, rule_nine_refused: directives.length - kept.length,
+          solver_objective: replayed.solver?.objective ?? null,
+          charge_order_cars: Array.isArray(replayed.charge_order?.cars) ? replayed.charge_order.cars.length : null,
+          rationale: String(replayed.rationale ?? "").slice(0, 600),
+          first_directives: kept.slice(0, 3),
+        } : null,
+        wake_brief_coverage: replayCall.model ? briefCoverage(storedBrief, kept) : null,
+        ...(replayCall.model ? {} : { last: replayCall.raw.slice(0, 300) }),
+      });
+    }
     const depot = run.depot_id;
     // 0332: multiple clocks can request an agent pass at the same run tick.
     // Claim the tick atomically before spending a model call or changing policy.
@@ -418,7 +585,7 @@ serve(async (req) => {
     async function recordPass(row: Record<string, unknown>): Promise<string | null> {
       try {
         const { error } = await sb.from("ottoq_agent_pass_evidence").insert({
-          chain_id: chainId, seat: "ottoq_prime", agent_version: "v31",
+          chain_id: chainId, seat: "ottoq_prime", agent_version: AGENT_VERSION,
           sim_run_id: run.sim_run_id, depot_id: depot, run_by: run.run_by ?? null,
           trigger_tick: chainTriggerTick, recorded_tick: run.tick_count, sim_clock: run.sim_clock_current,
           wake, ...row,
@@ -434,7 +601,7 @@ serve(async (req) => {
 
     // ---- v29 (0705): IS THERE ANYTHING NEW FOR THE AGENT TO LOOK AT? A missing or failing gate always wakes. ----
     const { data: wakeData, error: wakeErr } = await sb.rpc("ottoq_agent_wake", { p_sim_run_id: run.sim_run_id });
-    const wake: Wake = readWake(wakeData, wakeErr);
+    let wake: Wake = readWake(wakeData, wakeErr);
 
     if (!wake.wake) {
       // SOLVER-ONLY. Nothing the agent can act on has changed since it last answered: the solver runs on the
@@ -453,7 +620,7 @@ serve(async (req) => {
         depot_id: depot, action_context: "task_start", resolved_action_context: "orchestrator_agent",
         entity_type: "depot", entity_id: depot,
         context_frame: { lens: "wake_gate", fr4: true, agent_solver_chain_id: chainId,
-                         agent_chain_trigger_tick: chainTriggerTick, wake, agent_version: "v31" },
+                         agent_chain_trigger_tick: chainTriggerTick, wake, agent_version: AGENT_VERSION },
         proposed_action: { actions: [], solver: solverDirective, model: "kernel_regime", agent_solver_chain_id: chainId },
         enacted_action: { verb: solverAccepted ? "solve_on_standing_objective" : "no_op", applied: [], queued: [],
                           rejected: [], rationale, solver_handoff: solverHandoff, outcome_class: "solver_only", wake,
@@ -472,6 +639,19 @@ serve(async (req) => {
         evidence_error: evidenceError, latency_ms: { total: totalMs } });
     }
 
+    // ---- v32 (0823): WHY THIS PASS WAS WOKEN, from the run's own rows. Read-only; NULL while agent_wake_brief is 0.
+    // A missing function, an error or an unreadable answer is no brief (v31's message), recorded on the pass. ----
+    let brief: WakeBrief | null = null;
+    try {
+      const { data: briefData, error: briefErr } = await sb.rpc("ottoq_agent_wake_brief",
+        { p_sim_run_id: run.sim_run_id, p_wake: wake });
+      const read = readBrief(briefData, briefErr);
+      brief = read.brief;
+      if (read.record !== undefined) wake = { ...wake, brief: read.record };
+    } catch (error) {
+      wake = { ...wake, brief: { error: error instanceof Error ? error.message.slice(0, 300) : "brief read failed" } };
+    }
+
     const { data: board, error: bErr } = await sb.rpc("ottoq_agent_board", { p_sim_run_id: run.sim_run_id });
     if (bErr || !board) {
       await recordPass({ consulted: true, outcome_class: "failed", decision_written: false,
@@ -487,33 +667,23 @@ serve(async (req) => {
     const keys = NV_KEYS
       .map((name) => ({ name, value: Deno.env.get(name) }))
       .filter((candidate): candidate is { name: string; value: string } => Boolean(candidate.value));
-    const system = withChargeOrder(SYSTEM, board);
+    const system = withWakeBrief(withChargeOrder(SYSTEM, board), brief);
     // v29 (0703): the board text is computed once, so what is hashed and stored is exactly what the model reads
     const bText = boardText(board);
-    const userMessage = `BOARD DIGEST:\n${bText}\n\nReturn ONLY the JSON object.`;
+    const userMessage = userMessageOf(brief, bText);
     const boardSha = await sha256Hex(bText);
     const promptSha = await sha256Hex(system);
     // v23: a charge order is up to 12 cars with a reason each, so the answer needs room beyond v15's 1400
-    const maxTokens = chargeQueueOf(board) ? 2400 : 1400;
+    // v32: a brief asks for one directive per subject it names, so an answer to one gets 600 more
+    const maxTokens = (chargeQueueOf(board) ? 2400 : 1400) + (brief ? 600 : 0);
     const call = await callModelWithRetry({
       url: NV_URL,
       keys,
-      models: [MODEL, FALLBACK_MODEL],
-      body: (model) => ({
-        model,
-        ...(model === MODEL ? { temperature: 0.1 } : { temperature: 1.0, top_p: 0.95 }),
-        max_tokens: maxTokens,
-        chat_template_kwargs: { enable_thinking: false }, // fast structured output for the control loop
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userMessage },
-        ],
-      }),
-      parse: (content) => {
-        const candidate = extractJson(content) as any;
-        return candidate && Array.isArray(candidate.actions) ? candidate : null;
-      },
+      models: passModels,
+      // v33: a model no key may call takes one attempt per key, so the cap counts every key for every model
+      maxAttempts: passModels.length * Math.max(2, keys.length),
+      body: (model) => chatBody(model, system, userMessage, maxTokens),
+      parse: parseAnswer,
       budgetMs: MODEL_BUDGET_MS,
       attemptTimeoutMs: MODEL_TIMEOUT_MS,
       minAttemptMs: MIN_ATTEMPT_MS,
@@ -538,7 +708,10 @@ serve(async (req) => {
     }
 
     const dwellMin = reversalDwellMin(board);
-    for (const a of parsed.actions.slice(0, 6)) {
+    // v32: a brief can name up to 10 cut charges, 10 emergencies, 10 posts and 10 findings; an answer to one may carry
+    // more than six actions. The move cap (3) still bounds dial and ops actions.
+    const actionCap = brief ? 16 : 6;
+    for (const a of parsed.actions.slice(0, actionCap)) {
       if (a?.type === "set_policy" && Number.isFinite(Number(a.value))) {
         // v19: the work side's demand is not an agent actuator and not a question for the approval
         // queue either -- it is rejected with a reason the agent can read on its next board.
@@ -616,11 +789,19 @@ serve(async (req) => {
         // v30 (AV-9, rule 9): an operator reads a directive, so one that sets a charge target under 100% or skips,
         // defers or shortens a service is refused here and kept, with its text, in the rejected list.
         const r9 = ruleNineDirective(a.text);
-        if (!r9.ok) { rejected.push({ type: "directive", text: a.text.slice(0, 400), reason: r9.reason, matched: r9.matched }); continue; }
-        applied.push({ type: "directive", text: a.text.slice(0, 400), severity: a.severity === "warning" ? "warning" : "info" });
+        if (!r9.ok) { rejected.push({ type: "directive", text: a.text.slice(0, DIRECTIVE_MAX_CHARS), reason: r9.reason, matched: r9.matched }); continue; }
+        const about = directiveAbout(a);
+        // v33: a directive written by a fallback model says so. Replayed on three real boards the first fallback
+        // answered every time, gave no directive once and once paired the right cars with the wrong posts.
+        applied.push({ type: "directive", text: a.text.slice(0, DIRECTIVE_MAX_CHARS), severity: a.severity === "warning" ? "warning" : "info",
+                       ...(about ? { about } : {}), ...(modelUsed !== MODEL ? { by_fallback_model: modelUsed } : {}) });
       } else {
         rejected.push({ ...a, reason: "unrecognized action shape" });
       }
+    }
+    // v32: an action past the cap used to be dropped with no record; it is now kept in the rejected list
+    for (const a of parsed.actions.slice(actionCap, actionCap + 20)) {
+      rejected.push({ ...(a && typeof a === "object" ? a : { value: a }), reason: `action cap (${actionCap}) reached` });
     }
 
 
@@ -685,6 +866,10 @@ serve(async (req) => {
     const levers = leversOf({ applied: applied as any[], queued, rejected, chargeOrderReceipt,
       solverHandoff, objective: (solverDirective as any)?.objective ?? null });
     const outcomeClass: OutcomeClass = classifyPass({ consulted: true, answered: modelUsed !== "none", levers });
+    // v32 (0823): how many of the brief's new subjects the applied directives name (the same rule as the view
+    // public.ottoq_agent_wake_brief_coverage, which reads the model's answer; this reads what was applied)
+    const wakeBriefCoverage = modelUsed !== "none"
+      ? briefCoverage(brief, (applied as any[]).filter((x) => x?.type === "directive")) : null;
     const { error: decisionError } = await sb.from("ottoq_decisions").insert({
       sim_run_id: run.sim_run_id, tick_seq: run.tick_count, sim_clock: run.sim_clock_current,
       depot_id: depot, action_context: "task_start", resolved_action_context: "orchestrator_agent",
@@ -694,10 +879,11 @@ serve(async (req) => {
                        // v19: which halves of the board the model actually saw, so an audit can
                        // separate a grounded decision from one made on counters alone.
                        board_blocks: { grounding: board.grounding != null, assets: board.assets != null,
-                                       review: board.review != null, charge_queue: board.charge_queue != null },
+                                       review: board.review != null, charge_queue: board.charge_queue != null,
+                                       wake_brief: brief != null },
                        // v23: how the model call went, attempt by attempt (model, status, ms, pause; never a key)
                        model_attempts: call.attempts,
-                       agent_version: "v31" },
+                       agent_version: AGENT_VERSION },
       proposed_action: { actions: parsed.actions, solver: solverDirective, model: modelUsed,
                          agent_solver_chain_id: chainId,
                          // v23: the order as sent to the door, with any name the board did not hold
@@ -711,6 +897,7 @@ serve(async (req) => {
                         charge_order: chargeOrderReceipt,
                         // v29: the honest class (0703); outcome_status below is left as v28 wrote it
                         outcome_class: outcomeClass,
+                        ...(wakeBriefCoverage ? { wake_brief_coverage: wakeBriefCoverage } : {}),
                         source: modelUsed !== "none" ? "nemotron" : "deterministic_fallback" },
       // v23: an order the kernel accepted is an enacted action, as a dial write is
       outcome_status: applied.length > 0 || solverAccepted || orderAccepted ? "enacted" : "noop_no_candidate",
@@ -719,21 +906,22 @@ serve(async (req) => {
     // v29 (0703): the prompt by hash, once, and this pass's evidence row
     try {
       await sb.from("ottoq_agent_prompts").upsert(
-        { prompt_sha256: promptSha, agent_version: "v31", prompt_text: system },
+        { prompt_sha256: promptSha, agent_version: AGENT_VERSION, prompt_text: system },
         { onConflict: "prompt_sha256", ignoreDuplicates: true });
     } catch { /* the pass's row names the hash either way */ }
     const evidenceError = await recordPass({
       consulted: true, outcome_class: decisionError ? "failed" : outcomeClass,
       board_text: bText, board_sha256_client: boardSha, prompt_sha256: promptSha,
-      models_requested: [MODEL, FALLBACK_MODEL], model_answered: modelUsed !== "none" ? modelUsed : null,
+      models_requested: passModels, model_answered: modelUsed !== "none" ? modelUsed : null,
       response_model: call.responseModel ?? null, response_id: call.responseId ?? null,
-      sampling: { primary: { temperature: 0.1 }, fallback: { temperature: 1.0, top_p: 0.95 }, max_tokens: maxTokens,
+      sampling: { by_model: Object.fromEntries(MODELS.map((m) => [m, samplingFor(m)])), max_tokens: maxTokens,
                   enable_thinking: false, response_format: "json_object" },
       usage: call.usage ?? null, attempts: call.attempts,
       answer: modelUsed !== "none" ? { actions: parsed.actions ?? [], solver: parsed.solver ?? null,
                                        rationale: String(parsed.rationale ?? "").slice(0, 1200),
                                        charge_order: parsed.charge_order ?? null } : null,
-      levers, decision_written: !decisionError, propose_ms: proposeMs, total_ms: totalMs,
+      levers: wakeBriefCoverage ? { ...levers, wake_brief: wakeBriefCoverage } : levers,
+      decision_written: !decisionError, propose_ms: proposeMs, total_ms: totalMs,
     });
     if (decisionError) {
       // v21 (G188): the audit row IS the agent's output. Losing it silently is how a live agent
@@ -745,7 +933,7 @@ serve(async (req) => {
 
     return json({ ok: true, run: run.sim_run_id, model: modelUsed, applied, queued, rejected,
       solver_handoff: solverHandoff, charge_order: chargeOrderReceipt, model_attempts: call.attempts,
-      outcome_class: outcomeClass, wake, evidence_error: evidenceError,
+      outcome_class: outcomeClass, wake, wake_brief_coverage: wakeBriefCoverage, evidence_error: evidenceError,
       latency_ms: { propose: proposeMs, total: totalMs }, rationale: parsed.rationale });
   } catch (e) {
     return json({ ok: false, error: e instanceof Error ? e.message : "unknown" }, 500);

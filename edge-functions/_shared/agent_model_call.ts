@@ -15,7 +15,9 @@
  *     one, else 1 s, 2 s, 4 s... with jitter, never more than MAX_WAIT_MS), and move to the next key on a 429,
  *     because a rate limit can be the key's own.
  *   - 401, 403 and 404 are the key's problem: the next key, at once. (A legacy NVCF key can be valid yet point at
- *     a retired function and return 404 -- v14's reason for trying every key.)
+ *     a retired function and return 404 -- v14's reason for trying every key.) When every key has said so for one
+ *     model, the next model. v33 (G543): the count is per model. Until v33 the test was "the key index wrapped", so
+ *     a model reached after a 429 had moved the index was given up before every key had been tried.
  *   - 400 and 422 say the request shape does not suit this model: the next model, at once.
  *   - An answer that does not parse moves to the next model, at once: asking the same model again for the same
  *     board rarely parses differently.
@@ -124,6 +126,7 @@ export async function callModelWithRetry(o: ModelCallOptions): Promise<ModelCall
   let modelIdx = 0;
   let triesOnModel = 0;
   let keyIdx = 0;
+  let keyFailsOnModel = 0;   // v33: how many keys in a row have refused THIS model as theirs to call
   let retries = 0;
   let wait = 0;
   while (attempts.length < maxAttempts && modelIdx < o.models.length) {
@@ -180,18 +183,19 @@ export async function callModelWithRetry(o: ModelCallOptions): Promise<ModelCall
     if (typeof status === "number" && KEY_STATUSES.has(status)) {
       // the key's problem: the next key on the same model, at once. When every key has said so, the next model.
       keyIdx++;
-      if (keyIdx % o.keys.length === 0) { modelIdx++; triesOnModel = 0; }
+      keyFailsOnModel++;
+      if (keyFailsOnModel >= o.keys.length) { modelIdx++; triesOnModel = 0; keyFailsOnModel = 0; }
       continue;
     }
     if ((typeof status === "number" && SHAPE_STATUSES.has(status)) || status === "unparseable" || status === "timeout") {
-      modelIdx++; triesOnModel = 0;
+      modelIdx++; triesOnModel = 0; keyFailsOnModel = 0;
       continue;
     }
     if ((typeof status === "number" && RETRY_STATUSES.has(status)) || status === "network") {
       retries++;
       wait = backoffMs(retries, retryAfter, random);
       if (status === 429) keyIdx++;
-      if (triesOnModel >= tries) { modelIdx++; triesOnModel = 0; }
+      if (triesOnModel >= tries) { modelIdx++; triesOnModel = 0; keyFailsOnModel = 0; }
       continue;
     }
     // anything else (a 3xx, a 418): nothing about another try would differ

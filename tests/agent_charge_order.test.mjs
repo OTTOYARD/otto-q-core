@@ -179,13 +179,20 @@ test("v23: the order is recorded before the solver handoff, under the pass's cha
   assert.match(code, /charge_order: chargeOrder \}/);
 });
 
-test("v23-v31: the model call goes through the retry module, with the fallback model, and the row says v31", () => {
+test("v23-v32: the model call goes through the retry module, with the fallback model, and the row says v33", () => {
   assert.match(code, /await callModelWithRetry\(/);
-  assert.match(code, /models: \[MODEL, FALLBACK_MODEL\]/);
-  assert.match(code, /const FALLBACK_MODEL = "nvidia\/nemotron-3-super-120b-a12b";/);
+  // v33 (G543): the fallback is a chain, with v23's model last, and the attempt cap counts every key per model
+  assert.match(code, /models: passModels,/);
+  assert.match(code, /const passModels = body\.fallback_only === true \? FALLBACK_MODELS : MODELS;/);
+  assert.match(code, /models_requested: passModels,/);
+  assert.match(code, /const MODELS = \[MODEL, \.\.\.FALLBACK_MODELS\];/);
+  assert.match(code, /const FALLBACK_MODELS = \[\s*"nvidia\/[^"]+",\s*"nvidia\/[^"]+",\s*SUPER_MODEL,\s*\];/);
+  assert.match(code, /maxAttempts: passModels\.length \* Math\.max\(2, keys\.length\)/);
   assert.match(code, /model_attempts: call\.attempts/);
-  assert.match(code, /agent_version: "v31"/);
-  assert.doesNotMatch(code, /agent_version: "v(2[23456789]|30)"/);
+  // v32: one constant names the version, and every row that records it reads the constant
+  assert.match(code, /const AGENT_VERSION = "v33";/);
+  assert.equal((code.match(/agent_version: AGENT_VERSION/g) ?? []).length, 4);
+  assert.doesNotMatch(code, /agent_version: "v\d+"/);
   // the single-try key loop is gone
   assert.doesNotMatch(code, /for \(const candidate of keys\)/);
   // an accepted order is an enacted action
@@ -216,4 +223,58 @@ test("v31 / 0781: the charge-line section says how the kernel orders a car the b
   assert.match(CHARGE_ORDER_PROMPT, /last_order\.projection\.owners says which operator an order cost \(cmp -1\)/);
   // it explains the order; it does not forbid an order (the check disposes)
   assert.doesNotMatch(CHARGE_ORDER_PROMPT, /never (move|name|rank) a car with yields/i);
+});
+
+test("v32 / 0823: a consulted pass reads the wake brief, leads the message with it and keeps it on its record", () => {
+  // `code` above is the function source with its comment lines removed
+  assert.match(code, /sb\.rpc\("ottoq_agent_wake_brief",\s*\{ p_sim_run_id: run\.sim_run_id, p_wake: wake \}\)/);
+  assert.match(code, /withWakeBrief\(withChargeOrder\(SYSTEM, board\), brief\)/);
+  assert.match(code, /const userMessage = userMessageOf\(brief, bText\);/);
+  assert.match(code, /if \(read\.record !== undefined\) wake = \{ \.\.\.wake, brief: read\.record \};/);
+  // the brief is read after the wake gate says wake and before the board, so a solver-only pass never reads one
+  assert.ok(code.indexOf("if (!wake.wake)") < code.indexOf('sb.rpc("ottoq_agent_wake_brief"'));
+  assert.ok(code.indexOf('sb.rpc("ottoq_agent_wake_brief"') < code.indexOf('sb.rpc("ottoq_agent_board"'));
+  // no new lever: the function still calls only the setters it called before
+  const rpcs = [...code.matchAll(/sb\.rpc\("([a-z_]+)"/g)].map((m) => m[1]).sort();
+  assert.deepEqual([...new Set(rpcs)], ["ottoq_agent_board", "ottoq_agent_chain_claim", "ottoq_agent_charge_order_record",
+    "ottoq_agent_wake", "ottoq_agent_wake_brief", "ottoq_apply_ops_action", "ottoq_policy_get", "ottoq_policy_set"]);
+});
+
+test("v33 / G543: the model probe returns before any depot row is read, any tick is claimed or anything is written", () => {
+  const at = code.indexOf("if (body.probe_models === true)");
+  assert.ok(at > 0);
+  const end = code.indexOf("const requestedDepot", at);
+  const block = code.slice(at, end);
+  assert.ok(block.includes("return json({ ok: true, version: AGENT_VERSION, keys: probeKeys.map((k) => k.name), probe,"));
+  assert.doesNotMatch(block, /sb\.|createClient|\.rpc\(|\.insert\(/);          // no database
+  assert.equal((block.match(/\.value/g) ?? []).length, 1);                     // a key's value is read once, to drop unset keys
+  assert.ok(at < code.indexOf("createClient("));
+  assert.ok(at < code.indexOf('sb.rpc("ottoq_agent_chain_claim"'));
+});
+
+test("v33: a replay of a stored pass claims no tick, calls no door and writes nothing", () => {
+  const at = code.indexOf("if (body.replay_pass_id != null)");
+  const end = code.indexOf('sb.rpc("ottoq_agent_chain_claim"');
+  assert.ok(at > 0 && at < end);                       // before the claim, so it never takes a tick
+  assert.ok(code.indexOf('if (!run) return json({ ok: true, skipped: "no running run" });') < at);   // only while a run is live
+  const block = code.slice(at, end);
+  assert.doesNotMatch(block, /\.rpc\(|\.insert\(|\.upsert\(|\.update\(|\.delete\(/);
+  assert.equal((block.match(/sb\.from\(/g) ?? []).length, 1);
+  assert.match(block, /sb\.from\("ottoq_agent_pass_evidence"\)\s*\.select\(/);
+  // it sends what the pass sent: the stored board text and the stored brief, through the one message builder
+  assert.match(block, /userMessageOf\(storedBrief, ev\.board_text\)/);
+  assert.match(block, /withWakeBrief\(withChargeOrder\(SYSTEM, storedBoard\), storedBrief\)/);
+});
+
+test("v33: the live pass and the replay build their request through one function, and a directive keeps 1,200 characters", () => {
+  assert.equal((code.match(/chatBody\(model, /g) ?? []).length, 2);
+  assert.equal((code.match(/parse: parseAnswer,/g) ?? []).length, 2);
+  assert.match(code, /const DIRECTIVE_MAX_CHARS = 1_200;/);
+  assert.doesNotMatch(code, /a\.text\.slice\(0, 400\)/);
+});
+
+test("v33: the primary is bounded at 65 s so a fallback has 25, and a fallback's directive says which model wrote it", () => {
+  assert.match(code, /const MODEL_TIMEOUT_MS = 65_000;/);
+  assert.match(code, /const MODEL_BUDGET_MS = 90_000;/);
+  assert.match(code, /\.\.\.\(modelUsed !== MODEL \? \{ by_fallback_model: modelUsed \} : \{\}\)/);
 });

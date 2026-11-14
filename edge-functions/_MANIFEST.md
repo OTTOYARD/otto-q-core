@@ -139,7 +139,7 @@ against this table without trusting any metadata column.
 | ottoq-jobs-request | 6 | true | 2026-06-19 13:49 | yes | `d2b25506e078d7238a49939a17a6bc4faa15f0badbe26559a859b29d1be40b2f` |
 | ottoq-nemotron-copilot | 12 | true | 2026-06-06 15:41 | yes | `aca81d4358b9255508d3ca7f56a3190a117a7bafd7fd89649cfb5aa8798e155a` |
 | ottoq-orchestrate-tick | 12 | true | 2026-09-09 03:42 | yes | `47bc38feb463a9c103820d087c6a86f5856a3cdc049a73ab0a76387c1a73becf` |
-| ottoq-orchestrator-agent | 43 | true | 2026-10-25 19:23 | yes¹⁵ | `5a1b6cb6a38f3c40371591702f65a25677665bc36e3a6d278bf579061e591259` |
+| ottoq-orchestrator-agent | 49 | true | 2026-11-13, between 19:57 and 20:14 UTC | yes¹⁷ | `4f16ecf456f46a55cc0bcd0c2d181c569124090249111f12062439acc55f4ffd` (sha256 of `index.ts`; see ¹⁷) |
 | ottoq-ottocommand | 8 | true | 2026-06-27 18:47 | yes | `dac7eca5d514286ddebb97c9ba096b22adff09d97f08ec485dcfc91f49e5761a` |
 | ottoq-progress | 9 | true | 2026-06-18 04:05 | yes | `eaced82147a69688e977ddede528272370c8facbe60de6787e525731090db0aa` |
 | ottoq-run-blackbox | 8 | false | 2026-10-14 16:35 | yes¹⁴ | `63656ff3aa443cf87b2e4197afe5c18b87279bb9580a12655fa892a91b2baee5` (repo file) |
@@ -356,3 +356,30 @@ plan" and a grade that does not exist 404 "no such grade" (the gateway took the 
 with no key, 401 from the gateway. Nothing written. Its first real calls: the hindsight sweep, run by hand at 19:02:05 UTC
 after `bess_hindsight_enabled` went on at the twin depot, fired two grades (demo runs 78c0624c on 2026-10-23 and 763734d4
 on 2026-10-25, about 9 sim-hours each) and both landed `graded` at 19:02:06 UTC, HTTP 200 in 53 and 36 ms.
+
+¹⁷ **`ottoq-orchestrator-agent` v44 (agent v32), 2026-11-13 between 03:02 and 03:10 UTC (the evening of 11-12 CT), for 0823
+(G540).** Through the Supabase MCP `deploy_edge_function`, `verify_jwt` true as before, no import map and no deno.json,
+with the seven files v43 held and one new: `ottoq-orchestrator-agent/index.ts` and `_shared/agent_solver_chain.ts`,
+`agent_rule_nine.ts`, `agent_model_call.ts`, `agent_charge_order.ts`, `agent_pass_evidence.ts`,
+`agent_dial_discipline.ts` and `agent_wake_brief.ts` (new), each from this branch at `2602072e`
+(`node --test tests/*.test.mjs` 322 of 322). The deploy was made by a helper session, which fetched v44 back and
+compared each file's bytes with the repo's: eight of eight equal. Two checks made here, independent of it: the repo's
+sha256 of `index.ts` (`ccd802e601c6f278…`), `agent_wake_brief.ts` and `agent_rule_nine.ts` equal the ones it reported; and the
+prompt hash the function records on a consult with a brief, computed from the repo's source before any run
+(`0a36353c…`), is the hash on all of run b848a046's first seven consults. The same computation gives v31's prompt
+(`0f8d980d…`) for a pass with no brief, the hash on all 336 consults v43 recorded in its last ten days. The row's hash
+is `index.ts` alone; the earlier rows' hashes were not re-derived here.
+**v45, the same night, between 04:13:48 and 04:17:37 UTC** (the last consult on v44's prompt and the first on v45's):
+one file changed, `_shared/agent_wake_brief.ts` (the wake section: an answer to a brief with subjects is never empty,
+`db/checks/0488` §6), from this branch at `17bbf1ea`. The helper fetched v45 back: eight of eight files equal the
+repo's. The prompt hash computed from the repo before the deploy (`85f8d441…`) is on all 29 consults of run a95e51a3.
+The row's hash is `index.ts`, unchanged from v44.
+**v46 to v49 (agent v33), 2026-11-13, for G543 and `db/checks/0492`.** Each by the same helper and the same check
+(eight of eight files equal to the repo's bytes, fetched back): v46 the fallback chain, the per-model key count and the
+model probe (probed 16:31:52 UTC); v47 `fallback_only` (live by 16:39 UTC); v48 the replay of a stored pass and
+directives kept to 1,200 characters (replayed 19:57:30 UTC); v49 the primary bounded at 65 s and `by_fallback_model`,
+(index.ts sha256 `4f16ecf456f46a55…`, 73,054 bytes). The prompt is unchanged from v45
+(`85f8d441…` on every consult of runs 9085ca36 and 7a08f52a). v49's deploy time is bounded by the helper's report,
+which followed the replay at 19:57:30 and reached this session before its next clock read, 20:13:51 UTC; the deploy
+itself was not timed.
+
