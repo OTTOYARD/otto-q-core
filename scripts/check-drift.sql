@@ -872,7 +872,8 @@ repo_manifest(version, name, file) AS (
     ('20261114005209'::text, '0830_the_arm_of_a_car_cleaned_after_its_charge_starts_where_the_charge_is_stopped'::text, '0830_the_arm_of_a_car_cleaned_after_its_charge_starts_where_the_charge_is_stopped.sql'::text),
     ('20261114031206'::text, '0831_a_car_cleaned_after_its_charge_is_cleaned_on_an_immediate_turnaround_too'::text, '0831_a_car_cleaned_after_its_charge_is_cleaned_on_an_immediate_turnaround_too.sql'::text),
     ('20261114034649'::text, '0832_a_clean_cut_short_by_a_charger_fault_is_asked_for_again_where_the_next_charge_is_stopped'::text, '0832_a_clean_cut_short_by_a_charger_fault_is_asked_for_again_where_the_next_charge_is_stopped.sql'::text),
-    ('20261114055208'::text, '0833_the_twin_depots_fleet_carries_24_ojais_and_6_lucid_gravities'::text, '0833_the_twin_depots_fleet_carries_24_ojais_and_6_lucid_gravities.sql'::text)
+    ('20261114055208'::text, '0833_the_twin_depots_fleet_carries_24_ojais_and_6_lucid_gravities'::text, '0833_the_twin_depots_fleet_carries_24_ojais_and_6_lucid_gravities.sql'::text),
+    ('20261114072352'::text, '0836_a_bay_held_for_a_car_on_its_way_in_is_not_idle_with_a_car_ready'::text, '0836_a_bay_held_for_a_car_on_its_way_in_is_not_idle_with_a_car_ready.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
