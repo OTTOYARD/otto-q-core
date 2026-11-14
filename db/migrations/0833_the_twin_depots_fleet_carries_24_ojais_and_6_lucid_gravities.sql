@@ -176,3 +176,13 @@ COMMIT;
 --   the first send. No run was live. At apply, by port profile: waymo_ipace 22, waymo_ojai 24, tesla_model_y 26,
 --   tesla_cybercab 4, zoox_robotaxi 34, lucid_gravity_nuro 6.
 --   The run started to check it: 7435e685.
+--   RUN 7435e685 AT ITS END (724 ticks, ended 2026-11-14 07:00:00 UTC, read 07:05 UTC). Every car of every kind
+--   charged at least once. By port profile, cars / sessions / faulted / mean minutes of a completed session:
+--     lucid_gravity_nuro  6 / 10 / 1 / 22      tesla_cybercab  4 / 12 / 3 / 31      tesla_model_y 26 / 56 / 2 / 36
+--     waymo_ipace        22 / 41 / 3 / 77      waymo_ojai     24 / 48 / 3 / 33      zoox_robotaxi 34 / 82 / 7 / 30
+--   The Ojai's 33 minutes against the I-PACE's 77 rests on the assumed 200 kW (R-23). All 6 Lucids left for work.
+--   Visits with a charge done and cleaned by the post's arm: Lucid 8 of 8, Cybercab 8 of 8, Model Y 48 of 48, Ojai
+--   45 of 45, I-PACE 31 of 32, Zoox 71 of 73. The 3 without: two Zoox visits tidied by a technician (one before its
+--   charge stopped, one after the stop asked the arm and the tidy was not one the arm takes), and one I-PACE visit
+--   still open at the run's end after two faulted sessions.
+--   sim_tick_failed (a deadlock in the decide half): 53, against 23 to 38 on the five runs before. Not explained.

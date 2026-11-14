@@ -123,6 +123,13 @@
 --   arm reads left until 0826 is applied, which waits on ottoyarddepot-sim#170. Two reads of post-hours by arm side
 --   for sim 18:00-22:00 did not agree with each other (61 against 85 post-hours in all), so no split is quoted.
 --
+-- AFTER 0833 (the fleet: 22 I-PACE, 24 Ojai, 34 Zoox, 26 Model Y, 4 Cybercab, 6 Lucid Gravity). Run 7435e685 at its
+--   end, visits with a charge done / cleaned by the arm: Ojai 45 / 45, I-PACE 32 / 31, Zoox 73 / 71 (the three kinds
+--   cleaned after their charge: 150 / 147); Lucid 8 / 8, Cybercab 8 / 8, Model Y 48 / 48. The 3 without are in the
+--   0833 migration's footer: two tidied by a technician, one visit open at the run's end. None was a missed start.
+--   NOT EXPLAINED: 53 ticks failed with a deadlock in the decide half on this run, against 23 to 38 on the five
+--   runs before it (c86b46e1 32, 14d6eda7 23, c8913ea2 31, 1902d13b 38). The two earliest of those predate 0830.
+--
 -- TO READ THE STOP DOOR ON A RUN:
 --   SELECT n.meta->'arm_after_charge'->>'why' why, n.meta->'arm_after_charge'->>'result' result, count(*)
 --     FROM ottoq_visit_needs n WHERE n.sim_run_id = :'run' AND n.meta ? 'arm_after_charge' GROUP BY 1, 2;
