@@ -139,7 +139,7 @@ against this table without trusting any metadata column.
 | ottoq-jobs-request | 6 | true | 2026-06-19 13:49 | yes | `d2b25506e078d7238a49939a17a6bc4faa15f0badbe26559a859b29d1be40b2f` |
 | ottoq-nemotron-copilot | 12 | true | 2026-06-06 15:41 | yes | `aca81d4358b9255508d3ca7f56a3190a117a7bafd7fd89649cfb5aa8798e155a` |
 | ottoq-orchestrate-tick | 12 | true | 2026-09-09 03:42 | yes | `47bc38feb463a9c103820d087c6a86f5856a3cdc049a73ab0a76387c1a73becf` |
-| ottoq-orchestrator-agent | 49 | true | 2026-11-13, between 19:57 and 20:14 UTC | yes¹⁷ | `4f16ecf456f46a55cc0bcd0c2d181c569124090249111f12062439acc55f4ffd` (sha256 of `index.ts`; see ¹⁷) |
+| ottoq-orchestrator-agent | 51 | true | 2026-11-14 07:32:38 UTC | yes¹⁷ | `0df514394ff9ff5d8bbc29e64d7066dc7e6f1f0a13fa8b36cea05e9bbe3a4ba6` (sha256 of `index.ts`; see ¹⁷) |
 | ottoq-ottocommand | 8 | true | 2026-06-27 18:47 | yes | `dac7eca5d514286ddebb97c9ba096b22adff09d97f08ec485dcfc91f49e5761a` |
 | ottoq-progress | 9 | true | 2026-06-18 04:05 | yes | `eaced82147a69688e977ddede528272370c8facbe60de6787e525731090db0aa` |
 | ottoq-run-blackbox | 8 | false | 2026-10-14 16:35 | yes¹⁴ | `63656ff3aa443cf87b2e4197afe5c18b87279bb9580a12655fa892a91b2baee5` (repo file) |
@@ -382,4 +382,14 @@ directives kept to 1,200 characters (replayed 19:57:30 UTC); v49 the primary bou
 (`85f8d441…` on every consult of runs 9085ca36 and 7a08f52a). v49's deploy time is bounded by the helper's report,
 which followed the replay at 19:57:30 and reached this session before its next clock read, 20:13:51 UTC; the deploy
 itself was not timed.
+
+**v50 and v51 (agent v34), 2026-11-14, for 0836 and `db/checks/0494` (G541, G548).** Now nine files: the eight and
+`_shared/agent_directive_facts.ts`. v50 at 06:27:19 UTC (the helper's `date -u` after the deploy call returned): the
+prompt names `held_for_car_due` and says a waiting car is written again from this brief's numbers; a directive's facts
+about a cut car are read against the brief, a fallback's contradicted directive is not applied, and
+`POST {"grade_pass_ids": [...]}` grades stored passes (used at 06:27:45 UTC on 266 passes). v51 at 07:32:38 UTC changes
+comments only in `index.ts` and `agent_directive_facts.ts` (the migration, check and finding numbers, renumbered after
+two other branches took them), so the deployed source is the repo's. Both: nine of nine files equal to the repo's
+bytes fetched back (`index.ts` sha256 `0df51439…`, 77,714 bytes at v51). The prompt hash computed from the repo before
+v50, `067422dd…`, is the one all 16 consults of run 7435e685 after 06:27:19 recorded, and is unchanged at v51.
 
