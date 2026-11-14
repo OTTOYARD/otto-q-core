@@ -1,7 +1,7 @@
 -- migration-version: 20261114153539
 -- migration-name:    0837_a_busy_day_no_longer_shortens_every_cars_maintenance_interval
 --
--- 0837  **A busy day no longer shortens every car's maintenance and calibration interval.** (G548)
+-- 0837  **A busy day no longer shortens every car's maintenance and calibration interval.** (G550; applied under the number G548)
 --
 -- ══ §1 WHY ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -42,11 +42,11 @@
 --   recalls for service, its visits' atoms, its bays). Nothing acts on either while testing is off (rule 12).
 --   Learned estimates: the charge clock's evidence is charges, which this does not change, so no row is added to
 --   ottoq_evidence_regimes. The return and departure fits did learn from days with these recalls and bay holds; they
---   have no regime of their own, and db/checks/0494 records that as open.
+--   have no regime of their own, and db/checks/0495 records that as open.
 --
 -- APPLIED 2026-11-14 15:35:39 UTC (9:35 AM CT), ledger 20261114153539, between runs, P0-P2 and V1 passing inside the
 --   file; the ledger holds this file from BEGIN to COMMIT under a two-line header. The first run after it is
---   ff41e769 (db/checks/0494).
+--   ff41e769 (db/checks/0495).
 --
 -- ROLLBACK: UPDATE public.ottoq_sim_scenarios SET fleet_overrides = jsonb_set(jsonb_set(fleet_overrides,
 --   '{vehicle_overrides,pm_interval_km_scale}', '0.01'), '{vehicle_overrides,calib_interval_h_scale}', '0.02')

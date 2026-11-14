@@ -10,6 +10,18 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v34 (0836, G541; db/checks/0494, G548): A DIRECTIVE'S FACTS ARE READ AGAINST THE BRIEF.
+//      * The prompt names held_for_car_due, the bays a booked car is about to reach, which the board (0836) no longer
+//        counts idle with a car ready.
+//      * _shared/agent_directive_facts.ts reads what a directive says about a car whose charge a fault cut (its
+//        post, its place in line, the minutes since the cut, the SoC it was cut at) against the brief the model was
+//        sent. Every miss is counted on the pass (directive_facts). A directive a FALLBACK model wrote that
+//        contradicts the brief is not applied and is kept, with what it said, in the rejected list.
+//      * The brief's prompt says a car still waiting from an earlier fault is written again from THIS brief's
+//        numbers, never copied from last_answer.you_said: the first fallback repeated "cut 46 min ago" of a car
+//        the brief had at 72 and then 102 minutes.
+//      * POST {"grade_pass_ids": [N, ...]} (while a run is live) grades stored passes the same way. No model is
+//        called and nothing is written.
 // v33 (db/checks/0489, G543): THE FALLBACK IS A CHAIN, AND THE FUNCTION CAN SAY WHICH MODELS ANSWER.
 //      v23's one fallback model, nvidia/nemotron-3-super-120b-a12b, last answered on 2026-10-14. Since then it has
 //      returned HTTP 404 on every key (85 passes in 30 days), so a primary timeout was a pass with no answer; the
@@ -233,6 +245,7 @@ import { boardText, classifyPass, leversOf, readWake, sha256Hex, standingObjecti
   from "../_shared/agent_pass_evidence.ts";
 import { briefCoverage, directiveAbout, readBrief, userMessageOf, withWakeBrief, type WakeBrief }
   from "../_shared/agent_wake_brief.ts";
+import { checkDirectiveFacts, factsReason, newFactsTally, tallyFacts } from "../_shared/agent_directive_facts.ts";
 import {
   KNOBS, WORK_SIDE_KEYS, OPS_ACTION_DIAL, INERT_KEYS, INERT_OPS,
   clampDial, currentDialValue, reversalDwellMin, admitDialChange, opsActionDirection, reversalHold,
@@ -242,7 +255,7 @@ const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers
 function json(o: unknown, s = 200) { return new Response(JSON.stringify(o), { status: s, headers: { ...cors, "Content-Type": "application/json" } }); }
 
 const OPS_WHITELIST = new Set(Object.keys(OPS_ACTION_DIAL));
-const AGENT_VERSION = "v33";
+const AGENT_VERSION = "v34";
 
 const NV_KEYS = ["NVIDIA_API_KEY_NEMOTRON", "NVIDIA_API_KEY_CUOPT", "NVIDIA_API_KEY"];
 const NV_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
@@ -263,6 +276,13 @@ const MODELS = [MODEL, ...FALLBACK_MODELS];
 // temperature=1.0 and top_p=0.95 across all tasks". No card was read for the other two, so they are sent no
 // temperature and run on the endpoint's default.
 const DIRECTIVE_MAX_CHARS = 1_200;
+
+/** v34: the facts tally of a list of directive texts against one brief (the replay and the grader read it). */
+function gradeDirectives(brief: WakeBrief | null, texts: string[]) {
+  const t = newFactsTally();
+  for (const text of texts) tallyFacts(t, checkDirectiveFacts(brief, text), false);
+  return t;
+}
 
 /** The request body for one model: the same for a live pass and for a replay of one. */
 function chatBody(model: string, system: string, userMessage: string, maxTokens: number): Record<string, unknown> {
@@ -344,7 +364,7 @@ READ THE BOARD THIS WAY:
 - grounding.energy_limits.battery_plan (when energy_reserve_shave = 1) is the battery's plan for the rest of the day: mode, the grid level it defends (level_kw), the billed peak (ratchet_kw), the DR reserve it holds (reserve_now_kwh), and whether it is charging and why.
 - "assets" (when present): SoC distribution, hard constraints with their causes (dcfc blocked by pack_temp_high clears by waiting; cell_balance_overdue needs service; soh_derate is permanent), deadline pressure, and a named attention list. Use it to choose the solver objective and to write directives about named vehicles.
 - grounding.planner_learning is what the planners learned in THIS run: free chargers by type, cars waiting for one, the solver's batch (it plans only as many cars as there are free chargers, in the kernel's own order), its recent offers by outcome (used, moved to an equal free charger, refused by reason) and lesson {code, text}. A refusal for stall_occupied or stall_reserved while lesson.code is more_cars_than_chargers is a capacity finding, not a planner fault: the charger went to a car ahead in line. Say so in one directive that cites the numbers; do not move an energy dial for it, and never hold a vehicle back or shorten a charge because of it. When lesson.code is offers_lost_their_charger, name it in a directive as well.
-- "constraint" (when present) says where the depot's wall is. For each resource (service_bay, wash_bay, posts): units_up and busy_now, the cars queued for it and the minutes of work they owe there (queued_min), the work under way (in_progress_min), hours_to_clear, and idle_with_car_ready (units standing idle while a car they could take waits). exit_decided_by counts the waiting cars by the resource their exit waits on longest; posts.queued_min_bays_decide is the minutes of charge the line owes to cars whose exit a bay decides; "wall" is the resource with the most hours to clear and "lesson" says it in one line. When the wall is not the posts, name the wall with its numbers in a directive about capacity, not the chargers: a charger does not move a car whose exit a bay decides. A unit idle with a car ready is a finding to name. Never propose holding a vehicle back, shortening a charge or skipping a service because of the wall.
+- "constraint" (when present) says where the depot's wall is. For each resource (service_bay, wash_bay, posts): units_up and busy_now, the cars queued for it and the minutes of work they owe there (queued_min), the work under way (in_progress_min), hours_to_clear, held_for_car_due (bays not busy that a booked car reaches within 10 minutes: they are that car's, not idle capacity), and idle_with_car_ready (units neither busy nor held, standing idle while a car they could take waits). exit_decided_by counts the waiting cars by the resource their exit waits on longest; posts.queued_min_bays_decide is the minutes of charge the line owes to cars whose exit a bay decides; "wall" is the resource with the most hours to clear and "lesson" says it in one line. When the wall is not the posts, name the wall with its numbers in a directive about capacity, not the chargers: a charger does not move a car whose exit a bay decides. A unit idle with a car ready is a finding to name. Never propose holding a vehicle back, shortening a charge or skipping a service because of the wall.
 
 DIALS (the only keys set_policy accepts; value in [min, max]). Each grounding.actuators[dial].live says whether the dial does anything right now, and why not:
   energy_reserve_shave 0|1 — 1 = the battery follows its day plan (price- and demand-charge-aware to midnight, holding a demand-response reserve through the afternoon); 0 = a fixed grid-draw target set by the two factors below.
@@ -415,6 +435,26 @@ serve(async (req) => {
     const { data: run } = await runQuery.maybeSingle();
     if (!run) return json({ ok: true, skipped: "no running run" });
 
+    // ---- v34: GRADE STORED PASSES. Reads each pass's own answer and the brief it was sent, and says which facts its
+    // directives got wrong about a cut car. No model is called, no tick is claimed and nothing is written. ----
+    if (body.grade_pass_ids != null) {
+      const ids = Array.isArray(body.grade_pass_ids)
+        ? body.grade_pass_ids.map(Number).filter((n: number) => Number.isSafeInteger(n) && n > 0).slice(0, 400) : [];
+      if (ids.length === 0) return json({ ok: false, error: "grade_pass_ids must be a list of pass ids" }, 400);
+      const { data: evs, error: gErr } = await sb.from("ottoq_agent_pass_evidence")
+        .select("pass_id, sim_run_id, model_answered, wake, answer").in("pass_id", ids).order("pass_id");
+      if (gErr) return json({ ok: false, error: gErr.message }, 500);
+      const passes = (evs ?? []).map((ev: any) => {
+        const b = readBrief(ev.wake?.brief ?? null, null).brief;
+        const texts = (Array.isArray(ev.answer?.actions) ? ev.answer.actions : [])
+          .filter((a: any) => a?.type === "directive" && typeof a.text === "string")
+          .map((a: any) => a.text.slice(0, DIRECTIVE_MAX_CHARS));
+        return { pass_id: ev.pass_id, sim_run_id: ev.sim_run_id, model_answered: ev.model_answered,
+                 had_brief: b != null, directives: texts.length, facts: gradeDirectives(b, texts) };
+      });
+      return json({ ok: true, version: AGENT_VERSION, graded: passes.length, passes });
+    }
+
     // ---- v33: REPLAY A STORED PASS. Only while a run is live (the condition under which this function already
     // spends a model call for its caller). It claims no tick, calls no door and writes nothing. ----
     if (body.replay_pass_id != null) {
@@ -465,6 +505,7 @@ serve(async (req) => {
           first_directives: kept.slice(0, 3),
         } : null,
         wake_brief_coverage: replayCall.model ? briefCoverage(storedBrief, kept) : null,
+        directive_facts: replayCall.model ? gradeDirectives(storedBrief, kept.map((d: any) => d.text)) : null,
         ...(replayCall.model ? {} : { last: replayCall.raw.slice(0, 300) }),
       });
     }
@@ -697,6 +738,7 @@ serve(async (req) => {
 
     // ---- SQL disposes: whitelist + clamps + drift, execute or QUEUE FOR APPROVAL ----
     const applied: unknown[] = []; const queued: unknown[] = []; const rejected: unknown[] = [];
+    const factsTally = newFactsTally();   // v34: each directive's facts about a cut car, against the brief
     let moves = 0;
     async function queueApproval(kind: string, detail: unknown, priority = "normal") {
       const { error } = await sb.from("ottoq_ops_approvals").insert({
@@ -793,8 +835,22 @@ serve(async (req) => {
         const about = directiveAbout(a);
         // v33: a directive written by a fallback model says so. Replayed on three real boards the first fallback
         // answered every time, gave no directive once and once paired the right cars with the wrong posts.
+        // v34 (G546, G548): what the directive says about a car whose charge a fault cut is read against the brief the model
+        // was sent (its post, its place in line, the minutes since the cut, the SoC it was cut at). Every miss is
+        // counted on the pass. One a FALLBACK model wrote is not applied: over 30 hours the primary had no miss in
+        // 408 facts read (posts, minutes, cut SoC) and the first fallback had 5 in 23.
+        const facts = checkDirectiveFacts(brief, a.text.slice(0, DIRECTIVE_MAX_CHARS));
+        const byFallback = modelUsed !== MODEL;
+        if (byFallback && facts.wrong.length > 0) {
+          tallyFacts(factsTally, facts, true);
+          rejected.push({ type: "directive", text: a.text.slice(0, DIRECTIVE_MAX_CHARS), reason: factsReason(facts),
+                          by_fallback_model: modelUsed });
+          continue;
+        }
+        tallyFacts(factsTally, facts, false);
         applied.push({ type: "directive", text: a.text.slice(0, DIRECTIVE_MAX_CHARS), severity: a.severity === "warning" ? "warning" : "info",
-                       ...(about ? { about } : {}), ...(modelUsed !== MODEL ? { by_fallback_model: modelUsed } : {}) });
+                       ...(about ? { about } : {}), ...(byFallback ? { by_fallback_model: modelUsed } : {}),
+                       ...(facts.wrong.length > 0 ? { facts_wrong: facts.wrong.length } : {}) });
       } else {
         rejected.push({ ...a, reason: "unrecognized action shape" });
       }
@@ -898,6 +954,7 @@ serve(async (req) => {
                         // v29: the honest class (0703); outcome_status below is left as v28 wrote it
                         outcome_class: outcomeClass,
                         ...(wakeBriefCoverage ? { wake_brief_coverage: wakeBriefCoverage } : {}),
+                        ...(factsTally.directives > 0 ? { directive_facts: factsTally } : {}),   // v34
                         source: modelUsed !== "none" ? "nemotron" : "deterministic_fallback" },
       // v23: an order the kernel accepted is an enacted action, as a dial write is
       outcome_status: applied.length > 0 || solverAccepted || orderAccepted ? "enacted" : "noop_no_candidate",
@@ -920,7 +977,8 @@ serve(async (req) => {
       answer: modelUsed !== "none" ? { actions: parsed.actions ?? [], solver: parsed.solver ?? null,
                                        rationale: String(parsed.rationale ?? "").slice(0, 1200),
                                        charge_order: parsed.charge_order ?? null } : null,
-      levers: wakeBriefCoverage ? { ...levers, wake_brief: wakeBriefCoverage } : levers,
+      levers: { ...levers, ...(wakeBriefCoverage ? { wake_brief: wakeBriefCoverage } : {}),
+                ...(factsTally.directives > 0 ? { directive_facts: factsTally } : {}) },
       decision_written: !decisionError, propose_ms: proposeMs, total_ms: totalMs,
     });
     if (decisionError) {
@@ -934,6 +992,7 @@ serve(async (req) => {
     return json({ ok: true, run: run.sim_run_id, model: modelUsed, applied, queued, rejected,
       solver_handoff: solverHandoff, charge_order: chargeOrderReceipt, model_attempts: call.attempts,
       outcome_class: outcomeClass, wake, wake_brief_coverage: wakeBriefCoverage, evidence_error: evidenceError,
+      directive_facts: factsTally.directives > 0 ? factsTally : null,
       latency_ms: { propose: proposeMs, total: totalMs }, rationale: parsed.rationale });
   } catch (e) {
     return json({ ok: false, error: e instanceof Error ? e.message : "unknown" }, 500);

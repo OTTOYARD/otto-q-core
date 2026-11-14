@@ -1,8 +1,12 @@
--- 0494  **A service bay visit is rare. Two generators in the twin made over a hundred a day; both are fixed, and the
+-- 0495  **A service bay visit is rare. Two generators in the twin made over a hundred a day; both are fixed, and the
 --        first run after them sent six cars.**
 --        Production database, 2026-11-14 15:33 to 15:45 UTC (9:33 to 9:45 AM CT), from now() on the reads. Rule 8:
 --        the twin depot. Rule 12: two short runs to see finished changes working; no pair, no sweep. Each run is one
 --        seed: readings, not ranges.
+--
+--   NUMBERS. This file was written as 0494, with findings G548 and G549. Another branch (PR 280) had taken 0494, G548
+--   and G549 the same night, so this is 0495 with G550 and G551. The two lineage rows of 0837 and 0838, written at the
+--   apply, still say G548 and G549: read them as G550 and G551.
 --
 --   Chase, that morning: "a service bay should be extremely rare or even quarterly from an annual perspective unless
 --   there's a major issue with the vehicle like flat tire or malfunction of some sort. So for more than two or three
@@ -13,9 +17,9 @@
 --   Run 7c967d67 (busy_day, 9.1 sim-hours, 116 cars, each driving a mean 73.4 km and 1.38 h): service-bay atoms on its
 --   visits: mechanical_pm 106 on 102 cars, sensor_calibration 37, fault_repair 5, cosmetic_repair 1. I had read the
 --   same line the night before (db/checks/0493 (4): 75 cars, 36 hours) and filed it as the wall of G500-G503.
---   GENERATOR ONE (G548). busy_day's fleet_overrides scaled each car's maintenance interval by 0.01 and its
+--   GENERATOR ONE (G550). busy_day's fleet_overrides scaled each car's maintenance interval by 0.01 and its
 --   calibration interval by 0.02: 65-95 km and 3.6-6.4 h, where the cars' own draws are 6,523-9,469 km and 181-320 h.
---   GENERATOR TWO (G549), found on 0837's first run. twin.ottoq_sim_observe_asset draws on every arrival from the
+--   GENERATOR TWO (G551), found on 0837's first run. twin.ottoq_sim_observe_asset draws on every arrival from the
 --   'service_manifest' feed plan: maintenance (1.25% of arrivals at least, 10% from 80% of the interval, 30% once
 --   due), calibration (1%, 8%, 24%), a cosmetic repair (1%) and a fault repair (2%), whatever the car's mileage. The
 --   observer called 400 times on one car under version 1: 51 maintenance, 3 calibrations, 4 cosmetic, 8 faults.

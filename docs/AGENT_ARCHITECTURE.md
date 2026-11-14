@@ -271,3 +271,26 @@ subjects and is wrong, so step (b), grading directives against what happened nex
 earning its place in the way E8 describes: it named something on its board that did not add up, and a person followed
 it. Nothing consumed that report automatically, and nothing does yet.
 
+## 2026-11-14: a directive's facts are read against the brief, and the board stops calling a booked bay idle
+
+Read in `db/checks/0494`. Two open items from the day before, and one reading that is not the agent's.
+
+- **Is a directive right?** v32 counted whether a directive names its subject. Agent v34 reads what it says about
+  a car whose charge a fault cut (its post, its place in line, the minutes since the cut, the SoC it was cut at)
+  against the brief the model was sent (`_shared/agent_directive_facts.ts`). Graded over 266 stored consults: the
+  primary model 7 facts wrong of 478, the first fallback 10 of 32. A fallback's directive with a wrong fact is not
+  applied; the primary's are applied and counted. `POST {"grade_pass_ids": [...]}` grades stored passes with no
+  model call and no write. Another branch built a database grader of stored passes the same night (0834, 0835); a
+  test holding the two to the same cases is owed.
+- **The fallback answers live passes**: 24 since 2026-11-13, 70 directives.
+- **The board's bay count** (0836): a bay a held or active booking covers is busy, a bay a booked car reaches within
+  10 minutes is `held_for_car_due`, and neither is "idle with a car ready". First run (`7c967d67`): held on 4 of 29
+  boards, and wash bays still read idle with a car ready on 5 of 29. The evidence it was built on read each
+  booking's window as stored afterwards, and `during` is rewritten at activation, so the count is correct and the
+  rate did not visibly move (0494 §8).
+- **Not the agent's, and larger than both**: under charge-port-side routing (0824) the stored boards read 7 to 11
+  posts idle while 35 to 43 cars queue (G549). The agent names the queue; it has no lever on it, and should not.
+
+What the agent still cannot do: nothing checks the brief against the depot, the fact check reads cut cars only, and
+no fallback directive has yet been refused on a live pass (first whole run: 29 consults, 38 facts, 0 wrong).
+

@@ -1,7 +1,7 @@
 -- migration-version: 20261114154052
 -- migration-name:    0838_scheduled_service_comes_from_a_cars_own_interval_and_a_fault_is_rare
 --
--- 0838  **Scheduled service comes from a car's own interval, and a fault or a cosmetic repair is rare.** (G549)
+-- 0838  **Scheduled service comes from a car's own interval, and a fault or a cosmetic repair is rare.** (G551; applied under the number G549)
 --
 -- ══ §1 WHY ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 --

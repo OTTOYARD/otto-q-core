@@ -334,6 +334,16 @@ When information is missing:
      16 times); and **a cause written in a check file is a hypothesis until it is rebuilt from the events**: 0492 had
      the bay the board calls idle held by a car on its way in, and three of three on run `7435e685` were cars on
      their way out, in their last tick (G547, no change made).
+     **AND THE NIGHT AFTER (`db/checks/0494`, G548, G549; agent v34, `0836`).** A directive's facts about a cut car
+     are read against the brief the model was sent: the primary had 7 wrong of 478, the first fallback 10 of 32, and
+     a fallback's directive with a wrong fact is no longer applied. The board (0836) no longer calls a bay idle with a
+     car ready when the calendar has a car reaching it within 10 minutes; on its first run that was 4 boards of 29, and
+     the rate of "idle with a car ready" did not visibly move, because my evidence for it read each booking's window as
+     stored afterwards. **A stored range that functions rewrite (`ottoq_stall_bookings.during`, ten writers) is not what
+     it was at an earlier clock: read `ottoq_bay_binding_witness` before saying what the calendar held.** **Three sessions worked the same open items
+     that night and two built a directive grader apart; before building an open item, fetch every branch and read
+     the ledger's last names, not only main.** And the reading that mattered most was not the agent's: under
+     charge-port-side routing 7 to 11 posts stand idle while 35 to 43 cars queue (G549).
 
 **11. OTTO-COMMAND IS THE FILTER AND EXECUTOR FOR PERSONAL AGENTS — added 2026-10-14 in Chase's words.**
 
@@ -442,7 +452,7 @@ When information is missing:
      Find what generated the visits (a scenario's scale, a draw, a rule that raises a service) before measuring the
      line, ordering it or naming it a capacity finding. Rule 9 holds every car until its service is done, so a
      service nobody would ask for holds a car for nothing.
-   - **This was missed for months, and it had two generators** (`db/checks/0494`, G548, G549). The busy_day scenario
+   - **This was missed for months, and it had two generators** (`db/checks/0495`, G550, G551). The busy_day scenario
      multiplied every car's maintenance interval by 0.01 and its calibration interval by 0.02, and the twin drew
      maintenance, calibration, a cosmetic repair and a fault repair on every arrival, whatever the car's mileage. On
      run `7c967d67`, 102 of 116 cars owed a `mechanical_pm` in 9.1 sim-hours. On 2026-11-14 I read 75 cars in that

@@ -179,7 +179,7 @@ test("v23: the order is recorded before the solver handoff, under the pass's cha
   assert.match(code, /charge_order: chargeOrder \}/);
 });
 
-test("v23-v32: the model call goes through the retry module, with the fallback model, and the row says v33", () => {
+test("v23-v32: the model call goes through the retry module, with the fallback model, and the row says v34", () => {
   assert.match(code, /await callModelWithRetry\(/);
   // v33 (G543): the fallback is a chain, with v23's model last, and the attempt cap counts every key per model
   assert.match(code, /models: passModels,/);
@@ -190,7 +190,7 @@ test("v23-v32: the model call goes through the retry module, with the fallback m
   assert.match(code, /maxAttempts: passModels\.length \* Math\.max\(2, keys\.length\)/);
   assert.match(code, /model_attempts: call\.attempts/);
   // v32: one constant names the version, and every row that records it reads the constant
-  assert.match(code, /const AGENT_VERSION = "v33";/);
+  assert.match(code, /const AGENT_VERSION = "v34";/);
   assert.equal((code.match(/agent_version: AGENT_VERSION/g) ?? []).length, 4);
   assert.doesNotMatch(code, /agent_version: "v\d+"/);
   // the single-try key loop is gone
@@ -205,7 +205,7 @@ test("v31 / 0783: the prompt reads the depot's constraint and names the wall, ne
   assert.match(orchestrator, /LENS 1 — DEPOT ORCHESTRATION & FLOW: [^\n]*where the wall is \(constraint\)/);
   const bullet = orchestrator.slice(orchestrator.indexOf('- "constraint" (when present)'));
   assert.ok(bullet.length > 0 && orchestrator.indexOf('- "constraint" (when present)') > orchestrator.indexOf("READ THE BOARD THIS WAY:"));
-  for (const key of ["units_up", "busy_now", "queued_min", "in_progress_min", "hours_to_clear", "idle_with_car_ready",
+  for (const key of ["units_up", "busy_now", "queued_min", "in_progress_min", "hours_to_clear", "held_for_car_due", "idle_with_car_ready",
                      "exit_decided_by", "posts.queued_min_bays_decide", '"wall"', '"lesson"']) {
     assert.ok(bullet.slice(0, bullet.indexOf("\n")).includes(key), key);
   }
@@ -276,5 +276,23 @@ test("v33: the live pass and the replay build their request through one function
 test("v33: the primary is bounded at 65 s so a fallback has 25, and a fallback's directive says which model wrote it", () => {
   assert.match(code, /const MODEL_TIMEOUT_MS = 65_000;/);
   assert.match(code, /const MODEL_BUDGET_MS = 90_000;/);
-  assert.match(code, /\.\.\.\(modelUsed !== MODEL \? \{ by_fallback_model: modelUsed \} : \{\}\)/);
+  assert.match(code, /const byFallback = modelUsed !== MODEL;/);
+  assert.match(code, /\.\.\.\(byFallback \? \{ by_fallback_model: modelUsed \} : \{\}\)/);
+});
+
+test("v34 / G548: a fallback's directive that contradicts the brief is not applied; every miss is counted; the grader writes nothing", () => {
+  const branch = code.slice(code.indexOf('} else if (a?.type === "directive" && typeof a.text === "string") {'));
+  const upTo = branch.slice(0, branch.indexOf("applied.push("));
+  // rule 9 first, then the facts; the refusal is only for a fallback, and it is kept with its reason
+  assert.ok(upTo.indexOf("ruleNineDirective(a.text)") < upTo.indexOf("checkDirectiveFacts(brief,"));
+  assert.match(upTo, /if \(byFallback && facts\.wrong\.length > 0\) \{\s+tallyFacts\(factsTally, facts, true\);\s+rejected\.push\(\{ type: "directive"[^}]*reason: factsReason\(facts\)/);
+  assert.match(upTo, /tallyFacts\(factsTally, facts, false\);\s*$/);
+  assert.match(code, /\.\.\.\(factsTally\.directives > 0 \? \{ directive_facts: factsTally \} : \{\}\)/);
+  // the grader returns before the replay, the model call, the tick claim and every write
+  const grade = code.indexOf("if (body.grade_pass_ids != null) {");
+  const replay = code.indexOf("if (body.replay_pass_id != null) {");
+  assert.ok(grade > 0 && grade < replay);
+  const body = code.slice(grade, replay);
+  assert.doesNotMatch(body, /callModelWithRetry|\.insert\(|\.update\(|\.upsert\(|\.rpc\(/);
+  assert.match(body, /\.slice\(0, 400\)/);
 });
