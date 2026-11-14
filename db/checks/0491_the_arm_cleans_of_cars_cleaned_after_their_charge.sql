@@ -130,6 +130,12 @@
 --   NOT EXPLAINED: 53 ticks failed with a deadlock in the decide half on this run, against 23 to 38 on the five
 --   runs before it (c86b46e1 32, 14d6eda7 23, c8913ea2 31, 1902d13b 38). The two earliest of those predate 0830.
 --
+-- AFTER 0826 (every post's arm reads left; applied 2026-11-14 16:00:47 UTC). Run a7345255 against 7435e685: the west
+--   column's post-hours 40 -> 103, its sessions of left-inlet cars 0 -> 114, departures 159 -> 304, charge sessions
+--   249 -> 324, sim_tick_failed 53 -> 1. The arrived_at-to-first-session wait did not fall (median 10 -> 47 min,
+--   longest 255 -> 179, over 60 min 65 of 214 -> 129 of 267). The table and its caveats are in 0826's footer.
+--   The posts charged 214 of 270 post-hours on a7345255: with all 30 open the depot is close to charger-bound.
+--
 -- TO READ THE STOP DOOR ON A RUN:
 --   SELECT n.meta->'arm_after_charge'->>'why' why, n.meta->'arm_after_charge'->>'result' result, count(*)
 --     FROM ottoq_visit_needs n WHERE n.sim_run_id = :'run' AND n.meta ? 'arm_after_charge' GROUP BY 1, 2;
