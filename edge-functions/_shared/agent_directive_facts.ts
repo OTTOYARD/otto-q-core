@@ -1,5 +1,5 @@
 /**
- * Whether a directive's facts are the brief's (edge function v34, db/checks/0493, FINDINGS G545).
+ * Whether a directive's facts are the brief's (edge function v34, db/checks/0494, FINDINGS G546 and G548).
  *
  * WHY. v32 counts whether a directive NAMES the subject its brief gave it; nothing read whether what it says about the
  * subject is true. Read 2026-11-14 over 30 hours at the twin depot (759 directives, 236 consults, 12 runs), against the
@@ -16,6 +16,13 @@
  *   cut_soc   "cut at N%" is the SoC the brief says the charge was cut at.
  * It checks what is said against the brief the model was sent. It does not check the brief, and a fact it cannot find
  * in the text is not checked. Pure, so `node --test tests/*.test.mjs` drives it.
+ *
+ * THE DATABASE HAS ITS OWN GRADER, written the same night on another branch: public.ottoq_agent_directive_grade and
+ * the view public.ottoq_agent_directive_grades (0834, G545), which read stored passes. This module is what the edge
+ * function acts on while it answers (G546 left that undecided). The two read the same brief and were written apart:
+ * the view also grades "charging again" as a claim and does not read minutes; this reads minutes and does not grade
+ * "charging again". Where both read a fact they should agree; a test holding them to the same cases is owed once
+ * both are on main (db/checks/0494 §3).
  */
 import { namesSubject, type WakeBrief } from "./agent_wake_brief.ts";
 

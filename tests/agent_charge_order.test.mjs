@@ -280,7 +280,7 @@ test("v33: the primary is bounded at 65 s so a fallback has 25, and a fallback's
   assert.match(code, /\.\.\.\(byFallback \? \{ by_fallback_model: modelUsed \} : \{\}\)/);
 });
 
-test("v34 / G545: a fallback's directive that contradicts the brief is not applied; every miss is counted; the grader writes nothing", () => {
+test("v34 / G548: a fallback's directive that contradicts the brief is not applied; every miss is counted; the grader writes nothing", () => {
   const branch = code.slice(code.indexOf('} else if (a?.type === "directive" && typeof a.text === "string") {'));
   const upTo = branch.slice(0, branch.indexOf("applied.push("));
   // rule 9 first, then the facts; the refusal is only for a fallback, and it is kept with its reason

@@ -10,8 +10,8 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
-// v34 (0835, G541; db/checks/0493, G545): A DIRECTIVE'S FACTS ARE READ AGAINST THE BRIEF.
-//      * The prompt names held_for_car_due, the bays a booked car is about to reach, which the board (0835) no longer
+// v34 (0836, G541; db/checks/0494, G548): A DIRECTIVE'S FACTS ARE READ AGAINST THE BRIEF.
+//      * The prompt names held_for_car_due, the bays a booked car is about to reach, which the board (0836) no longer
 //        counts idle with a car ready.
 //      * _shared/agent_directive_facts.ts reads what a directive says about a car whose charge a fault cut (its
 //        post, its place in line, the minutes since the cut, the SoC it was cut at) against the brief the model was
@@ -835,7 +835,7 @@ serve(async (req) => {
         const about = directiveAbout(a);
         // v33: a directive written by a fallback model says so. Replayed on three real boards the first fallback
         // answered every time, gave no directive once and once paired the right cars with the wrong posts.
-        // v34 (G545): what the directive says about a car whose charge a fault cut is read against the brief the model
+        // v34 (G546, G548): what the directive says about a car whose charge a fault cut is read against the brief the model
         // was sent (its post, its place in line, the minutes since the cut, the SoC it was cut at). Every miss is
         // counted on the pass. One a FALLBACK model wrote is not applied: over 30 hours the primary had no miss in
         // 408 facts read (posts, minutes, cut SoC) and the first fallback had 5 in 23.

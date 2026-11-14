@@ -1,4 +1,4 @@
--- 0493  A bay held for a car due (0835), a directive's facts against its brief (agent v34), and the size of the idle
+-- 0494  A bay held for a car due (0836), a directive's facts against its brief (agent v34), and the size of the idle
 --       posts under charge-port-side routing.
 --
 -- Twin depot 11111111-1111-1111-1111-111111111111, scenario busy_day. Read 2026-11-14 05:43 to 06:28 UTC (11:43 PM
@@ -22,7 +22,7 @@
 --    busy by the cars' states and ready by the line, so the bay read idle and the same car read ready for it.
 --    WHAT IT DOES NOT SAY. That any car waited for a wash bay: on a95e51a3 cars entered one a median 1.9 minutes
 --    after staging (0492 §4). The three boards left are not explained here.
---    FIX: db/migrations/0835 (public.ottoq_depot_constraint, the bays only). §7 has its apply and its first run.
+--    FIX: db/migrations/0836 (public.ottoq_depot_constraint, the bays only). §7 has its apply and its first run.
 --
 -- §2 MEASURED AWAY: THE WASH BAYS' "detail" BOOKINGS BLOCK NOTHING.
 --
@@ -32,7 +32,7 @@
 --    its window began. No bay minute was held. (released_at on this table is sim time: it precedes booked_at, the
 --    real clock, by hours.) Not a defect; not built.
 --
--- §3 G545: WHAT A DIRECTIVE SAYS ABOUT A CUT CAR, AGAINST THE BRIEF THE MODEL WAS SENT.
+-- §3 G548: WHAT A DIRECTIVE SAYS ABOUT A CUT CAR, AGAINST THE BRIEF THE MODEL WAS SENT.
 --
 --    v32 counts whether a directive names its subject. Nothing read whether what it says is true (0492 §6).
 --    Graded by the deployed function itself (POST {"grade_pass_ids": [...]}, agent v34, function version 50,
@@ -106,7 +106,7 @@
 --    1.4 to 1.9 idle and 17 to 33 queued on the seven runs before. The line roughly doubled.
 --    WHAT IT DOES NOT SAY. That the rule is wrong: it is the arm's reach, on Chase's instruction, and 0824 names the
 --    answers (hardware on the side the fleet needs; rule 13). The runs are unpaired, with different seeds, and other
---    changes landed between them (0827 to 0833). The board's idle count before 0835 does not subtract a post a car is
+--    changes landed between them (0827 to 0833). The board's idle count before 0836 does not subtract a post a car is
 --    on its way to.
 --    Not changed here: it is another branch's work in progress. Reported to Chase.
 

@@ -864,7 +864,7 @@ repo_manifest(version, name, file) AS (
     ('20261113003556'::text, '0822_a_due_cabin_clean_is_done_during_the_charge_and_a_cabin_stop_takes_its_turn_in_the_charge_line'::text, '0822_a_due_cabin_clean_is_done_during_the_charge_and_a_cabin_stop_takes_its_turn_in_the_charge_line.sql'::text),
     ('20261113030227'::text, '0823_the_agent_is_told_why_it_was_woken_and_what_it_said_last'::text, '0823_the_agent_is_told_why_it_was_woken_and_what_it_said_last.sql'::text),
     ('20261114004743'::text, '0829_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line'::text, '0829_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line.sql'::text),
-    ('PENDING'::text, '0835_a_bay_held_for_a_car_on_its_way_in_is_not_idle_with_a_car_ready'::text, '0835_a_bay_held_for_a_car_on_its_way_in_is_not_idle_with_a_car_ready.sql'::text)
+    ('PENDING'::text, '0836_a_bay_held_for_a_car_on_its_way_in_is_not_idle_with_a_car_ready'::text, '0836_a_bay_held_for_a_car_on_its_way_in_is_not_idle_with_a_car_ready.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

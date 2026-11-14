@@ -9,7 +9,7 @@ import {
 } from "../edge-functions/_shared/agent_directive_facts.ts";
 import { WAKE_BRIEF_PROMPT } from "../edge-functions/_shared/agent_wake_brief.ts";
 
-// edge function v34 (db/checks/0493, G545): what a directive says about a car whose charge a fault cut, against the
+// edge function v34 (db/checks/0494, G548): what a directive says about a car whose charge a fault cut, against the
 // brief the model was sent. The cases marked REAL are directives and brief rows read from ottoq_agent_pass_evidence
 // on 2026-11-14 (passes 10304, 10317, 10330 and the three samples of the primary model).
 
