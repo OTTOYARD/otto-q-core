@@ -84,6 +84,11 @@
 --   The primary's directives of passes 10391 and 10394 name two cars cut at 97% and 98% and still waiting for a post
 --   209 and 222 minutes later (Waymo-AV-024, Waymo-AV-039). NOT READ: whether they owed bay work and yielded their place (0781), which would
 --   make the wait the rule's and not a defect. G542 is where a cut car's wait is tracked.
+--   The same question on the live run 7435e685, read at sim 21:05 (after 06:44 UTC): 15 charges cut by a charger
+--   fault, all 15 cars charging again, after a mean 22.9 minutes. Two took over two hours. Zoox-AV-085 (cut at 99%,
+--   141 minutes) deployed in between, so that is not a wait. Lucid-AV-003 (cut at 91% at sim 15:24) stood 129 minutes
+--   at the depot before its next charge; it owes a mechanical_pm in the service bays, the kind of car 0781 has yield
+--   its place to its owner's other cars. NOT READ: its exit_key during those 129 minutes. The next longest is 23.
 --
 -- ══ (5) WHAT IS OPEN ══════════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -112,6 +117,18 @@ SELECT after_0829, lane, count(*) AS boards, count(DISTINCT sim_run_id) AS runs,
                               > LEAST((p ->> 'free_by_pointer')::int,
                                       GREATEST((c ->> 'units_up')::int - (p ->> 'occupied')::int, 0))) AS above_pointer_free
   FROM x GROUP BY 1, 2 ORDER BY 1, 2;
+
+-- (4) charges a fault cut on a run, and how long each car took to charge again
+WITH cut AS (
+  SELECT os.vehicle_id, os.soc_end, os.ended_at,
+         (SELECT min(n.started_at) FROM ocpp_sessions n
+           WHERE n.sim_run_id = os.sim_run_id AND n.vehicle_id = os.vehicle_id AND n.started_at >= os.ended_at) AS again_at
+    FROM ocpp_sessions os
+   WHERE os.sim_run_id = '7435e685-0140-47f7-a15e-3d441fd2bbc6' AND os.status = 'faulted')
+SELECT count(*) AS cuts, count(again_at) AS charged_again,
+       round(avg(extract(epoch FROM (again_at - ended_at)) / 60.0), 1) AS mean_min,
+       round(max(extract(epoch FROM (again_at - ended_at)) / 60.0), 1) AS longest_min
+  FROM cut;
 
 -- (2), (3) the grades by the model that answered; count the runs behind a rate (0339)
 SELECT model_answered, count(*) AS directives, count(DISTINCT pass_id) AS passes, count(DISTINCT sim_run_id) AS runs,
