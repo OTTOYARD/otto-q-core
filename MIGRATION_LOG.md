@@ -915,7 +915,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0822](db/migrations/0822_a_due_cabin_clean_is_done_during_the_charge_and_a_cabin_stop_takes_its_turn_in_the_charge_line.sql) | `20261113003556` | yes — ledger | **A cabin clean that is due is done during the charge. A car waiting for a cabin stop takes its turn in the |
 | [0823](db/migrations/0823_the_agent_is_told_why_it_was_woken_and_what_it_said_last.sql) | `20261113030227` | yes — ledger | **The agent is told why it was woken, which cars and chargers are behind each reason, and what it said last.** |
 | [0829](db/migrations/0829_a_car_whose_cabin_clean_is_done_at_a_post_is_in_no_bays_line.sql) | `20261114004743` | yes — ledger | **A car whose cabin clean is done at a charging post is in no bay's line, so it no longer yields its place in |
-| [0836](db/migrations/0836_a_bay_held_for_a_car_on_its_way_in_is_not_idle_with_a_car_ready.sql) | `PENDING` | no — pending | **A bay held for a car on its way in is not "idle with a car ready" on the agent's board.** (G541, second half) |
+| [0836](db/migrations/0836_a_bay_held_for_a_car_on_its_way_in_is_not_idle_with_a_car_ready.sql) | `20261114072352` | yes — ledger | **A bay held for a car on its way in is not "idle with a car ready" on the agent's board.** (G541, second half) |
 
 633 migrations indexed.
 

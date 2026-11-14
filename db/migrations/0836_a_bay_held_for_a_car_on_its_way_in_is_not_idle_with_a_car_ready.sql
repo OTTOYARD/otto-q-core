@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261114072352
 -- migration-name:    0836_a_bay_held_for_a_car_on_its_way_in_is_not_idle_with_a_car_ready
 --
 -- 0836  **A bay held for a car on its way in is not "idle with a car ready" on the agent's board.** (G541, second half)
