@@ -276,5 +276,23 @@ test("v33: the live pass and the replay build their request through one function
 test("v33: the primary is bounded at 65 s so a fallback has 25, and a fallback's directive says which model wrote it", () => {
   assert.match(code, /const MODEL_TIMEOUT_MS = 65_000;/);
   assert.match(code, /const MODEL_BUDGET_MS = 90_000;/);
-  assert.match(code, /\.\.\.\(modelUsed !== MODEL \? \{ by_fallback_model: modelUsed \} : \{\}\)/);
+  assert.match(code, /const byFallback = modelUsed !== MODEL;/);
+  assert.match(code, /\.\.\.\(byFallback \? \{ by_fallback_model: modelUsed \} : \{\}\)/);
+});
+
+test("v34 / G545: a fallback's directive that contradicts the brief is not applied; every miss is counted; the grader writes nothing", () => {
+  const branch = code.slice(code.indexOf('} else if (a?.type === "directive" && typeof a.text === "string") {'));
+  const upTo = branch.slice(0, branch.indexOf("applied.push("));
+  // rule 9 first, then the facts; the refusal is only for a fallback, and it is kept with its reason
+  assert.ok(upTo.indexOf("ruleNineDirective(a.text)") < upTo.indexOf("checkDirectiveFacts(brief,"));
+  assert.match(upTo, /if \(byFallback && facts\.wrong\.length > 0\) \{\s+tallyFacts\(factsTally, facts, true\);\s+rejected\.push\(\{ type: "directive"[^}]*reason: factsReason\(facts\)/);
+  assert.match(upTo, /tallyFacts\(factsTally, facts, false\);\s*$/);
+  assert.match(code, /\.\.\.\(factsTally\.directives > 0 \? \{ directive_facts: factsTally \} : \{\}\)/);
+  // the grader returns before the replay, the model call, the tick claim and every write
+  const grade = code.indexOf("if (body.grade_pass_ids != null) {");
+  const replay = code.indexOf("if (body.replay_pass_id != null) {");
+  assert.ok(grade > 0 && grade < replay);
+  const body = code.slice(grade, replay);
+  assert.doesNotMatch(body, /callModelWithRetry|\.insert\(|\.update\(|\.upsert\(|\.rpc\(/);
+  assert.match(body, /\.slice\(0, 400\)/);
 });
