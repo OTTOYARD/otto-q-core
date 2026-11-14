@@ -91,7 +91,18 @@
 --   The 1 missed (d9d2a011): the arm started with 1.8 minutes of charge left, the charger faulted
 --   (fault.session_aborted_other), the car left the post and the routine was cancelled as interrupted. The visit had no
 --   later stop. 0832 (applied 03:46:49 UTC) lets a later stop on the same visit ask again; that case is not yet seen.
---   Mid-run read; the run's end is not read here yet.
+--   AT THE RUN'S END, 722 ticks (ended 2026-11-14 04:22:00 UTC, read 04:30 UTC):
+--     the three kinds 129 charged · 126 arm (38 of them immediate turnarounds) · 0 immediate not cleaned · 3 without
+--     other kinds      54 charged ·  54 arm (21 immediate)
+--   meta.arm_after_charge, 129 stops: arm_at_work 98, asked -> arm_started 31. No error.
+--   The 3 without the arm, each on a visit with a faulted charge session:
+--     d9d2a011  the arm's routine cut short by the fault (above); not cleaned on that visit.
+--     87098f16  the arm's tidy cut short by a fault (fault.communication_dropout); the tidy was then done by another
+--               performer, so the car was cleaned, not by the arm.
+--     5ea53696  a cabin-stop visit (source cabin_post_stop): charge done, interior_deep_clean still pending when the
+--               visit was superseded. This is 0817's path, not 0827's; whether the newer visit carried the deep clean
+--               on is NOT read here.
+--   So no visit of the three kinds went without the arm unless a charger fault was on it. One run.
 --
 -- TO READ THE STOP DOOR ON A RUN:
 --   SELECT n.meta->'arm_after_charge'->>'why' why, n.meta->'arm_after_charge'->>'result' result, count(*)
