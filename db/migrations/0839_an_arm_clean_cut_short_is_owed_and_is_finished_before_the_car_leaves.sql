@@ -214,3 +214,13 @@ COMMIT;
 --   No run was live. V3 at apply: tested true, first_pass_visits 1, second_pass_visits 0, owed_tidies_on_the_test_visit 1.
 --   Stored after the apply, md5(prosrc): ottoq_sim_advance_visit_atoms 807b32f1a87ab6aa92956192f1548537.
 --   The run started to check it: 5ea96a57.
+--   TWO CHECK RUNS, AND NEITHER EXERCISED IT (read-only reads; twin depot):
+--     5ea96a57  stopped by an operator at tick 138 (ended 2026-11-14 18:35:54 UTC): 5 faulted sessions, 5 re-seated
+--               (median 1 minute later, the longest 14); 92 departures, none below 99%; sim_tick_failed 0.
+--     6f9a1b0e  a whole day, 763 ticks (ended 22:06:00 UTC, read 22:11 UTC): 19 faulted sessions, 19 re-seated (median
+--               5 minutes, the longest 24); 332 departures, none below 99%; sim_tick_failed 1.
+--   On neither run does a visit still in the table hold a cancelled arm atom or an `owed_from` atom, so no routine was
+--   cut short where 0839 acts, and the chain fault -> owed tidy -> done -> departure is NOT seen on a run. (Superseded
+--   visits leave the table, so a cut-short routine on a visit since replaced would not show in these reads.)
+--   What stands behind 0839 is its V3 at apply. A write test against the live run 5ea96a57 at 18:2x UTC deadlocked
+--   against the tick and was rolled back; write tests are not run against a live run.
