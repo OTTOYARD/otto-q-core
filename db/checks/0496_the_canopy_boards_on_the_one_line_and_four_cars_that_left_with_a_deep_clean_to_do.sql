@@ -89,6 +89,8 @@
 --     the 2,185.2 arm-minutes counted (4.2%; Q6). The bound includes the work done before each interruption, so the
 --     true overcount is smaller.
 --     NOT FIXED HERE. It is the engine's visit replacement and departure test, not the one-line: its own migration.
+--     FIXED THE SAME MORNING by 0841 (ledger 20261116163709): the wash triage passed the deriver no run id, so 0698's
+--     carry found nothing; it now matches the run the new visit is written under. db/checks/0497 has the check run.
 --
 --   G553. ON 9 VISITS, AN INTERIOR DEEP CLEAN AND AN INTERIOR TIDY RAN ON THE SAME ARM AT THE SAME TIME (Q7). All on
 --     6f9a1b0e, both done, overlapping 9.7 minutes on average, 10.8 at the most. An arm does one routine at a time:
@@ -108,7 +110,7 @@
 --   (c) A board's load follows the engine's plan for each routine (started_at to done_at, or to ends_at while open),
 --       not a meter. G552's open atoms show where the plan and the arm part.
 --   (d) The twin's Power tab drops a kind it does not know, so it shows no board until ottoyarddepot-sim learns the kind.
---   (e) G552 and G553 are open.
+--   (e) G552 was fixed by 0841 (db/checks/0497). G553 is open.
 --
 -- ══ THE QUERIES ══════════════════════════════════════════════════════════════════════════════════════════════════════
 
