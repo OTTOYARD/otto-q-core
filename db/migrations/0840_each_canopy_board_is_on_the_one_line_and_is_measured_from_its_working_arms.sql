@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261116145457
 -- migration-name:    0840_each_canopy_board_is_on_the_one_line_and_is_measured_from_its_working_arms
 --
 -- 0840  **Each fast-charger canopy's board is on the one-line, under TX-AUX, and is measured every tick from the
@@ -45,6 +45,18 @@
 --
 -- §4 CLASSIFICATION. forces_recert FALSE, forces_dial_restart FALSE: the capture writes only its own 2 tables, which
 --   no decision reads and no atom hashes (0810 §2), and the new function is read only by the capture.
+--
+-- APPLIED 2026-11-16 at 14:54:57 UTC (8:54 AM CT), ledger 20261116145457, through apply_migration, on the first send.
+--   No run was live: the twin depot's newest run, bf447eb4, had stopped at 2026-11-15 06:32 UTC. A dry run of the same
+--   statements, ending in ROLLBACK, ran first: V1-V6 passed and nothing persisted. The ledger holds this file from BEGIN
+--   to COMMIT byte for byte (md5 753971013926a5745094621795657930, 34,955 bytes) under a 5-line header.
+--   Stored after the apply, md5(prosrc), each equal to this file's body: ottoq_power_capture
+--   1ed53750b3f5ca68edf9677c7ce0ccf4, ottoq_power_one_line_design e76817a2385e7c77651e44ea631b277d,
+--   ottoq_power_canopy_board_load dcb1deb928123179cf05927806c8755f.
+--   Read after the apply: BOARD-A, BOARD-B and BOARD-C under TX-AUX at 54 kW each; TX-AUX 2,500 kVA with 1,912.0 kW
+--   connected; 2 rows in ottoq_schema_snapshots '0840_pre'; 1 lineage row; no row left at V5's instant.
+--   V6, re-read after the apply on the same function: on run 6f9a1b0e the most arms at work at once were 8, 9 and 8.
+--   db/checks/0496 has the readings.
 --
 -- ROLLBACK, in this order: EXECUTE the `definition`s in ottoq_schema_snapshots WHERE label = '0840_pre' (the capture and
 --   the design rule); DELETE FROM public.ottoq_power_nodes WHERE kind = 'canopy_board'; set TX-AUX's title and
