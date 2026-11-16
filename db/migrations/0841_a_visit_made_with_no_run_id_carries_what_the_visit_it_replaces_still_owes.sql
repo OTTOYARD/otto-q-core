@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261116163709
 -- migration-name:    0841_a_visit_made_with_no_run_id_carries_what_the_visit_it_replaces_still_owes
 --
 -- 0841  **A new visit made by a caller that passes no run id carries the required work the visit it replaces still
@@ -53,6 +53,13 @@
 --
 -- §4 CLASSIFICATION. forces_recert TRUE: on the twin's wash-triage path a visit now carries required work it used to
 --   drop, and the decisions that read visits follow. forces_dial_restart FALSE.
+--
+-- APPLIED 2026-11-16 at 16:37:09 UTC (10:37 AM CT), ledger 20261116163709, through apply_migration, on the first send.
+--   No run was live. A dry run of the same statements, ending in ROLLBACK, ran first, passed every check and left
+--   nothing. The ledger holds this whole file byte for byte as committed before this note (md5
+--   936bd45a4d3c1b562908318b7fbf0f2b, 12,413 bytes). Read after the apply: md5(prosrc) of ottoq.ottoq_derive_visit_needs
+--   bd34d1346bd3d17b8aa04a361cdc4913 (was 1c0bbc70a8391d6c4c2afbd4c69dfa3c), with the new line in it; 1 row in
+--   ottoq_schema_snapshots '0841_pre'; the lineage row, forces_recert true; no probe row left.
 --
 -- ROLLBACK: EXECUTE the `definition` in ottoq_schema_snapshots WHERE label = '0841_pre'; DELETE FROM
 --   public.ottoq_cert_lineage WHERE name LIKE '0841_%'.
