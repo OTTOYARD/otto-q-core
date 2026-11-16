@@ -73,8 +73,10 @@
 --       bf447eb4 (87 ticks)             11             0              0              11
 --     And 3, 4 and 3 interior tidies left open, all at a run's end with no departure after.
 --     On 6f9a1b0e, all 11 deep cleans were interrupted in the run's first 72 sim-minutes, on visits that were then
---     replaced. Each atom says must_do true, deferrable false, raised in the depot by the needs card. The visit that
---     replaced it carried no deep clean, and the departure test reads the car's live visit. So 4 cars left with it:
+--     replaced. Each atom says must_do true, deferrable false, raised in the depot by the needs card. For the 7 cars
+--     that had it done before leaving, the visit that replaced theirs carried the deep clean again. For the other 4 it
+--     did not (Q5: readiness_check and interior_inspection, with a tidy, a triage check or a sensor clean), and the
+--     departure test reads the car's live visit. So 4 cars left with it:
 --       car        clean interrupted   left the depot   back      clean done
 --       1b9b6ea1   14:05               14:16            15:30     16:21
 --       1225f10e   14:21               14:56            16:06     17:38
