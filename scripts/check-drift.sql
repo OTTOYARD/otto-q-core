@@ -880,7 +880,8 @@ repo_manifest(version, name, file) AS (
     ('20261114154052'::text, '0838_scheduled_service_comes_from_a_cars_own_interval_and_a_fault_is_rare'::text, '0838_scheduled_service_comes_from_a_cars_own_interval_and_a_fault_is_rare.sql'::text),
     ('20261114182421'::text, '0839_an_arm_clean_cut_short_is_owed_and_is_finished_before_the_car_leaves'::text, '0839_an_arm_clean_cut_short_is_owed_and_is_finished_before_the_car_leaves.sql'::text),
     ('20261116145457'::text, '0840_each_canopy_board_is_on_the_one_line_and_is_measured_from_its_working_arms'::text, '0840_each_canopy_board_is_on_the_one_line_and_is_measured_from_its_working_arms.sql'::text),
-    ('20261116163709'::text, '0841_a_visit_made_with_no_run_id_carries_what_the_visit_it_replaces_still_owes'::text, '0841_a_visit_made_with_no_run_id_carries_what_the_visit_it_replaces_still_owes.sql'::text)
+    ('20261116163709'::text, '0841_a_visit_made_with_no_run_id_carries_what_the_visit_it_replaces_still_owes'::text, '0841_a_visit_made_with_no_run_id_carries_what_the_visit_it_replaces_still_owes.sql'::text),
+    ('PENDING'::text, '0842_the_service_bays_tire_robot_replaces_worn_tires_and_rotates_them_each_quarter'::text, '0842_the_service_bays_tire_robot_replaces_worn_tires_and_rotates_them_each_quarter.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
