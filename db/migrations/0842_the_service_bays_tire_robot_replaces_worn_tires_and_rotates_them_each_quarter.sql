@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261117233648
 -- migration-name:    0842_the_service_bays_tire_robot_replaces_worn_tires_and_rotates_them_each_quarter
 --
 -- 0842  **OTTO-Q gives the service bays' tire robot (OTTO-TIRE) its two jobs: a worn set of tires is replaced, and the
@@ -96,6 +96,26 @@
 --
 -- §4 CLASSIFICATION. forces_recert TRUE: visits gain services, the service bays seat different cars for different
 --   lengths, and the decisions that read them follow. forces_dial_restart FALSE.
+--
+-- APPLIED 2026-11-17 at 23:36:48 UTC (5:36 PM CT), ledger 20261117233648, through apply_migration, on the first send.
+--   No run was live. Before it, five rolled-back sends of the same statements: the first ran every check of this file
+--   and printed the probes' answers; the others drove the decide tick and the service flow for real on a staged worn
+--   car (two stopped on the harness's own setup) and found the L2 door's 45-minute default, which this file then took
+--   in (decide tick substitution 3, and V4). The ledger holds this whole file byte for byte as committed before this
+--   note (md5 658ea0ab30642702e6e74fe3f9a8d07a, 57,962 bytes). Read after the apply: md5(prosrc) of
+--   public.ottoq_decide_tick 3f3871c273f10cbd935329ff8e3d16c8 (was d09961121632e5374405eb51d7ab6ee7),
+--   ottoq.ottoq_derive_visit_needs 2cacfcda6808779415848a01933c1e49 (was bd34d1346bd3d17b8aa04a361cdc4913),
+--   twin.ottoq_sim_advance_service_flow 47e96d6f76d8b6597b8474facfddc19b (was 02b12d958aba397731d50155c871b542),
+--   public.ottoq_seed_vehicle_need_profiles 272c63e65ab0f26d688192045fd5915d, public.ottoq_wear_mark_serviced
+--   701d366874d21c6370ea054a39a47f35, and the needs card's definition e3eb4bbe26f6285385fd35500d3f6cf3; 14 rows in
+--   ottoq_schema_snapshots '0842_pre'; the lineage row, forces_recert true; 19 services declared, none undeclared, the
+--   two new ones not yet on any visit (no run since).
+--   The probes' answers (the dry runs, same checks on the same data): before, the probe car (2.6 mm, PM fresh) was
+--   must-do for mechanical_pm; after, for tire_replacement alone, seated 12 minutes alone and 40 with PM, and the reset
+--   fitted 8.0 mm. A rotation 100 days old was due (ratio 1.096) and its reset cleared it; one 80 days old waited
+--   alone and rode along with PM. The newest run's seed draws 1 worn car of 116 and 1 rotation due at the draw, 0 more
+--   within its first day. The tick booked the staged worn car a service bay for 12 minutes, and the service flow's own
+--   booked admission seated it for 9 minutes (12 times that run's draw, 0.75).
 --
 -- ROLLBACK: for each function, EXECUTE the `definition` in ottoq_schema_snapshots WHERE label = '0842_pre' AND
 --   object_kind = 'function'. The view gained four columns, which CREATE OR REPLACE cannot remove: DROP VIEW

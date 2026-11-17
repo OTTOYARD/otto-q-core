@@ -932,7 +932,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0839](db/migrations/0839_an_arm_clean_cut_short_is_owed_and_is_finished_before_the_car_leaves.sql) | `20261114182421` | yes — ledger | **An arm clean that was cut short is owed: it goes back on the visit as a needed tidy, and the car does not |
 | [0840](db/migrations/0840_each_canopy_board_is_on_the_one_line_and_is_measured_from_its_working_arms.sql) | `20261116145457` | yes — ledger | **Each fast-charger canopy's board is on the one-line, under TX-AUX, and is measured every tick from the |
 | [0841](db/migrations/0841_a_visit_made_with_no_run_id_carries_what_the_visit_it_replaces_still_owes.sql) | `20261116163709` | yes — ledger | **A new visit made by a caller that passes no run id carries the required work the visit it replaces still |
-| [0842](db/migrations/0842_the_service_bays_tire_robot_replaces_worn_tires_and_rotates_them_each_quarter.sql) | `PENDING` | no — pending | **OTTO-Q gives the service bays' tire robot (OTTO-TIRE) its two jobs: a worn set of tires is replaced, and the |
+| [0842](db/migrations/0842_the_service_bays_tire_robot_replaces_worn_tires_and_rotates_them_each_quarter.sql) | `20261117233648` | yes — ledger | **OTTO-Q gives the service bays' tire robot (OTTO-TIRE) its two jobs: a worn set of tires is replaced, and the |
 
 650 migrations indexed.
 
