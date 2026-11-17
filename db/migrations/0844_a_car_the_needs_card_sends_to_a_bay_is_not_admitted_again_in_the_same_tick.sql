@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261117235645
 -- migration-name:    0844_a_car_the_needs_card_sends_to_a_bay_is_not_admitted_again_in_the_same_tick
 --
 -- 0844  **A car the needs card has sent to a bay in this tick is not admitted again by service sequencing in the same
@@ -32,6 +32,14 @@
 --   (the defect, reproduced). V2b, after it: once, and the needs card's booking stands, held, for 12 minutes.
 --
 -- §3 CLASSIFICATION. forces_recert TRUE: a car's service-bay seat changes. forces_dial_restart FALSE.
+--
+-- APPLIED 2026-11-17 at 23:56:45 UTC (5:56 PM CT), ledger 20261117235645, through apply_migration, on the first send,
+--   right after 0843. No run was live. A dry run of the same statements, ending in a raise that rolled everything back,
+--   ran first. On check run 0dc17f83's clock: before the patch the probe car was sent to a bay twice and the needs
+--   card's booking ended 'done' after 1 second, as the run showed; after it, once, and the booking stood, held, for 720
+--   seconds; the tick erred nowhere. The ledger holds this whole file byte for byte as committed before this note (md5
+--   ce220cbb8f6827c7cb97d14d0069f107). Read after the apply: md5(prosrc) of public.ottoq_decide_tick
+--   17cedddda8c9c211346a1ba8eec6cc62 (was 3f3871c273f10cbd935329ff8e3d16c8).
 --
 -- ROLLBACK: EXECUTE the `definition` in ottoq_schema_snapshots WHERE label = '0844_pre'; DELETE FROM
 --   public.ottoq_cert_lineage WHERE name LIKE '0844_%'.

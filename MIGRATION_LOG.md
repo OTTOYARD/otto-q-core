@@ -933,8 +933,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0840](db/migrations/0840_each_canopy_board_is_on_the_one_line_and_is_measured_from_its_working_arms.sql) | `20261116145457` | yes — ledger | **Each fast-charger canopy's board is on the one-line, under TX-AUX, and is measured every tick from the |
 | [0841](db/migrations/0841_a_visit_made_with_no_run_id_carries_what_the_visit_it_replaces_still_owes.sql) | `20261116163709` | yes — ledger | **A new visit made by a caller that passes no run id carries the required work the visit it replaces still |
 | [0842](db/migrations/0842_the_service_bays_tire_robot_replaces_worn_tires_and_rotates_them_each_quarter.sql) | `20261117233648` | yes — ledger | **OTTO-Q gives the service bays' tire robot (OTTO-TIRE) its two jobs: a worn set of tires is replaced, and the |
-| [0843](db/migrations/0843_a_bay_seat_in_the_twin_snapshot_names_the_work_it_is_doing.sql) | `PENDING` | no — pending | **A car's bay seat in the twin's snapshot names the work the seat is doing, as the bay exit will credit it, so |
-| [0844](db/migrations/0844_a_car_the_needs_card_sends_to_a_bay_is_not_admitted_again_in_the_same_tick.sql) | `PENDING` | no — pending | **A car the needs card has sent to a bay in this tick is not admitted again by service sequencing in the same |
+| [0843](db/migrations/0843_a_bay_seat_in_the_twin_snapshot_names_the_work_it_is_doing.sql) | `20261117235604` | yes — ledger | **A car's bay seat in the twin's snapshot names the work the seat is doing, as the bay exit will credit it, so |
+| [0844](db/migrations/0844_a_car_the_needs_card_sends_to_a_bay_is_not_admitted_again_in_the_same_tick.sql) | `20261117235645` | yes — ledger | **A car the needs card has sent to a bay in this tick is not admitted again by service sequencing in the same |
 
 652 migrations indexed.
 

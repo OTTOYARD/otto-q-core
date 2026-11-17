@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261117235604
 -- migration-name:    0843_a_bay_seat_in_the_twin_snapshot_names_the_work_it_is_doing
 --
 -- 0843  **A car's bay seat in the twin's snapshot names the work the seat is doing, as the bay exit will credit it, so
@@ -25,6 +25,13 @@
 --   ["tire_rotation"] and ["tire_replacement"]; a car in a wash bay reads only wash work.
 --
 -- §3 CLASSIFICATION. forces_recert FALSE (no decision reads it). forces_dial_restart FALSE.
+--
+-- APPLIED 2026-11-17 at 23:56:04 UTC (5:56 PM CT), ledger 20261117235604, through apply_migration, on the first send.
+--   No run was live (check run 0dc17f83 was stopped at 5:53 PM CT). A dry run of the same statements, ending in a raise
+--   that rolled everything back, ran first and read work = ["tire_rotation"], ["tire_replacement"] and
+--   ["exterior_wash"] for the three probe cars. The ledger holds this whole file byte for byte as committed before this
+--   note (md5 241a7e092b571c13fd61a3049fc014f4). Read after the apply: md5(prosrc) of public.ottoq_twin_snapshot
+--   91068abd372bb7c7e397dadcae8c9cd5 (was 7f961b8576f4c8dddea6f7d825f54a12).
 --
 -- ROLLBACK: EXECUTE the `definition` in ottoq_schema_snapshots WHERE label = '0843_pre'; DROP FUNCTION
 --   public.ottoq_bay_seat_work(uuid, text, uuid, jsonb); DELETE FROM public.ottoq_cert_lineage WHERE name LIKE '0843_%'.
