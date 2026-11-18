@@ -935,7 +935,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0842](db/migrations/0842_the_service_bays_tire_robot_replaces_worn_tires_and_rotates_them_each_quarter.sql) | `20261117233648` | yes — ledger | **OTTO-Q gives the service bays' tire robot (OTTO-TIRE) its two jobs: a worn set of tires is replaced, and the |
 | [0843](db/migrations/0843_a_bay_seat_in_the_twin_snapshot_names_the_work_it_is_doing.sql) | `20261117235604` | yes — ledger | **A car's bay seat in the twin's snapshot names the work the seat is doing, as the bay exit will credit it, so |
 | [0844](db/migrations/0844_a_car_the_needs_card_sends_to_a_bay_is_not_admitted_again_in_the_same_tick.sql) | `20261117235645` | yes — ledger | **A car the needs card has sent to a bay in this tick is not admitted again by service sequencing in the same |
-| [0845](db/migrations/0845_a_car_that_owes_its_tire_job_does_not_leave_before_the_robot_has_done_it.sql) | `PENDING` | no — pending | **A car that owes the service bay's tire robot a job (a worn set, or a rotation that is due) does not leave the |
+| [0845](db/migrations/0845_a_car_that_owes_its_tire_job_does_not_leave_before_the_robot_has_done_it.sql) | `20261118010216` | yes — ledger | **A car that owes the service bay's tire robot a job (a worn set, or a rotation that is due) does not leave the |
 
 653 migrations indexed.
 

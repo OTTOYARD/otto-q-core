@@ -43,6 +43,14 @@
 --       none rode along: on this seed no car with a rotation within 14 days of due had other service-bay work.
 --   (b) Boot cars have no visit, so their tire need lives on the needs card alone, and the departure test reads the
 --       visit. Both runs seated AV-038 before it could leave; a run whose bays were busy might not. Not measured.
+--       MEASURED AND CLOSED 2026-11-18 (0845, ledger 20261118010216, 7:02 PM CT on 11-17). It was a real gap: a charged
+--       car with a worn set and no visit was departure-clear. AV-038 was not protected by luck in dispatch, as I first
+--       said; it began each run at 89% against a 100% target, so the departure recheck sent it to charge (14:06:50 on
+--       0dc17f83, 14:04:21 on eb4e90ca) and the needs card seated it for the tires from there. Closing the door alone
+--       would have stranded such a car: the recheck had no remedy for card-only work, and the needs card seats only cars
+--       waiting for service; and with the bays busy the service flow's 0468 need gate and the deploy gate would have
+--       released it every tick. 0845 closes all three, and its probe reproduced each before and showed it closed after.
+--       The same shape holds for any must-do the card raises on a car with no visit; only the tire jobs are closed (G554).
 --   (c) The flat-tyre path (tow truck, a parking spot) is not modeled.
 --
 -- ══ THE QUERIES ══════════════════════════════════════════════════════════════════════════════════════════════════════

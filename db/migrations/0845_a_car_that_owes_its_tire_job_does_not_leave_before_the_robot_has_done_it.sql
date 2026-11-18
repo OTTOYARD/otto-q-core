@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261118010216
 -- migration-name:    0845_a_car_that_owes_its_tire_job_does_not_leave_before_the_robot_has_done_it
 --
 -- 0845  **A car that owes the service bay's tire robot a job (a worn set, or a rotation that is due) does not leave the
@@ -53,6 +53,22 @@
 --        tire_replacement, its booking held for 12 minutes, both times.
 --
 -- §3 CLASSIFICATION. forces_recert TRUE: departures and service-bay seats change. forces_dial_restart FALSE.
+--
+-- APPLIED 2026-11-18 at 01:02:16 UTC (7:02 PM CT on 2026-11-17), ledger 20261118010216, through apply_migration, on the
+--   first send. No run was live. A dry run of the same statements, ending in a raise that rolled everything back, ran
+--   first, on run eb4e90ca's clock (sim 15:41:50). Before the patches the worn car and the rotation-due car were clear to
+--   leave, the recheck left both in staging, and the service flow released the waiting car to staged_for_departure; the
+--   decide tick also counted the rotation-due car among its departures to consider (3 requests built, 2 after). After:
+--   both held, both sent to need_service, the waiting car kept there, and the decide tick sent it to a bay once, by the
+--   needs card, for tire_replacement, its booking held for 720 seconds; the tick erred nowhere. The helper agreed with
+--   the needs card on all 116 cars. The apply's own V2a and V2b passed. The ledger holds this whole file byte for byte
+--   as committed before this note (md5 e16147b91f7e453e805a8b02360d190a). Read after the apply, md5(prosrc):
+--   public.ottoq_departure_clear 55eb702247598a5c68353c42c7279cd0 (was d5e4d262f68870a3b8d72e113fe68d45),
+--   twin.ottoq_sim_departure_recheck ec37116e43fd821d81e8cf567efd0101 (was 4060e9d844d293468748c3a2d04cdd8f),
+--   twin.ottoq_sim_advance_service_flow bf8ef966746df3b99742013600f8a35b (was 47e96d6f76d8b6597b8474facfddc19b),
+--   public.ottoq_decide_tick f031133a812fb6e5852bd971dd93e46f (was 17cedddda8c9c211346a1ba8eec6cc62), and the new
+--   public.ottoq_tire_job_owed 089ecf183b715f5a2977cfaa1f811152. Its grants are 0842's helpers' (postgres,
+--   service_role, authenticated), as are those of ottoq_owner_departure_blocked, which the departure test already called.
 --
 -- ROLLBACK: EXECUTE each `definition` in ottoq_schema_snapshots WHERE label = '0845_pre'; DROP FUNCTION
 --   public.ottoq_tire_job_owed(uuid, timestamptz); DELETE FROM public.ottoq_cert_lineage WHERE name LIKE '0845_%'.

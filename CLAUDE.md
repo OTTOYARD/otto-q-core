@@ -483,7 +483,13 @@ When information is missing:
      doors to the service bay admitted the same car in one tick, and the second released the first one's booking to a
      second, so a rotation was seated for one minute. A tire job is must-do on the card and required on the visit, so both
      doors saw it; the second now passes over a car the first has already sent to a bay. `0843` puts the seat's work on
-     the twin's snapshot, so the yard plays the robot only for a tire job.
+     the twin's snapshot, so the yard plays the robot only for a tire job. **And `0845` closed a door that read only the
+     visit** (`db/checks/0498` §4(b)): a car on the depot when its run begins has no visit, so its tire job is on its needs
+     card alone, and `ottoq_departure_clear` cleared a charged car with a worn set. The departure test, the departure
+     recheck, the service flow's need gate and the decide tick now read one rule, `public.ottoq_tire_job_owed` (the card's
+     own must-do rule), and the car is seated before it leaves. Neither check run reached that path: their worn car began
+     at 89% and its charge held it. **The pattern is general and only the tire jobs are closed:** any must-do the card
+     raises for a car with no visit is invisible to the departure test (G554).
 
 ---
 
