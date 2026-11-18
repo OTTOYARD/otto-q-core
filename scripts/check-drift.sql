@@ -883,7 +883,8 @@ repo_manifest(version, name, file) AS (
     ('20261116163709'::text, '0841_a_visit_made_with_no_run_id_carries_what_the_visit_it_replaces_still_owes'::text, '0841_a_visit_made_with_no_run_id_carries_what_the_visit_it_replaces_still_owes.sql'::text),
     ('20261117233648'::text, '0842_the_service_bays_tire_robot_replaces_worn_tires_and_rotates_them_each_quarter'::text, '0842_the_service_bays_tire_robot_replaces_worn_tires_and_rotates_them_each_quarter.sql'::text),
     ('20261117235604'::text, '0843_a_bay_seat_in_the_twin_snapshot_names_the_work_it_is_doing'::text, '0843_a_bay_seat_in_the_twin_snapshot_names_the_work_it_is_doing.sql'::text),
-    ('20261117235645'::text, '0844_a_car_the_needs_card_sends_to_a_bay_is_not_admitted_again_in_the_same_tick'::text, '0844_a_car_the_needs_card_sends_to_a_bay_is_not_admitted_again_in_the_same_tick.sql'::text)
+    ('20261117235645'::text, '0844_a_car_the_needs_card_sends_to_a_bay_is_not_admitted_again_in_the_same_tick'::text, '0844_a_car_the_needs_card_sends_to_a_bay_is_not_admitted_again_in_the_same_tick.sql'::text),
+    ('PENDING'::text, '0845_a_car_that_owes_its_tire_job_does_not_leave_before_the_robot_has_done_it'::text, '0845_a_car_that_owes_its_tire_job_does_not_leave_before_the_robot_has_done_it.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
