@@ -506,6 +506,12 @@ When information is missing:
      interval before naming which one is wrong:** the card, the wear ledger and the arrival observers each counted a car's
      cycles, and only the card disagreed. Open, Chase's: what a maintenance visit does to brake wear (G556), and a young
      car's calibration count against its lifetime driving (G557).
+     **And the demo run that checked `0847` found two empty seats (G558, fixed by `0848`):** two cars whose only work, a
+     cabin clean, was done at their charger posts were seated in a service bay for 45 minutes each, because section (5)
+     took an outside `admit_service` as it stood and an outside proposal lives at least 35 real minutes (4.7 sim-hours at
+     8x). Section (5) now takes one only when its own heuristic would admit the car at that tick. On the same seed and
+     window the next run seated three cars, each owing its bay work, against six. **A full line hides its defects: when a
+     fix empties a line, read every car that still enters it.**
 
 ---
 

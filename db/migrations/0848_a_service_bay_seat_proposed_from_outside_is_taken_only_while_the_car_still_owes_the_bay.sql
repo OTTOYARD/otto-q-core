@@ -58,6 +58,14 @@
 --   public.ottoq_decide_tick 66a66fa24c6a1abc01d10fe7a5e6d99f (was e1ef8490217afdb498af7b8d7b7b5859),
 --   public.ottoq_service_priority_propose 47beb6904c8b98b9eeb19ebbc744ea02 (was 63f81c41620680d60d1c052c1bdf2fd2).
 --
+-- CHECKED ON ONE DEMO RUN (rule 12): 368e1472, busy_day on the same seed as 02fca960 (8350472578738339482), started
+--   18:40:49 UTC (12:40 PM CT), live at 8x, read at sim 9:34 AM CT and stopped through ottoq_sim_stop_and_reset at
+--   18:53:08 UTC (12:53 PM CT), 147 ticks. In the same 95 sim-minutes 02fca960 had seated six cars in the service bays;
+--   this run seated three, and each owed the bay its work: the two tire rotations (Tesla-AV-057 at 8:35 and Tesla-AV-064
+--   at 8:48 AM sim, where 02fca960 seated them at 9:13 and 9:06, behind the two empty seats) and Lucid-AV-003 for a
+--   calibration raised after a failed sensor clean. 15 cars had an outside admit_service; one was taken, the Lucid's.
+--   The decide tick erred nowhere (1,146 decisions enacted, 1,138 found no candidate) and admitted no car twice.
+--
 -- ROLLBACK: EXECUTE each `definition` in ottoq_schema_snapshots WHERE label = '0848_pre'; DELETE FROM
 --   public.ottoq_cert_lineage WHERE name LIKE '0848_%'.
 
