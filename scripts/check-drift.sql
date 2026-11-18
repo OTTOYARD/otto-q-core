@@ -886,7 +886,7 @@ repo_manifest(version, name, file) AS (
     ('20261117235645'::text, '0844_a_car_the_needs_card_sends_to_a_bay_is_not_admitted_again_in_the_same_tick'::text, '0844_a_car_the_needs_card_sends_to_a_bay_is_not_admitted_again_in_the_same_tick.sql'::text),
     ('20261118010216'::text, '0845_a_car_that_owes_its_tire_job_does_not_leave_before_the_robot_has_done_it'::text, '0845_a_car_that_owes_its_tire_job_does_not_leave_before_the_robot_has_done_it.sql'::text),
     ('20261118040158'::text, '0846_a_service_bay_seat_says_why_the_car_is_there_and_its_booking_names_the_work'::text, '0846_a_service_bay_seat_says_why_the_car_is_there_and_its_booking_names_the_work.sql'::text),
-    ('PENDING'::text, '0847_a_run_starts_with_service_bay_work_rare_and_the_needs_card_counts_a_cars_service_cycles_as_its_wear_does'::text, '0847_a_run_starts_with_service_bay_work_rare_and_the_needs_card_counts_a_cars_service_cycles_as_its_wear_does.sql'::text)
+    ('20261118181246'::text, '0847_a_run_starts_with_service_bay_work_rare_and_the_needs_card_counts_a_cars_service_cycles_as_its_wear_does'::text, '0847_a_run_starts_with_service_bay_work_rare_and_the_needs_card_counts_a_cars_service_cycles_as_its_wear_does.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

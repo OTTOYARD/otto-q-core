@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261118181246
 -- migration-name:    0847_a_run_starts_with_service_bay_work_rare_and_the_needs_card_counts_a_cars_service_cycles_as_its_wear_does
 --
 -- 0847  **A run no longer starts with a fifth of the fleet owing the service bays. The needs profile draws open faults
@@ -85,6 +85,28 @@
 --   canon re-certifies, as for 0837 and 0838. forces_dial_restart TRUE, likewise. Rule 12: nothing acts on either until
 --   testing resumes. No evidence regime is recorded: ottoq_evidence_regimes is read only by the charge clock
 --   (charge_time_v2), and nothing here changes a battery, a charger or the charge physics.
+--
+-- APPLIED 2026-11-18 at 18:12:46 UTC (12:12 PM CT), ledger 20261118181246, through apply_migration, on the first send.
+--   No run was live: the twin depot's newest run, 2b0c4017, had ended at 04:07:20 UTC. Two dry runs of the same
+--   statements, each ending in a raise that rolled everything back, ran first on 2b0c4017's seed and clock. The first
+--   stopped at V2b on the young cars (G557), and this file gained the odometer cap; the second passed every check. Read in
+--   the second, before and after:
+--   - cars owing service-bay work at a run's start: 23 -> 2 (the two tire jobs);
+--   - fault repairs 12 -> 0, maintenance 6 -> 0, calibrations 5 -> 0; cars with an open fault 14 -> 0;
+--   - cars past their maintenance interval 16 -> 0, past their calibration interval 38 -> 0; brakes at 80% 10 -> 0;
+--   - the profile and the wear ledger at most 11,298 km and 377 hours apart -> 0.5 km and 0.49 hours;
+--   - two cars put half an interval past their calibration and their maintenance on the wear ledger: must-do, with "432
+--     driving hours since its last calibration, due every 288" and "11345 km since its last maintenance, due every 7563
+--     km". Before the patches neither was must-do for it;
+--   - the needs card's read at the twin depot: 247 to 261 ms before, 249 to 254 ms after.
+--   The card as it stood, on profiles not yet redrawn, read calibrations 5 -> 0 and maintenance 6 -> 3; the 3 left are
+--   brakes at 82% or more, and the 12 fault repairs are the old draw's. The next run's draw makes neither. The ledger
+--   holds this whole file byte for byte as committed before this note (md5 551b28a12f71c1acc4e7be6c8c45bc6e). Read after
+--   the apply, md5(prosrc): public.ottoq_seed_vehicle_need_profiles 8070217c37d53779b63513df800d6ee4 (was
+--   272c63e65ab0f26d688192045fd5915d), public.ottoq_scenario_apply_fleet_overrides 9efc730e0b86e1b45e0894ac252bc56f (was
+--   2b8e59042b5b068e7ada0e1121b7e70a), public.ottoq_service_reason cb8fe891004a07b6fa03c6f1c73c2cc9 (was
+--   12af06afde239b2744b283770705135e); md5(pg_get_viewdef(..., true)) of public.ottoq_vehicle_needs_card
+--   d8ca456bc1e42feb6989ba3fde74c338 (was aee9c8180c6ac1666d21df5168706372).
 --
 -- ROLLBACK: EXECUTE each `definition` in ottoq_schema_snapshots WHERE label = '0847_pre'; DELETE FROM
 --   public.ottoq_cert_lineage WHERE name LIKE '0847_%'. Profiles drawn after this file keep their 'v2' draw until the next

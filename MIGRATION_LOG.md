@@ -937,7 +937,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0844](db/migrations/0844_a_car_the_needs_card_sends_to_a_bay_is_not_admitted_again_in_the_same_tick.sql) | `20261117235645` | yes — ledger | **A car the needs card has sent to a bay in this tick is not admitted again by service sequencing in the same |
 | [0845](db/migrations/0845_a_car_that_owes_its_tire_job_does_not_leave_before_the_robot_has_done_it.sql) | `20261118010216` | yes — ledger | **A car that owes the service bay's tire robot a job (a worn set, or a rotation that is due) does not leave the |
 | [0846](db/migrations/0846_a_service_bay_seat_says_why_the_car_is_there_and_its_booking_names_the_work.sql) | `20261118040158` | yes — ledger | **A car seated in a service bay says why it is there: the snapshot's seat carries the needs card's reason for |
-| [0847](db/migrations/0847_a_run_starts_with_service_bay_work_rare_and_the_needs_card_counts_a_cars_service_cycles_as_its_wear_does.sql) | `PENDING` | no — pending | **A run no longer starts with a fifth of the fleet owing the service bays. The needs profile draws open faults |
+| [0847](db/migrations/0847_a_run_starts_with_service_bay_work_rare_and_the_needs_card_counts_a_cars_service_cycles_as_its_wear_does.sql) | `20261118181246` | yes — ledger | **A run no longer starts with a fifth of the fleet owing the service bays. The needs profile draws open faults |
 
 655 migrations indexed.
 
