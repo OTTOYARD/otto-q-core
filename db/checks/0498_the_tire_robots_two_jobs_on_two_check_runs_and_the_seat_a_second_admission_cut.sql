@@ -51,6 +51,8 @@
 --       waiting for service; and with the bays busy the service flow's 0468 need gate and the deploy gate would have
 --       released it every tick. 0845 closes all three, and its probe reproduced each before and showed it closed after.
 --       The same shape holds for any must-do the card raises on a car with no visit; only the tire jobs are closed (G554).
+--       A demo run after the apply (e0c4962f, the same seed, 7:06 to 7:20 PM CT) let 65 cars leave by sim 14:59 against
+--       66 on eb4e90ca, seated both tire cars as before, and erred nowhere; no car took the new path on this seed.
 --   (c) The flat-tyre path (tow truck, a parking spot) is not modeled.
 --
 -- ══ THE QUERIES ══════════════════════════════════════════════════════════════════════════════════════════════════════

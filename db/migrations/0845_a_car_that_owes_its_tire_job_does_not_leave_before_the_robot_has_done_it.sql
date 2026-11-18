@@ -70,6 +70,12 @@
 --   public.ottoq_tire_job_owed 089ecf183b715f5a2977cfaa1f811152. Its grants are 0842's helpers' (postgres,
 --   service_role, authenticated), as are those of ottoq_owner_departure_blocked, which the departure test already called.
 --
+-- CHECKED ON ONE DEMO RUN (rule 12): e0c4962f, busy_day on the check runs' seed, started 01:06:21 UTC (7:06 PM CT), read
+--   to sim 15:48 and stopped through ottoq_sim_stop_and_reset at 01:20:03 UTC (7:20 PM CT). By sim 14:59, 65 cars had left
+--   against 66 on eb4e90ca by the same sim clock, in 86 ticks each, and no decision errored. AV-038's replacement seat at
+--   14:05:47 and AV-006's rotation seat at 15:08:11 (NASH-SVC-01, 720 s, credited at 15:20:11) ran as before, and no car
+--   was admitted twice. No car took the new path (no recheck remedy of need_service): this seed's worn car begins at 89%.
+--
 -- ROLLBACK: EXECUTE each `definition` in ottoq_schema_snapshots WHERE label = '0845_pre'; DROP FUNCTION
 --   public.ottoq_tire_job_owed(uuid, timestamptz); DELETE FROM public.ottoq_cert_lineage WHERE name LIKE '0845_%'.
 
