@@ -884,7 +884,8 @@ repo_manifest(version, name, file) AS (
     ('20261117233648'::text, '0842_the_service_bays_tire_robot_replaces_worn_tires_and_rotates_them_each_quarter'::text, '0842_the_service_bays_tire_robot_replaces_worn_tires_and_rotates_them_each_quarter.sql'::text),
     ('20261117235604'::text, '0843_a_bay_seat_in_the_twin_snapshot_names_the_work_it_is_doing'::text, '0843_a_bay_seat_in_the_twin_snapshot_names_the_work_it_is_doing.sql'::text),
     ('20261117235645'::text, '0844_a_car_the_needs_card_sends_to_a_bay_is_not_admitted_again_in_the_same_tick'::text, '0844_a_car_the_needs_card_sends_to_a_bay_is_not_admitted_again_in_the_same_tick.sql'::text),
-    ('20261118010216'::text, '0845_a_car_that_owes_its_tire_job_does_not_leave_before_the_robot_has_done_it'::text, '0845_a_car_that_owes_its_tire_job_does_not_leave_before_the_robot_has_done_it.sql'::text)
+    ('20261118010216'::text, '0845_a_car_that_owes_its_tire_job_does_not_leave_before_the_robot_has_done_it'::text, '0845_a_car_that_owes_its_tire_job_does_not_leave_before_the_robot_has_done_it.sql'::text),
+    ('20261118040158'::text, '0846_a_service_bay_seat_says_why_the_car_is_there_and_its_booking_names_the_work'::text, '0846_a_service_bay_seat_says_why_the_car_is_there_and_its_booking_names_the_work.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

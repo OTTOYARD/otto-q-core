@@ -490,6 +490,13 @@ When information is missing:
      own must-do rule), and the car is seated before it leaves. Neither check run reached that path: their worn car began
      at 89% and its charge held it. **The pattern is general and only the tire jobs are closed:** any must-do the card
      raises for a car with no visit is invisible to the departure test (G554).
+     **And a car in a service bay now says why (`0846`):** the snapshot's seat carries the needs card's reason for each
+     service of its work, and the needs card's booking names its need instead of `service_due`. Chase found both bays
+     "parked" on run `52dfc2d3` with no reason on the cars' cards; they held a fault repair and a calibration, technician
+     work, so the tire machine stayed home. **Writing it found the rule-15 defect underneath (G555, open, Chase's rates):**
+     that run began with 25 service-bay must-dos on 116 cars (12 fault repairs, 6 maintenance, 5 calibrations, 2
+     rotations), from the needs profile's starting draws (13% of cars with open faults, brake wear up to 85%) and the
+     card reading the calibration interval in calendar hours.
 
 ---
 
