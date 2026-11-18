@@ -467,6 +467,29 @@ When information is missing:
      Re-read one on a run after `0838` before quoting it.
    - **The general test, for any number the twin makes:** would a fleet manager believe a real depot did this in a
      day? If not, the number is the simulator's, and the cause comes before the analysis.
+   - **THE SERVICE BAYS' TIRE ROBOT HAS TWO JOBS, AND A FLAT IS NOT ONE OF THEM — Chase, 2026-11-17, evening CT:**
+     *"Let's not do a flat, because that would require rolling the vehicle in on its rim (not safe/advised). Flats will be
+     brought in via tow truck (OTTOW workflow) and then jacked up in place at a parking spot for it to receive a new tire.
+     The tire robot stall needs to be for worn out tires and rotations (scheduled quarterly, and only occurs a few times
+     per simulation run)."* Built by `0842`: `tire_replacement` (tread under 3.0 mm, the needs card's own 'due') and
+     `tire_rotation` (every 2,190 h) are service-bay services of their own, required on the visit, seated for the robot's
+     12 minutes when nothing else is owed there. A rotation due within 14 days rides along when the car is in the service
+     bay for other required work. **Before it, the needs card folded tyre wear into preventive maintenance**, so a worn car
+     was seated for a PM it did not need and the exit reset the PM clock and never the tread (two cars in Chase's run
+     89ac9e74). The flat-tyre path (tow truck, parking spot) is not modeled: nothing in OTTO-Q names a flat yet.
+     **The arithmetic, for this rule:** quarterly rotations at 116 cars average 1.27 a day, and the seeding draws a worn set
+     for about 1 car in 100, so about 2 to 3 tire visits a day, on top of the six this rule still reads above its bound.
+     Chase set their rate. **And `0844` closed what the first check run found** (`0dc17f83`): both of the decide tick's
+     doors to the service bay admitted the same car in one tick, and the second released the first one's booking to a
+     second, so a rotation was seated for one minute. A tire job is must-do on the card and required on the visit, so both
+     doors saw it; the second now passes over a car the first has already sent to a bay. `0843` puts the seat's work on
+     the twin's snapshot, so the yard plays the robot only for a tire job. **And `0845` closed a door that read only the
+     visit** (`db/checks/0498` §4(b)): a car on the depot when its run begins has no visit, so its tire job is on its needs
+     card alone, and `ottoq_departure_clear` cleared a charged car with a worn set. The departure test, the departure
+     recheck, the service flow's need gate and the decide tick now read one rule, `public.ottoq_tire_job_owed` (the card's
+     own must-do rule), and the car is seated before it leaves. Neither check run reached that path: their worn car began
+     at 89% and its charge held it. **The pattern is general and only the tire jobs are closed:** any must-do the card
+     raises for a car with no visit is invisible to the departure test (G554).
 
 ---
 
