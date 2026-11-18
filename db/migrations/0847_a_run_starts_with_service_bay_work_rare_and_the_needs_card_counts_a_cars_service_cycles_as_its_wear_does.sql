@@ -24,6 +24,11 @@
 --   started past either: 0 of 116, the largest ratios 0.989 and just under 1. The arrival observers
 --   (ottoq.ottoq_observe_asset, twin.ottoq_sim_observe_asset) and both recall functions already read the wear ledger
 --   first. Only the needs card, which seats a car that is on the depot with no visit, read the profile's second draw.
+--   The dry run of this file found one more thing (G557). The wear ledger's point in the maintenance cycle ignores the
+--   car's odometer: 17 of the 116 cars are young (config lifetime_miles 502 to 3,350), and each was put further into its
+--   cycle than it has ever driven. Zoox-AV-087 has 1,054 km on it and was put 9,413 km into a 9,434 km interval, so the
+--   arrival observers would call it due for maintenance after 21 km. The profile already capped km since maintenance at
+--   the odometer.
 --
 -- §1 WHAT THIS DOES.
 --   public.ottoq_seed_vehicle_need_profiles (profile_version 'v2'):
@@ -33,10 +38,14 @@
 --     - brake wear: drawn from 5% to 79.9%, under the 80% due line, unless the car's maintenance is due (its km since
 --       maintenance at or past its interval), when it is drawn from 5% to 85% as before.
 --     - km since maintenance: the run's wear ledger's, when it has a row for the car; otherwise the point in the cycle that
---       the scenario's overrides give the wear ledger (the same seed, salt and interval), which is never past the
---       interval. Before, it was up to 1.45 intervals, plus the wear ledger's own count when there was a row.
+--       the scenario's overrides give the wear ledger (the same seed, salt, interval and odometer cap), which is never past
+--       the interval or the car's odometer. Before, it was up to 1.45 intervals, plus the wear ledger's own count when
+--       there was a row.
 --     - the last calibration: the same point in the calibration cycle the wear ledger is given, in hours before the draw.
 --       Before, it was up to 1.5 intervals back.
+--   public.ottoq_scenario_apply_fleet_overrides (0715's wear phase): a car's point in its maintenance cycle is capped at
+--     its lifetime odometer (config lifetime_miles in km) when the car has one. A car with no lifetime_miles has an
+--     odometer of 20,000 km or more in the profile, above every interval (6,500 to 9,500 km), so it is never capped.
 --   public.ottoq_vehicle_needs_card: calib_ratio, pm_ratio and km_since_pm count as the wear ledger does when the card's
 --     run has a row for the car: driving hours since the last calibration, and km since the last maintenance, against
 --     the car's own intervals (its config first, as ottoq.ottoq_observe_asset reads them). With no row (production, or a
@@ -52,11 +61,15 @@
 --   the km and the DTCs, never the brakes), so a car seated for its brakes would still read due after the visit. After
 --   this file no car is drawn at the line (its km is never past its interval at a draw), and nothing raises brake wear
 --   during a run, so the path cannot be reached. What a visit does to brake wear is Chase's to set.
+--   Not changed, and recorded as G557: the same young cars are put up to a whole interval (180 to 320 driving hours) into
+--   their calibration cycle, more driving than a car with 800 km has done. Nothing records a car's lifetime driving
+--   hours to cap it with, and a calibration is must-do only at 1.45 intervals, which no car reaches from a draw under 1.
 --
 -- §2 PRECONDITIONS AND CHECKS. P0 no certification in flight and no run at the twin depot running, paused or pending.
---   P1 the seeder's and the reason's bodies (md5 of prosrc) and the card's definition (md5 of pg_get_viewdef). P2 once.
---   V1 each anchor matched as often as written; the seeder stored as patched and, with its patches reversed, its
---   snapshot; the card's columns (names and types) unchanged, and its definition reads the wear ledger.
+--   P1 the seeder's, the overrides' and the reason's bodies (md5 of prosrc) and the card's definition (md5 of
+--   pg_get_viewdef). P2 once.
+--   V1 each anchor matched as often as written; the seeder and the overrides stored as patched and, with their patches
+--   reversed, their snapshots; the card's columns (names and types) unchanged, and its definition reads the wear ledger.
 --   V2 a probe, rolled back, on the twin depot's newest run (none is live, P0), in three modes.
 --     card: the needs card as it stands.
 --     boot: what a run's start does, in its order (the boot draw seeds the profiles, then the scenario's overrides phase
@@ -95,6 +108,10 @@ BEGIN
      IS DISTINCT FROM '12af06afde239b2744b283770705135e' THEN
     RAISE EXCEPTION '0847 P1: public.ottoq_service_reason is not the body this file was written against';
   END IF;
+  IF (SELECT md5(p.prosrc) FROM pg_proc p WHERE p.oid = to_regprocedure('public.ottoq_scenario_apply_fleet_overrides(uuid)'))
+     IS DISTINCT FROM '2b8e59042b5b068e7ada0e1121b7e70a' THEN
+    RAISE EXCEPTION '0847 P1: public.ottoq_scenario_apply_fleet_overrides is not the body this file was written against';
+  END IF;
   IF md5(pg_get_viewdef('public.ottoq_vehicle_needs_card'::regclass, true)) IS DISTINCT FROM 'aee9c8180c6ac1666d21df5168706372' THEN
     RAISE EXCEPTION '0847 P1: public.ottoq_vehicle_needs_card is not the view this file was written against';
   END IF;
@@ -105,7 +122,8 @@ END $pre$;
 
 INSERT INTO public.ottoq_schema_snapshots (label, object_kind, schema_name, object_name, definition, def_md5)
 SELECT '0847_pre', 'function', 'public', f, pg_get_functiondef(to_regprocedure(f)), md5(pg_get_functiondef(to_regprocedure(f)))
-  FROM unnest(ARRAY['public.ottoq_seed_vehicle_need_profiles(uuid)', 'public.ottoq_service_reason(uuid,text,timestamptz)']) AS f
+  FROM unnest(ARRAY['public.ottoq_seed_vehicle_need_profiles(uuid)', 'public.ottoq_service_reason(uuid,text,timestamptz)',
+                    'public.ottoq_scenario_apply_fleet_overrides(uuid)']) AS f
 UNION ALL
 SELECT '0847_pre', 'view', 'public', 'public.ottoq_vehicle_needs_card',
        'CREATE OR REPLACE VIEW public.ottoq_vehicle_needs_card AS ' || pg_get_viewdef('public.ottoq_vehicle_needs_card'::regclass, true),
@@ -221,7 +239,7 @@ $n$round((ottoq_sim_seeded_random(v_seed, 'calphase:' || d.id::text) * d.cal_int
 ('public.ottoq_seed_vehicle_need_profiles(uuid)', 3, 1,
 $o$round((1.45 * d.r_pm * d.pm_int$o$,
 $n$round((CASE WHEN d.drive_km_total IS NOT NULL THEN d.drive_km_total - COALESCE(d.w_km_pm, 0)
-                    ELSE ottoq_sim_seeded_random(v_seed, 'pmphase:' || d.id::text) * d.pm_int END  -- 0847 (G555): the wear ledger's km since maintenance when the run has a row for the car, else where ottoq_scenario_apply_fleet_overrides starts the car in its cycle (the same draw), never past it$n$),
+                    ELSE LEAST(ottoq_sim_seeded_random(v_seed, 'pmphase:' || d.id::text) * d.pm_int, d.lifetime_mi * 1.60934) END  -- 0847 (G555, G557): the wear ledger's km since maintenance when the run has a row for the car, else where ottoq_scenario_apply_fleet_overrides starts the car in its cycle (the same draw and cap), never past it or the odometer$n$),
 ('public.ottoq_seed_vehicle_need_profiles(uuid)', 4, 1,
 $o$+ GREATEST(0, COALESCE(d.drive_km_total, 0) - COALESCE(d.w_km_pm, 0)))::numeric, 0) AS km_since_pm,$o$,
 $n$)::numeric, 0) AS km_since_pm,$n$),
@@ -245,6 +263,14 @@ $n$OR c.r_fault < 0.002 THEN 1$n$),
 ('public.ottoq_seed_vehicle_need_profiles(uuid)', 9, 1,
 $o$OR c.r_fault < 0.13 THEN$o$,
 $n$OR c.r_fault < 0.005 THEN$n$),
+-- the wear ledger's point in the maintenance cycle never passes the car's odometer (G557)
+('public.ottoq_scenario_apply_fleet_overrides(uuid)', 1, 1,
+$o$round(ottoq_sim_seeded_random(v_seed, 'pmphase:'$o$,
+$n$round(LEAST(ottoq_sim_seeded_random(v_seed, 'pmphase:'$n$),
+('public.ottoq_scenario_apply_fleet_overrides(uuid)', 2, 1,
+$o$* COALESCE((v.config->>'pm_interval_km')::numeric, 8000), 3),$o$,
+$n$* COALESCE((v.config->>'pm_interval_km')::numeric, 8000),
+                            NULLIF(v.config->>'lifetime_miles', '')::numeric * 1.60934), 3),  -- 0847 (G557): never further into the cycle than the car's odometer; LEAST skips a NULL$n$),
 -- the needs card counts the two cycles on the run's wear ledger when it has a row for the car
 ('public.ottoq_vehicle_needs_card', 1, 1,
 $o$COALESCE(r_1.sim_clock, now()) AS sim_clock$o$,
@@ -284,31 +310,33 @@ $n$CASE WHEN b.w_drive_km_total IS NOT NULL THEN b.w_drive_km_total - COALESCE(b
                  ELSE GREATEST(0::numeric, b.odometer_km - COALESCE(b.km_at_last_pm, 0::numeric))
             END AS km_since_pm$n$);
 
-DO $seed$
-DECLARE p record; v_def text; v_back text; n int;
+DO $fns$
+DECLARE f text; p record; v_def text; v_back text; n int;
 BEGIN
-  v_def := pg_get_functiondef('public.ottoq_seed_vehicle_need_profiles(uuid)'::regprocedure);
-  FOR p IN SELECT * FROM _0847_patch WHERE fn = 'public.ottoq_seed_vehicle_need_profiles(uuid)' ORDER BY ord LOOP
-    n := (length(v_def) - length(replace(v_def, p.c_old, ''))) / length(p.c_old);
-    IF n <> p.n_expected THEN
-      RAISE EXCEPTION '0847 V1: the seeder''s anchor % matches % times, not %', p.ord, n, p.n_expected;
+  FOREACH f IN ARRAY ARRAY['public.ottoq_seed_vehicle_need_profiles(uuid)', 'public.ottoq_scenario_apply_fleet_overrides(uuid)'] LOOP
+    v_def := pg_get_functiondef(to_regprocedure(f));
+    FOR p IN SELECT * FROM _0847_patch WHERE fn = f ORDER BY ord LOOP
+      n := (length(v_def) - length(replace(v_def, p.c_old, ''))) / length(p.c_old);
+      IF n <> p.n_expected THEN
+        RAISE EXCEPTION '0847 V1: anchor % of % matches % times, not %', p.ord, f, n, p.n_expected;
+      END IF;
+      v_def := replace(v_def, p.c_old, p.c_new);
+    END LOOP;
+    EXECUTE v_def;
+    IF pg_get_functiondef(to_regprocedure(f)) IS DISTINCT FROM v_def THEN
+      RAISE EXCEPTION '0847 V1: % is not stored as patched', f;
     END IF;
-    v_def := replace(v_def, p.c_old, p.c_new);
+    v_back := v_def;
+    FOR p IN SELECT * FROM _0847_patch WHERE fn = f ORDER BY ord DESC LOOP
+      v_back := replace(v_back, p.c_new, p.c_old);
+    END LOOP;
+    IF md5(v_back) IS DISTINCT FROM
+       (SELECT def_md5 FROM public.ottoq_schema_snapshots WHERE label = '0847_pre' AND object_name = f
+         ORDER BY snapshot_id DESC LIMIT 1) THEN
+      RAISE EXCEPTION '0847 V1: % with its patches reversed is not its snapshot', f;
+    END IF;
   END LOOP;
-  EXECUTE v_def;
-  IF pg_get_functiondef('public.ottoq_seed_vehicle_need_profiles(uuid)'::regprocedure) IS DISTINCT FROM v_def THEN
-    RAISE EXCEPTION '0847 V1: the seeder is not stored as patched';
-  END IF;
-  v_back := v_def;
-  FOR p IN SELECT * FROM _0847_patch WHERE fn = 'public.ottoq_seed_vehicle_need_profiles(uuid)' ORDER BY ord DESC LOOP
-    v_back := replace(v_back, p.c_new, p.c_old);
-  END LOOP;
-  IF md5(v_back) IS DISTINCT FROM
-     (SELECT def_md5 FROM public.ottoq_schema_snapshots WHERE label = '0847_pre'
-         AND object_name = 'public.ottoq_seed_vehicle_need_profiles(uuid)' ORDER BY snapshot_id DESC LIMIT 1) THEN
-    RAISE EXCEPTION '0847 V1: the seeder with its patches reversed is not its snapshot';
-  END IF;
-END $seed$;
+END $fns$;
 
 DO $card$
 DECLARE p record; v_def text; v_cols_before text; v_cols_after text; n int;
@@ -481,7 +509,8 @@ VALUES ('0847_a_run_starts_with_service_bay_work_rare_and_the_needs_card_counts_
         true, true,
         'G555: the needs profile draws open faults for about 0.5% of cars (was 13%), brake wear under the 80% due line '
         || 'unless maintenance is due, and each car''s place in its maintenance and calibration cycles where the run''s wear '
-        || 'ledger puts it (was up to 1.45 and 1.5 intervals); the needs card counts calibration in driving hours and '
+        || 'ledger puts it (was up to 1.45 and 1.5 intervals), with the wear ledger''s maintenance point capped at the '
+        || 'car''s odometer (G557); the needs card counts calibration in driving hours and '
         || 'maintenance in km on the wear ledger when it has a row for the car; ottoq_service_reason says so. Every run starts '
         || 'from a different world and the card''s must-dos change. Pre-image 0847_pre.', now());
 COMMIT;
