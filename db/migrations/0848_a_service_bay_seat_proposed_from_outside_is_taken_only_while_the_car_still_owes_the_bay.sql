@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261118184018
 -- migration-name:    0848_a_service_bay_seat_proposed_from_outside_is_taken_only_while_the_car_still_owes_the_bay
 --
 -- 0848  **A service-bay seat proposed from outside the decide tick is taken only while the car still owes the bay
@@ -46,6 +46,17 @@
 --
 -- §3 CLASSIFICATION. forces_recert TRUE: section (5) refuses admissions it used to take. forces_dial_restart FALSE, as
 --   for 0844 and 0845. Rule 12: nothing acts on either until testing resumes.
+--
+-- APPLIED 2026-11-18 at 18:40:18 UTC (12:40 PM CT), ledger 20261118184018, through apply_migration, on the first send.
+--   No run was live: the twin depot's newest run, 02fca960, had ended at 18:28:03 UTC. A dry run of the same statements,
+--   ending in a raise that rolled everything back, ran first on 02fca960's clock (sim 9:35 AM CT). Before the patches:
+--   car A, with no service-bay work, svc_step need_deploy and an outside admit_service, was sent to a service bay, and so
+--   was car B (need_service); car C, owing only an interior deep clean, was proposed with must_do true. After them: A was
+--   not sent and its decision was the heuristic's promote_ready; B was still sent; C was still proposed, with must_do
+--   false; the tick erred nowhere. The apply's own V2a and V2b passed. The ledger holds this whole file byte for byte as
+--   committed before this note (md5 8a5ba4495755ccbc6fe65fe5de85838c). Read after the apply, md5(prosrc):
+--   public.ottoq_decide_tick 66a66fa24c6a1abc01d10fe7a5e6d99f (was e1ef8490217afdb498af7b8d7b7b5859),
+--   public.ottoq_service_priority_propose 47beb6904c8b98b9eeb19ebbc744ea02 (was 63f81c41620680d60d1c052c1bdf2fd2).
 --
 -- ROLLBACK: EXECUTE each `definition` in ottoq_schema_snapshots WHERE label = '0848_pre'; DELETE FROM
 --   public.ottoq_cert_lineage WHERE name LIKE '0848_%'.
