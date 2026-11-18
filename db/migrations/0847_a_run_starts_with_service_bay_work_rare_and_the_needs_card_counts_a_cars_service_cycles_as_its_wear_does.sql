@@ -108,6 +108,20 @@
 --   12af06afde239b2744b283770705135e); md5(pg_get_viewdef(..., true)) of public.ottoq_vehicle_needs_card
 --   d8ca456bc1e42feb6989ba3fde74c338 (was aee9c8180c6ac1666d21df5168706372).
 --
+-- CHECKED ON ONE DEMO RUN (rule 12): 02fca960, busy_day on 52dfc2d3's seed (8350472578738339482), started 18:16:06 UTC
+--   (12:16 PM CT), live at 8x, read at sim 9:35 AM CT and stopped through ottoq_sim_stop_and_reset at 18:28:03 UTC (12:28
+--   PM CT), 131 ticks. At its start the needs card held 2 cars owing service-bay work, both tire rotations (Tesla-AV-064,
+--   Tesla-AV-057), against 23 at 52dfc2d3's start: no calibration, maintenance or fault repair, no car past either
+--   interval, no brakes at 80%, and 116 profiles drawn 'v2'. The decide tick erred nowhere (1,213 decisions enacted, 1,186
+--   found no candidate) and admitted no car twice. Six cars entered a service bay in the 95 sim-minutes:
+--   - the two rotations, seated by the needs card; a seat read why "92 days since its last rotation, due every 91 days";
+--   - Zoox-AV-077 for a fault repair drawn at its arrival (0838's 0.2%);
+--   - Zoox-AV-076 for a calibration its visit raised after a failed sensor clean (its wear ledger read 0.90 of its
+--     interval, so the interval did not raise it);
+--   - Zoox-002 and Waymo-AV-027, with no service-bay work at all, each seated for 45 minutes. A service-sequencing
+--     proposal was made while each car's interior deep clean was still running at its charger post, and section (5) of
+--     the decide tick took it 2 and 72 seconds after the clean had finished. That is G558, a defect of its own (0848).
+--
 -- ROLLBACK: EXECUTE each `definition` in ottoq_schema_snapshots WHERE label = '0847_pre'; DELETE FROM
 --   public.ottoq_cert_lineage WHERE name LIKE '0847_%'. Profiles drawn after this file keep their 'v2' draw until the next
 --   run re-seeds them.
