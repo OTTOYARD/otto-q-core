@@ -264,7 +264,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0846 — GENERATED, not a log
+## Index, 0134–0848 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0559, 0560, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0603, 0604, 0605, 0606, 0607, 0608, 0609, 0610, 0611, 0612, 0613, 0614, 0615, 0616, 0617, 0618, 0619, 0620, 0621, 0622, 0623, 0624, 0625, 0626, 0627, 0628, 0629, 0630, 0631, 0632, 0633, 0634, 0635, 0636, 0637, 0638, 0639, 0640, 0641, 0642, 0643, 0644, 0647, 0648, 0649, 0650, 0651, 0652, 0653, 0654, 0655, 0656, 0657, 0658, 0659, 0690, 0691, 0692, 0693, 0694, 0695, 0696, 0698, 0699, 0701, 0714, 0720, 0738, 0749, 0755, 0759, 0760, 0761, 0762, 0763, 0764, 0765, 0766, 0767, 0768, 0769, 0780, 0781, 0782, 0783, 0784, 0785, 0791, 0792, 0793, 0794, 0795, 0796, 0797, 0798, 0799, 0800, 0801, 0802, 0803, 0804, 0805, 0806, 0807, 0808, 0809, 0814, 0815 — which are indexed below as well as logged above; the log row is
@@ -937,7 +937,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0844](db/migrations/0844_a_car_the_needs_card_sends_to_a_bay_is_not_admitted_again_in_the_same_tick.sql) | `20261117235645` | yes — ledger | **A car the needs card has sent to a bay in this tick is not admitted again by service sequencing in the same |
 | [0845](db/migrations/0845_a_car_that_owes_its_tire_job_does_not_leave_before_the_robot_has_done_it.sql) | `20261118010216` | yes — ledger | **A car that owes the service bay's tire robot a job (a worn set, or a rotation that is due) does not leave the |
 | [0846](db/migrations/0846_a_service_bay_seat_says_why_the_car_is_there_and_its_booking_names_the_work.sql) | `20261118040158` | yes — ledger | **A car seated in a service bay says why it is there: the snapshot's seat carries the needs card's reason for |
+| [0847](db/migrations/0847_a_run_starts_with_service_bay_work_rare_and_the_needs_card_counts_a_cars_service_cycles_as_its_wear_does.sql) | `20261118181246` | yes — ledger | **A run no longer starts with a fifth of the fleet owing the service bays. The needs profile draws open faults |
+| [0848](db/migrations/0848_a_service_bay_seat_proposed_from_outside_is_taken_only_while_the_car_still_owes_the_bay.sql) | `20261118184018` | yes — ledger | **A service-bay seat proposed from outside the decide tick is taken only while the car still owes the bay |
 
-654 migrations indexed.
+656 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

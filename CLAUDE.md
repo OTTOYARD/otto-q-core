@@ -493,10 +493,25 @@ When information is missing:
      **And a car in a service bay now says why (`0846`):** the snapshot's seat carries the needs card's reason for each
      service of its work, and the needs card's booking names its need instead of `service_due`. Chase found both bays
      "parked" on run `52dfc2d3` with no reason on the cars' cards; they held a fault repair and a calibration, technician
-     work, so the tire machine stayed home. **Writing it found the rule-15 defect underneath (G555, open, Chase's rates):**
+     work, so the tire machine stayed home. **Writing it found the rule-15 defect underneath (G555):**
      that run began with 25 service-bay must-dos on 116 cars (12 fault repairs, 6 maintenance, 5 calibrations, 2
      rotations), from the needs profile's starting draws (13% of cars with open faults, brake wear up to 85%) and the
      card reading the calibration interval in calendar hours.
+     **G555 IS FIXED BY `0847` (Chase, 2026-11-18: "Sure, go fix those notes your proposed"):** a run's starting draws are
+     rare (open faults for about 0.5% of cars, brake wear under the 80% line unless maintenance is due), and the needs card
+     counts calibration in driving hours and maintenance in km on the run's wear ledger, as the arrival observers already
+     did, with no car put further into its maintenance cycle than its odometer. On `52dfc2d3`'s seed a run now starts with
+     2 cars owing service-bay work (the two tire jobs), against 23. **And a correction:** G555 credited the 6 maintenance
+     must-dos to brake wear; 4 came from the card's own second draw of km since maintenance. **Read every counter of an
+     interval before naming which one is wrong:** the card, the wear ledger and the arrival observers each counted a car's
+     cycles, and only the card disagreed. Open, Chase's: what a maintenance visit does to brake wear (G556), and a young
+     car's calibration count against its lifetime driving (G557).
+     **And the demo run that checked `0847` found two empty seats (G558, fixed by `0848`):** two cars whose only work, a
+     cabin clean, was done at their charger posts were seated in a service bay for 45 minutes each, because section (5)
+     took an outside `admit_service` as it stood and an outside proposal lives at least 35 real minutes (4.7 sim-hours at
+     8x). Section (5) now takes one only when its own heuristic would admit the car at that tick. On the same seed and
+     window the next run seated three cars, each owing its bay work, against six. **A full line hides its defects: when a
+     fix empties a line, read every car that still enters it.**
 
 ---
 
