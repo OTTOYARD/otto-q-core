@@ -62,6 +62,13 @@
 --   public.ottoq_service_reason 12af06afde239b2744b283770705135e, ottoq_service_reasons cfc242af19fe8d23835e29cb701b4cdc,
 --   ottoq_span_words 1ee5dc89860c8e9d0b0f5c1f3ff7db9c.
 --
+-- CHECKED ON ONE DEMO RUN (rule 12): 2b0c4017, busy_day on 52dfc2d3's seed (8350472578738339482), started 04:04:49 UTC
+--   (10:04 PM CT), read at sim 8:18 AM CT and stopped through ottoq_sim_stop_and_reset at 04:07:20 UTC. The same two cars
+--   were seated at 8:03 AM. Twin-sim-046's seat read why {fault_repair: "open faults P0AA6 and U0100, the worst at severity
+--   1, where 1 is the most severe"} and its booking need_atom fault_repair; twin-sim-019's seat read why
+--   {sensor_calibration: "11 days since its last calibration, due every 8 days"} and its booking need_atom
+--   sensor_calibration. Each car has its own interval.
+--
 -- ROLLBACK: EXECUTE each `definition` in ottoq_schema_snapshots WHERE label = '0846_pre'; DROP FUNCTION
 --   public.ottoq_service_reasons(uuid, text[], timestamptz), public.ottoq_service_reason(uuid, text, timestamptz),
 --   public.ottoq_span_words(numeric); DELETE FROM public.ottoq_cert_lineage WHERE name LIKE '0846_%'.
