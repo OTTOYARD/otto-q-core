@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261118040158
 -- migration-name:    0846_a_service_bay_seat_says_why_the_car_is_there_and_its_booking_names_the_work
 --
 -- 0846  **A car seated in a service bay says why it is there: the snapshot's seat carries the needs card's reason for
@@ -44,6 +44,23 @@
 -- §3 CLASSIFICATION. forces_recert FALSE: no decision changes. The booking's need_atom and why, and the snapshot, are
 --   recorded text; no atom digests a booking's why, and need_atom is read only to describe or to probe a rule.
 --   forces_dial_restart FALSE.
+--
+-- APPLIED 2026-11-18 at 04:01:58 UTC (10:01 PM CT on 2026-11-17), ledger 20261118040158, through apply_migration, on
+--   the first send. No run was live: Chase's run 52dfc2d3 had ended at 03:43:27 UTC. A dry run of the same statements,
+--   ending in a raise that rolled everything back, ran first, on 52dfc2d3's clock (sim 14:16:19). Before the patches no
+--   seat carried `why`, and car D's needs-card booking read need 'service_due' (inferred_from_purpose) with no need_atom.
+--   After them: A "open faults P0AA6 and U0100, the worst at severity 1, where 1 is the most severe"; B "11 days since its
+--   last calibration, due every 10 days"; C "92 days since its last rotation, due every 91 days"; D's booking need_atom
+--   fault_repair, reading need 'fault_repair' (needs card: open faults P0AA6 and U0100, ...); the tick erred nowhere.
+--   Every service-bay must-do on the depot's needs cards had a reason: 27 of 27 (12 fault repairs, 6 maintenance, 5
+--   calibrations and 2 rotations at 52dfc2d3's end, plus the probe's own two faults). The apply's own V2a and V2b passed.
+--   need_atom on a booking is read by ottoq_depot_cards, the booking writers, ottoq_probe_task_completion_at and the view
+--   ottoq_booking_why_v1, and by no decision (read 2026-11-18). The ledger holds this whole file byte for byte as
+--   committed before this note (md5 12ff71982dc121a4f116513c9ec945e7). Read after the apply, md5(prosrc):
+--   public.ottoq_twin_snapshot 1fb122c51b98d756fee5691092e8d8a4 (was 91068abd372bb7c7e397dadcae8c9cd5),
+--   public.ottoq_decide_tick e1ef8490217afdb498af7b8d7b7b5859 (was f031133a812fb6e5852bd971dd93e46f), and the new
+--   public.ottoq_service_reason 12af06afde239b2744b283770705135e, ottoq_service_reasons cfc242af19fe8d23835e29cb701b4cdc,
+--   ottoq_span_words 1ee5dc89860c8e9d0b0f5c1f3ff7db9c.
 --
 -- ROLLBACK: EXECUTE each `definition` in ottoq_schema_snapshots WHERE label = '0846_pre'; DROP FUNCTION
 --   public.ottoq_service_reasons(uuid, text[], timestamptz), public.ottoq_service_reason(uuid, text, timestamptz),
