@@ -6,7 +6,7 @@
 -- WHY. Chase, 2026-11-18 (evening CT): "Should new run start with vehicles in place and then 'go' after several ticks?
 -- Or take longer to plan upon start, but then renders with vehicles randomly throughout the yard at various stages,
 -- etc?" The recommendation (docs/RUN_START.md, PR 289): the second, each car where its state says it is, chargers and
--- bays part-way through their work. Chase, 2026-11-19 (about 12:20 AM CT): "Yes, I want the run start as recommended.
+-- bays part-way through their work. Chase, 2026-11-19: "Yes, I want the run start as recommended.
 -- Test first to make sure it functions correctly. And I don't mind if it takes longer to spin up the rendering when you
 -- start a run if it requires a bit more time to to get everything ordered from a simulation standpoint. Just make sure
 -- Otto-q begins solving and orchestrating immediately as soon as the world variables are selected and the twin
