@@ -888,7 +888,7 @@ repo_manifest(version, name, file) AS (
     ('20261118040158'::text, '0846_a_service_bay_seat_says_why_the_car_is_there_and_its_booking_names_the_work'::text, '0846_a_service_bay_seat_says_why_the_car_is_there_and_its_booking_names_the_work.sql'::text),
     ('20261118181246'::text, '0847_a_run_starts_with_service_bay_work_rare_and_the_needs_card_counts_a_cars_service_cycles_as_its_wear_does'::text, '0847_a_run_starts_with_service_bay_work_rare_and_the_needs_card_counts_a_cars_service_cycles_as_its_wear_does.sql'::text),
     ('20261118184018'::text, '0848_a_service_bay_seat_proposed_from_outside_is_taken_only_while_the_car_still_owes_the_bay'::text, '0848_a_service_bay_seat_proposed_from_outside_is_taken_only_while_the_car_still_owes_the_bay.sql'::text),
-    ('PENDING'::text, '0849_a_demo_run_opens_on_a_yard_already_at_work_and_otto_q_decides_before_the_first_frame'::text, '0849_a_demo_run_opens_on_a_yard_already_at_work_and_otto_q_decides_before_the_first_frame.sql'::text)
+    ('20261123030919'::text, '0849_a_demo_run_opens_on_a_yard_already_at_work_and_otto_q_decides_before_the_first_frame'::text, '0849_a_demo_run_opens_on_a_yard_already_at_work_and_otto_q_decides_before_the_first_frame.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

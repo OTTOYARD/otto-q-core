@@ -939,7 +939,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0846](db/migrations/0846_a_service_bay_seat_says_why_the_car_is_there_and_its_booking_names_the_work.sql) | `20261118040158` | yes — ledger | **A car seated in a service bay says why it is there: the snapshot's seat carries the needs card's reason for |
 | [0847](db/migrations/0847_a_run_starts_with_service_bay_work_rare_and_the_needs_card_counts_a_cars_service_cycles_as_its_wear_does.sql) | `20261118181246` | yes — ledger | **A run no longer starts with a fifth of the fleet owing the service bays. The needs profile draws open faults |
 | [0848](db/migrations/0848_a_service_bay_seat_proposed_from_outside_is_taken_only_while_the_car_still_owes_the_bay.sql) | `20261118184018` | yes — ledger | **A service-bay seat proposed from outside the decide tick is taken only while the car still owes the bay |
-| [0849](db/migrations/0849_a_demo_run_opens_on_a_yard_already_at_work_and_otto_q_decides_before_the_first_frame.sql) | `PENDING` | no — pending | **A demo run opens on a yard already at work, and OTTO-Q decides before the first frame.** |
+| [0849](db/migrations/0849_a_demo_run_opens_on_a_yard_already_at_work_and_otto_q_decides_before_the_first_frame.sql) | `20261123030919` | yes — ledger | **A demo run opens on a yard already at work, and OTTO-Q decides before the first frame.** |
 
 657 migrations indexed.
 

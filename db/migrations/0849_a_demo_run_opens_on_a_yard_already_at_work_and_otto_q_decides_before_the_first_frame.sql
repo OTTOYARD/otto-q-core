@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261123030919
 -- migration-name:    0849_a_demo_run_opens_on_a_yard_already_at_work_and_otto_q_decides_before_the_first_frame
 --
 -- 0849  **A demo run opens on a yard already at work, and OTTO-Q decides before the first frame.**
@@ -96,6 +96,16 @@
 --   ottoq_policy_params and ottoq_policy_param_catalog WHERE param_key IN ('boot_mid_shift', 'boot_head_start_cap_min',
 --   'metronome_idle_poll'); the two new functions may stay (nothing calls them once the start is restored); DELETE FROM
 --   public.ottoq_cert_lineage WHERE name LIKE '0849_%'.
+--
+-- APPLIED 2026-11-23 at 03:09:19 UTC (2026-11-22, 9:09 PM CT), ledger 20261123030919, through apply_migration, on its
+--   third send (the first two, on 2026-11-19, timed out waiting on the connector's prompt and applied nothing). Stored
+--   as written: md5(prosrc) twin.ottoq_sim_boot_head_start 77d1bb6de9d526a7a4e3d2136aeea749 and
+--   public.ottoq_boot_mid_shift bdecd259eac6bbe59db1fc6d355bf792, the same as this file's two bodies; after the patches,
+--   public.ottoq_sim_run_scenario 62dd166f49dabe1d2ec5894704884e61 and public.ottoq_demo_metronome
+--   cba902bb87e4208021a553e04da8e16b. V3 at apply (rolled back): start 13,308 ms of which the boot step 10,174 ms; 70
+--   cars on the site, 0 without a stall, 0 stalls without a live booking; 27 decisions at the start clock (26 enacted);
+--   18 charges, all opened before the start clock (head starts 1.0 to 28.2 min, mean 11.6), 1 faulted in its head start;
+--   0 cars in a bay, so the bay branch did not run in V3. Checked on one demo run after it: db/checks/0499.
 
 BEGIN;
 
